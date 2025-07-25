@@ -1,0 +1,26 @@
+[package]
+name = "pair"
+version.workspace = true
+license.workspace = true
+edition.workspace = true
+
+[dependencies]
+pair-app = { path = "app" }
+extended-vft = { git = "https://github.com/gear-foundation/standards/"}
+
+[build-dependencies]
+pair-app = { path = "app" }
+sails-rs = { workspace = true, features = ["wasm-builder"] }
+sails-idl-gen.workspace = true
+
+[dev-dependencies]
+pair = { path = ".", features = ["wasm-binary"] }
+pair-client = { path = "client" }
+sails-rs = { workspace = true, features = ["gtest"] }
+tokio = { workspace = true, features = ["rt", "macros"] }
+extended-vft-client = { git = "https://github.com/gear-foundation/standards/"}
+extended-vft = { git = "https://github.com/gear-foundation/standards/"}
+
+
+[features]
+wasm-binary = []
