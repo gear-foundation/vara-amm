@@ -1,7 +1,10 @@
-import { Navigation } from "@/components/navigation"
-import { ExplorePage } from "@/components/explore-page"
+"use client";
 
-export default function Explore() {
+import { Navigation } from "@/components/navigation";
+import { ExplorePage } from "@/components/explore-page";
+import { withProviders } from "../hocs";
+
+function Explore() {
   return (
     <div className="min-h-screen">
       <Navigation />
@@ -9,5 +12,7 @@ export default function Explore() {
         <ExplorePage />
       </main>
     </div>
-  )
+  );
 }
+
+export default withProviders(Explore);

@@ -1,0 +1,100 @@
+.list {
+  display: grid;
+  grid-gap: 15px;
+  width: 100%;
+
+  &--scroll {
+    padding-right: 20px;
+  }
+
+  .walletButton {
+    width: 100%;
+    padding-right: 20px;
+    padding-left: 24px;
+    justify-content: space-between;
+
+    .statusAccounts {
+      margin-top: 2px;
+      color: var(--primary);
+    }
+
+    .wallet {
+      display: flex;
+      align-items: center;
+      font-weight: 700;
+      font-size: 14px;
+      line-height: 120%;
+      letter-spacing: 0.02em;
+    }
+
+    .icon {
+      margin-right: 8px;
+      height: 26px;
+      width: 26px;
+      background-color: #fff;
+      border-radius: 50%;
+      border: 1px solid #ebeeee;
+    }
+  }
+}
+
+.status {
+  display: block;
+  text-align: right;
+
+  &Text {
+    display: block;
+    font-weight: 600;
+    font-size: 12px;
+    line-height: 12px;
+    color: #a2a2a2;
+  }
+
+  &Accounts {
+    display: block;
+    font-weight: 700;
+    font-size: 11px;
+    line-height: 10px;
+    letter-spacing: 0.02em;
+    color: var(--primary);
+    transition: color 250ms ease;
+  }
+}
+
+.account {
+  display: flex;
+  align-items: center;
+
+  &Button {
+    margin-right: 10px;
+    justify-content: center;
+    display: inline-grid;
+    grid-template-columns: auto auto;
+    width: 100%;
+    padding-right: 24px;
+    padding-left: 24px;
+    font-weight: 600;
+    font-size: 16px;
+
+    span {
+      display: block;
+      max-width: 22ch;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+  }
+
+  &Icon {
+    margin-right: 12px;
+    pointer-events: none;
+  }
+}
+
+.textButton {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 14px;
+  margin-right: 10px;
+}

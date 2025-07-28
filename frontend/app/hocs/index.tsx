@@ -22,7 +22,7 @@ function ApiProvider({ children }: ProviderProps) {
 
 function AccountProvider({ children }: ProviderProps) {
   return (
-    <GearAccountProvider appName="Vara ZK Poker">
+    <GearAccountProvider appName="Vara DEX">
       {children}
     </GearAccountProvider>
   );

@@ -1,7 +1,10 @@
-import { Navigation } from "@/components/navigation"
-import { TradePage } from "@/components/trade-page"
+"use client";
 
-export default function Home() {
+import { Navigation } from "@/components/navigation";
+import { TradePage } from "@/components/trade-page";
+import { withProviders } from "./hocs";
+
+function Home() {
   return (
     <div className="min-h-screen">
       <Navigation />
@@ -9,5 +12,7 @@ export default function Home() {
         <TradePage />
       </main>
     </div>
-  )
+  );
 }
+
+export default withProviders(Home);

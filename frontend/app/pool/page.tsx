@@ -1,7 +1,10 @@
+"use client";
+
 import { Navigation } from "@/components/navigation"
 import { PoolPage } from "@/components/pool-page"
+import { withProviders } from "../hocs";
 
-export default function Pool() {
+function Pool() {
   return (
     <div className="min-h-screen">
       <Navigation />
@@ -9,5 +12,7 @@ export default function Pool() {
         <PoolPage />
       </main>
     </div>
-  )
+  );
 }
+
+export default withProviders(Pool);
