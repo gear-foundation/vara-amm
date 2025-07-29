@@ -1,116 +1,118 @@
-"use client"
+'use client';
 
-import { useState } from "react"
-import { Search, Check } from "lucide-react"
-import { Input } from "@/components/ui/input"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { HexString } from '@gear-js/api';
+import { Search, Check } from 'lucide-react';
+import { useState } from 'react';
+
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 
 interface Token {
-  symbol: string
-  name: string
-  address: string
-  decimals: number
-  logoURI: string
-  balance?: string
+  symbol: string;
+  name: string;
+  address: HexString;
+  decimals: number;
+  logoURI: string;
+  balance?: string;
 }
 
 interface Network {
-  id: string
-  name: string
-  chainId: number
-  logoURI: string
-  tokens: Token[]
+  id: string;
+  name: string;
+  chainId: number;
+  logoURI: string;
+  tokens: Token[];
 }
 
 const networks: Network[] = [
   {
-    id: "vara",
-    name: "Vara Network",
+    id: 'vara',
+    name: 'Vara Network',
     chainId: 1,
-    logoURI: "/tokens/vara.png",
+    logoURI: '/tokens/vara.png',
     tokens: [
       {
-        symbol: "VARA",
-        name: "Vara Token",
-        address: "0x...",
+        symbol: 'VARA',
+        name: 'Vara Token',
+        address: '0x...',
         decimals: 18,
-        logoURI: "/tokens/vara.png",
-        balance: "1,234.56",
+        logoURI: '/tokens/vara.png',
+        balance: '1,234.56',
       },
       {
-        symbol: "WETH",
-        name: "Wrapped Ethereum",
-        address: "0x...",
+        symbol: 'WETH',
+        name: 'Wrapped Ethereum',
+        address: '0x...',
         decimals: 18,
-        logoURI: "/tokens/eth.png",
-        balance: "2.45",
+        logoURI: '/tokens/eth.png',
+        balance: '2.45',
       },
       {
-        symbol: "WUSDT",
-        name: "Wrapped USDT",
-        address: "0x...",
+        symbol: 'WUSDT',
+        name: 'Wrapped USDT',
+        address: '0x...',
         decimals: 6,
-        logoURI: "/tokens/usdt.png",
-        balance: "5,678.90",
+        logoURI: '/tokens/usdt.png',
+        balance: '5,678.90',
       },
       {
-        symbol: "WUSDC",
-        name: "Wrapped USDC",
-        address: "0x...",
+        symbol: 'WUSDC',
+        name: 'Wrapped USDC',
+        address: '0x...',
         decimals: 6,
-        logoURI: "/tokens/usdc.png",
-        balance: "3,456.78",
+        logoURI: '/tokens/usdc.png',
+        balance: '3,456.78',
       },
     ],
   },
   {
-    id: "ethereum",
-    name: "Ethereum",
+    id: 'ethereum',
+    name: 'Ethereum',
     chainId: 1,
-    logoURI: "/tokens/eth.png",
+    logoURI: '/tokens/eth.png',
     tokens: [
       {
-        symbol: "WVARA",
-        name: "Wrapped VARA",
-        address: "0x...",
+        symbol: 'WVARA',
+        name: 'Wrapped VARA',
+        address: '0x...',
         decimals: 18,
-        logoURI: "/tokens/vara.png",
-        balance: "0.00",
+        logoURI: '/tokens/vara.png',
+        balance: '0.00',
       },
       {
-        symbol: "ETH",
-        name: "Ethereum",
-        address: "0x...",
+        symbol: 'ETH',
+        name: 'Ethereum',
+        address: '0x...',
         decimals: 18,
-        logoURI: "/tokens/eth.png",
-        balance: "2.5",
+        logoURI: '/tokens/eth.png',
+        balance: '2.5',
       },
       {
-        symbol: "USDT",
-        name: "Tether USD",
-        address: "0x...",
+        symbol: 'USDT',
+        name: 'Tether USD',
+        address: '0x...',
         decimals: 6,
-        logoURI: "/tokens/usdt.png",
-        balance: "1,000.00",
+        logoURI: '/tokens/usdt.png',
+        balance: '1,000.00',
       },
       {
-        symbol: "USDC",
-        name: "USD Coin",
-        address: "0x...",
+        symbol: 'USDC',
+        name: 'USD Coin',
+        address: '0x...',
         decimals: 6,
-        logoURI: "/tokens/usdc.png",
-        balance: "500.00",
+        logoURI: '/tokens/usdc.png',
+        balance: '500.00',
       },
     ],
   },
-]
+];
 
 interface TokenSelectorProps {
-  isOpen: boolean
-  onClose: () => void
-  onSelectToken: (token: Token, network: Network) => void
-  selectedToken?: Token
-  title?: string
+  isOpen: boolean;
+  onClose: () => void;
+  onSelectToken: (token: Token, network: Network) => void;
+  selectedToken?: Token;
+  title?: string;
 }
 
 export function TokenSelector({
@@ -118,26 +120,26 @@ export function TokenSelector({
   onClose,
   onSelectToken,
   selectedToken,
-  title = "Select a token",
+  title = 'Select a token',
 }: TokenSelectorProps) {
-  const [selectedNetwork, setSelectedNetwork] = useState<Network>(networks[0])
-  const [searchQuery, setSearchQuery] = useState("")
+  const [selectedNetwork, setSelectedNetwork] = useState<Network>(networks[0]);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const filteredTokens = selectedNetwork.tokens.filter(
     (token) =>
       token.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       token.symbol.toLowerCase().includes(searchQuery.toLowerCase()),
-  )
+  );
 
   const handleTokenSelect = (token: Token) => {
-    onSelectToken(token, selectedNetwork)
-    onClose()
-    setSearchQuery("")
-  }
+    onSelectToken(token, selectedNetwork);
+    onClose();
+    setSearchQuery('');
+  };
 
   const handleNetworkSelect = (network: Network) => {
-    setSelectedNetwork(network)
-  }
+    setSelectedNetwork(network);
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -167,9 +169,8 @@ export function TokenSelector({
                   <button
                     key={token.symbol}
                     onClick={() => handleTokenSelect(token)}
-                    className="w-full flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-500/10 transition-colors text-left"
-                  >
-                    <img src={token.logoURI || "/placeholder.svg"} alt={token.name} className="w-8 h-8 rounded-full" />
+                    className="w-full flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-500/10 transition-colors text-left">
+                    <img src={token.logoURI || '/placeholder.svg'} alt={token.name} className="w-8 h-8 rounded-full" />
                     <div className="flex-1">
                       <div className="font-medium theme-text">{token.symbol}</div>
                       <div className="text-sm text-gray-400">{token.name}</div>
@@ -194,12 +195,11 @@ export function TokenSelector({
                       key={network.id}
                       onClick={() => handleNetworkSelect(network)}
                       className={`w-full flex items-center justify-between p-2 rounded-lg hover:bg-gray-500/10 transition-colors ${
-                        selectedNetwork.id === network.id ? "bg-[#00FF85]/10 border border-[#00FF85]/20" : ""
-                      }`}
-                    >
+                        selectedNetwork.id === network.id ? 'bg-[#00FF85]/10 border border-[#00FF85]/20' : ''
+                      }`}>
                       <div className="flex items-center space-x-2">
                         <img
-                          src={network.logoURI || "/placeholder.svg"}
+                          src={network.logoURI || '/placeholder.svg'}
                           alt={network.name}
                           className="w-6 h-6 rounded-full"
                         />
@@ -215,5 +215,5 @@ export function TokenSelector({
         </div>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

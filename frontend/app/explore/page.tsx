@@ -1,8 +1,9 @@
-"use client";
+'use client';
 
-import { Navigation } from "@/components/navigation";
-import { ExplorePage } from "@/components/explore-page";
-import { withProviders } from "../hocs";
+import { ExplorePage } from '@/components/explore-page';
+import { Navigation } from '@/components/navigation';
+
+import { withProviders } from '../hocs';
 
 function Explore() {
   return (

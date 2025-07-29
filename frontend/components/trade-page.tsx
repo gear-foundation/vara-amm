@@ -1,99 +1,101 @@
-"use client"
+'use client';
 
-import { useState } from "react"
-import { ArrowDownUp, Info, ChevronDown, ChevronUp } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { TokenSelector } from "./token-selector"
+import { ArrowDownUp, Info, ChevronDown, ChevronUp } from 'lucide-react';
+import { useState } from 'react';
+
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
+import { TokenSelector } from './token-selector';
 
 interface Token {
-  symbol: string
-  name: string
-  address: string
-  decimals: number
-  logoURI: string
-  balance?: string
-  network?: string
+  symbol: string;
+  name: string;
+  address: string;
+  decimals: number;
+  logoURI: string;
+  balance?: string;
+  network?: string;
 }
 
 interface Network {
-  id: string
-  name: string
-  chainId: number
-  logoURI: string
-  tokens: Token[]
+  id: string;
+  name: string;
+  chainId: number;
+  logoURI: string;
+  tokens: Token[];
 }
 
 export function TradePage() {
   const [fromToken, setFromToken] = useState<Token>({
-    symbol: "ETH",
-    name: "Ethereum",
-    address: "0x...",
+    symbol: 'ETH',
+    name: 'Ethereum',
+    address: '0x...',
     decimals: 18,
-    logoURI: "/tokens/eth.png",
-    balance: "2.5",
-    network: "Ethereum",
-  })
+    logoURI: '/tokens/eth.png',
+    balance: '2.5',
+    network: 'Ethereum',
+  });
   const [toToken, setToToken] = useState<Token>({
-    symbol: "VARA",
-    name: "Vara Token",
-    address: "0x...",
+    symbol: 'VARA',
+    name: 'Vara Token',
+    address: '0x...',
     decimals: 18,
-    logoURI: "/tokens/vara.png",
-    balance: "0.0",
-    network: "Vara Network",
-  })
-  const [fromAmount, setFromAmount] = useState("")
-  const [toAmount, setToAmount] = useState("")
-  const [showFromTokenSelector, setShowFromTokenSelector] = useState(false)
-  const [showToTokenSelector, setShowToTokenSelector] = useState(false)
-  const [showDetails, setShowDetails] = useState(false)
-  const [isWalletConnected, setIsWalletConnected] = useState(false)
+    logoURI: '/tokens/vara.png',
+    balance: '0.0',
+    network: 'Vara Network',
+  });
+  const [fromAmount, setFromAmount] = useState('');
+  const [toAmount, setToAmount] = useState('');
+  const [showFromTokenSelector, setShowFromTokenSelector] = useState(false);
+  const [showToTokenSelector, setShowToTokenSelector] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
+  const [isWalletConnected, setIsWalletConnected] = useState(false);
 
   const swapTokens = () => {
-    const tempToken = fromToken
-    const tempAmount = fromAmount
-    setFromToken(toToken)
-    setToToken(tempToken)
-    setFromAmount(toAmount)
-    setToAmount(tempAmount)
-  }
+    const tempToken = fromToken;
+    const tempAmount = fromAmount;
+    setFromToken(toToken);
+    setToToken(tempToken);
+    setFromAmount(toAmount);
+    setToAmount(tempAmount);
+  };
 
   const handleFromTokenSelect = (token: Token, network: Network) => {
-    setFromToken({ ...token, network: network.name })
-  }
+    setFromToken({ ...token, network: network.name });
+  };
 
   const handleToTokenSelect = (token: Token, network: Network) => {
-    setToToken({ ...token, network: network.name })
-  }
+    setToToken({ ...token, network: network.name });
+  };
 
   const connectWallet = () => {
-    setIsWalletConnected(true)
-  }
+    setIsWalletConnected(true);
+  };
 
   const handleSwap = () => {
     if (!isWalletConnected) {
-      connectWallet()
+      connectWallet();
     } else {
       // Handle swap logic here
-      console.log("Executing swap...")
+      console.log('Executing swap...');
     }
-  }
+  };
 
   const getSwapDirection = () => {
     if (fromToken.network === toToken.network) {
-      return `${fromToken.network}`
+      return `${fromToken.network}`;
     }
-    return `${fromToken.network} → ${toToken.network}`
-  }
+    return `${fromToken.network} → ${toToken.network}`;
+  };
 
   const calculateFeeInUSD = () => {
     // Mock calculation - in real app this would be based on actual amounts and prices
-    const mockFeeUSD = Number.parseFloat(fromAmount || "0") * 0.003 * 2500 // Assuming ETH price of $2500
-    return mockFeeUSD.toFixed(2)
-  }
+    const mockFeeUSD = Number.parseFloat(fromAmount || '0') * 0.003 * 2500; // Assuming ETH price of $2500
+    return mockFeeUSD.toFixed(2);
+  };
 
   return (
     <div className="max-w-md mx-auto">
@@ -101,20 +103,17 @@ export function TradePage() {
         <TabsList className="grid w-full grid-cols-3 card p-1">
           <TabsTrigger
             value="swap"
-            className="data-[state=active]:bg-[#00FF85] data-[state=active]:text-black font-bold uppercase"
-          >
+            className="data-[state=active]:bg-[#00FF85] data-[state=active]:text-black font-bold uppercase">
             SWAP
           </TabsTrigger>
           <TabsTrigger
             value="buy"
-            className="data-[state=active]:bg-[#00FF85] data-[state=active]:text-black font-bold uppercase"
-          >
+            className="data-[state=active]:bg-[#00FF85] data-[state=active]:text-black font-bold uppercase">
             BUY
           </TabsTrigger>
           <TabsTrigger
             value="sell"
-            className="data-[state=active]:bg-[#00FF85] data-[state=active]:text-black font-bold uppercase"
-          >
+            className="data-[state=active]:bg-[#00FF85] data-[state=active]:text-black font-bold uppercase">
             SELL
           </TabsTrigger>
         </TabsList>
@@ -140,10 +139,9 @@ export function TradePage() {
                   />
                   <Button
                     onClick={() => setShowFromTokenSelector(true)}
-                    className="btn-secondary flex items-center space-x-2 min-w-[120px]"
-                  >
+                    className="btn-secondary flex items-center space-x-2 min-w-[120px]">
                     <img
-                      src={fromToken.logoURI || "/placeholder.svg"}
+                      src={fromToken.logoURI || '/placeholder.svg'}
                       alt={fromToken.name}
                       className="w-5 h-5 rounded-full"
                     />
@@ -152,13 +150,12 @@ export function TradePage() {
                   </Button>
                 </div>
                 <div className="flex space-x-2">
-                  {["25%", "50%", "75%", "MAX"].map((percent) => (
+                  {['25%', '50%', '75%', 'MAX'].map((percent) => (
                     <Button
                       key={percent}
                       variant="ghost"
                       size="sm"
-                      className="text-xs bg-gray-500/20 hover:bg-gray-500/30 theme-text"
-                    >
+                      className="text-xs bg-gray-500/20 hover:bg-gray-500/30 theme-text">
                       {percent}
                     </Button>
                   ))}
@@ -171,8 +168,7 @@ export function TradePage() {
                   onClick={swapTokens}
                   variant="ghost"
                   size="icon"
-                  className="rounded-full bg-gray-500/20 border-2 border-gray-500/30 hover:border-[#00FF85] hover:bg-[#00FF85]/10 theme-text hover:text-[#00FF85] transition-all duration-200"
-                >
+                  className="rounded-full bg-gray-500/20 border-2 border-gray-500/30 hover:border-[#00FF85] hover:bg-[#00FF85]/10 theme-text hover:text-[#00FF85] transition-all duration-200">
                   <ArrowDownUp className="w-4 h-4" />
                 </Button>
               </div>
@@ -194,10 +190,9 @@ export function TradePage() {
                   />
                   <Button
                     onClick={() => setShowToTokenSelector(true)}
-                    className="btn-secondary flex items-center space-x-2 min-w-[120px]"
-                  >
+                    className="btn-secondary flex items-center space-x-2 min-w-[120px]">
                     <img
-                      src={toToken.logoURI || "/placeholder.svg"}
+                      src={toToken.logoURI || '/placeholder.svg'}
                       alt={toToken.name}
                       className="w-5 h-5 rounded-full"
                     />
@@ -211,8 +206,7 @@ export function TradePage() {
               <div className="bg-gray-500/10 border border-gray-500/20 rounded-lg">
                 <button
                   onClick={() => setShowDetails(!showDetails)}
-                  className="w-full flex items-center justify-between p-3 hover:bg-gray-500/5 transition-colors"
-                >
+                  className="w-full flex items-center justify-between p-3 hover:bg-gray-500/5 transition-colors">
                   <div className="flex items-center space-x-2">
                     <span className="text-sm theme-text">
                       1 {fromToken.symbol} = 1,250 {toToken.symbol}
@@ -245,7 +239,7 @@ export function TradePage() {
               </div>
 
               <Button onClick={handleSwap} className="btn-primary w-full py-4 text-lg">
-                {isWalletConnected ? "SWAP TOKENS" : "CONNECT WALLET"}
+                {isWalletConnected ? 'SWAP TOKENS' : 'CONNECT WALLET'}
               </Button>
             </CardContent>
           </Card>
@@ -476,5 +470,5 @@ export function TradePage() {
         title="Select token to swap to"
       />
     </div>
-  )
+  );
 }

@@ -1,8 +1,9 @@
-"use client";
+'use client';
 
-import { Navigation } from "@/components/navigation";
-import { TradePage } from "@/components/trade-page";
-import { withProviders } from "./hocs";
+import { Navigation } from '@/components/navigation';
+import { TradePage } from '@/components/trade-page';
+
+import { withProviders } from './hocs';
 
 function Home() {
   return (

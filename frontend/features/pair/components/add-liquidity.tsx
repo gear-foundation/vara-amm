@@ -1,0 +1,253 @@
+'use client';
+
+import { HexString } from '@gear-js/api';
+import { useAccount } from '@gear-js/react-hooks';
+import { Plus, ChevronDown, Info } from 'lucide-react';
+import { useState } from 'react';
+
+import { TokenSelector } from '@/components/token-selector';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { useAddLiquidityMessage, useGetReservesQuery, useVftApproveMessage } from '@/lib/sails';
+
+interface Token {
+  symbol: string;
+  name: string;
+  address: HexString;
+  decimals: number;
+  logoURI: string;
+  balance?: string;
+}
+
+interface Network {
+  id: string;
+  name: string;
+  chainId: number;
+  logoURI: string;
+  tokens: Token[];
+}
+
+const AddLiquidity = () => {
+  const [token0, setToken0] = useState<Token>({
+    symbol: 'ETH',
+    name: 'Ethereum',
+    address: '0x...',
+    decimals: 18,
+    logoURI: '/tokens/eth.png',
+    balance: '2.5',
+  });
+  const [token1, setToken1] = useState<Token>({
+    symbol: 'VARA',
+    name: 'Vara Token',
+    address: '0x...',
+    decimals: 18,
+    logoURI: '/tokens/vara.png',
+    balance: '0.0',
+  });
+
+  const [amount0, setAmount0] = useState('');
+  const [amount1, setAmount1] = useState('');
+  const [showToken0Selector, setShowToken0Selector] = useState(false);
+  const [showToken1Selector, setShowToken1Selector] = useState(false);
+
+  const handleToken0Select = (token: Token, network: Network) => {
+    setToken0(token);
+  };
+
+  const handleToken1Select = (token: Token, network: Network) => {
+    setToken1(token);
+  };
+
+  const pairAddress = '0x123';
+
+  const { reserves } = useGetReservesQuery(pairAddress);
+
+  const { approveMessage, isPending: isApprovePending } = useVftApproveMessage(pairAddress);
+  const { addLiquidityMessage, isPending } = useAddLiquidityMessage(pairAddress);
+  const { account } = useAccount();
+
+  const addLiquidity = async () => {
+    if (!amount0 || !amount1) {
+      console.error('Please enter amounts for both tokens');
+      return;
+    }
+
+    if (!account?.decodedAddress) {
+      console.error('Wallet not connected');
+      return;
+    }
+
+    const amountANum = parseFloat(amount0);
+    const amountBNum = parseFloat(amount1);
+
+    if (isNaN(amountANum) || amountANum <= 0) {
+      console.error('Invalid amount for first token');
+      return;
+    }
+
+    if (isNaN(amountBNum) || amountBNum <= 0) {
+      console.error('Invalid amount for second token');
+      return;
+    }
+
+    // Проверка баланса (базовая проверка)
+    const token0Balance = parseFloat(token0.balance || '0');
+    const token1Balance = parseFloat(token1.balance || '0');
+
+    if (amountANum > token0Balance) {
+      console.error(`Insufficient ${token0.symbol} balance. Available: ${token0Balance}`);
+      return;
+    }
+
+    if (amountBNum > token1Balance) {
+      console.error(`Insufficient ${token1.symbol} balance. Available: ${token1Balance}`);
+      return;
+    }
+
+    const amountADesired = amount0;
+    const amountBDesired = amount1;
+
+    // Устанавливаем минимальные суммы с учетом slippage tolerance (1%)
+    // В реальном приложении это должно быть настраиваемо пользователем
+    const slippageTolerance = 0.01; // 1%
+    const amountAMin = (amountANum * (1 - slippageTolerance)).toString();
+    const amountBMin = (amountBNum * (1 - slippageTolerance)).toString();
+
+    // Устанавливаем deadline на 20 минут от текущего времени
+    const deadline = Math.floor(Date.now() / 1000) + 1200; // 20 минут в секундах
+
+    console.log('Adding liquidity with params:', {
+      tokenA: `${token0.symbol} (${token0.address})`,
+      tokenB: `${token1.symbol} (${token1.address})`,
+      amountADesired,
+      amountBDesired,
+      amountAMin,
+      amountBMin,
+      deadline: deadline.toString(),
+      recipient: account.decodedAddress,
+    });
+
+    // approve pair contract to spend token0 and token1
+    const approveToken0 = await approveMessage({
+      value: amount0,
+      spender: pairAddress,
+    });
+
+    addLiquidityMessage({
+      amountADesired,
+      amountBDesired,
+      amountAMin,
+      amountBMin,
+      deadline: deadline.toString(),
+    });
+  };
+
+  return (
+    <>
+      <Card className="card max-w-md mx-auto">
+        <CardHeader>
+          <CardTitle className="text-lg font-bold uppercase theme-text">ADD LIQUIDITY</CardTitle>
+          <div className="text-sm text-gray-400">Fixed fee tier: 0.3%</div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Token 0 */}
+          <div className="space-y-2">
+            <div className="flex justify-between text-sm text-gray-400">
+              <span>TOKEN 1</span>
+              <span>
+                Balance: {token0.balance} {token0.symbol}
+              </span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Input
+                value={amount0}
+                onChange={(e) => setAmount0(e.target.value)}
+                placeholder="0.0"
+                className="input-field flex-1 text-xl"
+              />
+              <Button
+                onClick={() => setShowToken0Selector(true)}
+                className="btn-secondary flex items-center space-x-2 min-w-[120px]">
+                <img src={token0.logoURI || '/placeholder.svg'} alt={token0.name} className="w-5 h-5 rounded-full" />
+                <span>{token0.symbol}</span>
+                <ChevronDown className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex justify-center">
+            <Plus className="w-6 h-6 text-gray-400" />
+          </div>
+
+          {/* Token 1 */}
+          <div className="space-y-2">
+            <div className="flex justify-between text-sm text-gray-400">
+              <span>TOKEN 2</span>
+              <span>
+                Balance: {token1.balance} {token1.symbol}
+              </span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Input
+                value={amount1}
+                onChange={(e) => setAmount1(e.target.value)}
+                placeholder="0.0"
+                className="input-field flex-1 text-xl"
+              />
+              <Button
+                onClick={() => setShowToken1Selector(true)}
+                className="btn-secondary flex items-center space-x-2 min-w-[120px]">
+                <img src={token1.logoURI || '/placeholder.svg'} alt={token1.name} className="w-5 h-5 rounded-full" />
+                <span>{token1.symbol}</span>
+                <ChevronDown className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+
+          {/* Pool Info */}
+          <div className="bg-gray-500/10 border border-gray-500/20 rounded-lg p-4 space-y-3">
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-400">Pool Share</span>
+              <span className="theme-text">0.12%</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-400">Fee Tier</span>
+              <span className="theme-text">0.3%</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-400">LP Tokens</span>
+              <div className="flex items-center space-x-1">
+                <span className="theme-text">1,234.56</span>
+                <Info className="w-3 h-3 text-gray-400" />
+              </div>
+            </div>
+          </div>
+
+          <Button onClick={addLiquidity} disabled={isPending} className="btn-primary w-full py-4 text-lg">
+            ADD LIQUIDITY
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Token Selectors */}
+      <TokenSelector
+        isOpen={showToken0Selector}
+        onClose={() => setShowToken0Selector(false)}
+        onSelectToken={handleToken0Select}
+        selectedToken={token0}
+        title="Select first token"
+      />
+
+      <TokenSelector
+        isOpen={showToken1Selector}
+        onClose={() => setShowToken1Selector(false)}
+        onSelectToken={handleToken1Select}
+        selectedToken={token1}
+        title="Select second token"
+      />
+    </>
+  );
+};
+
+export { AddLiquidity };

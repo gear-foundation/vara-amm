@@ -1,8 +1,9 @@
-"use client";
+'use client';
 
-import { Navigation } from "@/components/navigation"
-import { PoolPage } from "@/components/pool-page"
-import { withProviders } from "../hocs";
+import { Navigation } from '@/components/navigation';
+import { PoolPage } from '@/components/pool-page';
+
+import { withProviders } from '../hocs';
 
 function Pool() {
   return (

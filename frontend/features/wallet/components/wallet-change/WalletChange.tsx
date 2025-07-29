@@ -1,14 +1,14 @@
-"use client";
+'use client';
 
-import { useAccount } from "@gear-js/react-hooks";
-import Identicon from "@polkadot/react-identicon";
-import { Suspense } from "react";
+import { useAccount } from '@gear-js/react-hooks';
+import Identicon from '@polkadot/react-identicon';
+import { Suspense } from 'react';
 
-import { Button } from "@/components/ui/button";
+import { Button } from '@/components/ui/button';
 
-import { useWallet } from "../../hooks";
+import { useWallet } from '../../hooks';
 
-import styles from "./WalletChange.module.scss";
+import styles from './WalletChange.module.scss';
 
 type Props = {
   onClose(): void;
@@ -29,12 +29,7 @@ export function WalletChange({ onClose, openConnectWallet }: Props) {
         <li key={address}>
           <div className={styles.account}>
             <Suspense>
-              <Identicon
-                value={address}
-                size={34}
-                theme="polkadot"
-                className={styles.accountIcon}
-              />
+              <Identicon value={address} size={34} theme="polkadot" className={styles.accountIcon} />
             </Suspense>
             <span className="font-semibold">{meta.name}</span>
           </div>

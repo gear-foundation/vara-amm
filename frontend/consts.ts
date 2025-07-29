@@ -1,4 +1,4 @@
-import { HexString } from "@gear-js/api";
+import { HexString } from '@gear-js/api';
 
 export const ENV = {
   NODE_ADDRESS: process.env.NEXT_PUBLIC_NODE_ADDRESS as string,
@@ -7,8 +7,8 @@ export const ENV = {
 };
 
 export const ROUTES = {
-  HOME: "/",
-  TRADE: "/trade",
-  EXPLORE: "/explore",
-  POOL: "/pool",
+  HOME: '/',
+  TRADE: '/trade',
+  EXPLORE: '/explore',
+  POOL: '/pool',
 };

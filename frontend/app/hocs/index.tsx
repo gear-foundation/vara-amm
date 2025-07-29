@@ -3,29 +3,22 @@ import {
   // AlertProvider as GearAlertProvider,
   AccountProvider as GearAccountProvider,
   ProviderProps,
-} from "@gear-js/react-hooks";
-import { ComponentType } from "react";
+} from '@gear-js/react-hooks';
+import { ComponentType } from 'react';
 
-import { QueryProvider } from "./query-provider";
-import { ENV } from "../../consts";
+import { ENV } from '../../consts';
+
+import { QueryProvider } from './query-provider';
 
 // import { ENV } from "@/app/consts";
 // import { Alert, alertStyles } from "@/components/ui/alert";
 
 function ApiProvider({ children }: ProviderProps) {
-  return (
-    <GearApiProvider initialArgs={{ endpoint: ENV.NODE_ADDRESS }}>
-      {children}
-    </GearApiProvider>
-  );
+  return <GearApiProvider initialArgs={{ endpoint: ENV.NODE_ADDRESS }}>{children}</GearApiProvider>;
 }
 
 function AccountProvider({ children }: ProviderProps) {
-  return (
-    <GearAccountProvider appName="Vara DEX">
-      {children}
-    </GearAccountProvider>
-  );
+  return <GearAccountProvider appName="Vara DEX">{children}</GearAccountProvider>;
 }
 
 // function AlertProvider({ children }: ProviderProps) {
@@ -39,11 +32,7 @@ function AccountProvider({ children }: ProviderProps) {
 const providers = [ApiProvider, QueryProvider, AccountProvider];
 
 function withProviders(Component: ComponentType) {
-  return () =>
-    providers.reduceRight(
-      (children, Provider) => <Provider>{children}</Provider>,
-      <Component />
-    );
+  return () => providers.reduceRight((children, Provider) => <Provider>{children}</Provider>, <Component />);
 }
 
 export { withProviders };

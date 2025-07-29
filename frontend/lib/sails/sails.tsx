@@ -1,8 +1,10 @@
-import { useProgram as useGearJsProgram } from "@gear-js/react-hooks";
+import { HexString } from '@gear-js/api';
+import { useProgram as useGearJsProgram } from '@gear-js/react-hooks';
 
-import { Program as FactoryProgram } from "./factory";
-import { Program as PairProgram } from "./pair";
-import { ENV } from "@/consts";
+import { ENV } from '@/consts';
+
+import { Program as FactoryProgram } from './factory';
+import { Program as PairProgram } from './pair';
 
 const useFactoryProgram = () => {
   const { data: program } = useGearJsProgram({
@@ -13,10 +15,10 @@ const useFactoryProgram = () => {
   return program;
 };
 
-const usePairProgram = () => {
+const usePairProgram = (pairAddress: HexString) => {
   const { data: program } = useGearJsProgram({
     library: PairProgram,
-    id: ENV.PAIR_PROGRAM_ID,
+    id: pairAddress,
   });
 
   return program;
