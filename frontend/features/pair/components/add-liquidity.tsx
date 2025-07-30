@@ -9,6 +9,7 @@ import { TokenSelector } from '@/components/token-selector';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { SECONDS_IN_MINUTE } from '@/consts';
 import { useAddLiquidityMessage, useGetReservesQuery, useVftApproveMessage, useVftTotalSupplyQuery } from '@/lib/sails';
 
 interface Token {
@@ -27,8 +28,6 @@ interface Network {
   logoURI: string;
   tokens: Token[];
 }
-
-const SECONDS_IN_MINUTE = 60;
 
 const AddLiquidity = () => {
   const [token0, setToken0] = useState<Token>({

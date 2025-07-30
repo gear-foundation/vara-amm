@@ -12,3 +12,5 @@ export const ROUTES = {
   EXPLORE: '/explore',
   POOL: '/pool',
 };
+
+export const SECONDS_IN_MINUTE = 60;

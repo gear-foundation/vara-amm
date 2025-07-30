@@ -1,16 +1,18 @@
 import { HexString } from '@gear-js/api';
-import { useProgramQuery } from '@gear-js/react-hooks';
+import { useAccount, useProgramQuery } from '@gear-js/react-hooks';
 
 import { usePairProgram } from '@/lib/sails/sails';
 
-export const useCalculateLpUserFeeQuery = (pairAddress: HexString, account: HexString) => {
+export const useCalculateLpUserFeeQuery = (pairAddress: HexString) => {
+  const { account } = useAccount();
   const program = usePairProgram(pairAddress);
 
   const { data, refetch, isFetching, error } = useProgramQuery({
     program,
     serviceName: 'pair',
     functionName: 'calculateLpUserFee',
-    args: [account],
+    args: [account?.decodedAddress || '0x'],
+    query: { enabled: !!account?.decodedAddress },
   });
 
   return { lpUserFee: data, isFetching, refetch, error };

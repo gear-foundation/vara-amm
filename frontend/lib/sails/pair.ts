@@ -22,11 +22,7 @@ export class Program {
     private _programId?: `0x${string}`,
   ) {
     const types: Record<string, any> = {
-      Config: {
-        gas_for_token_ops: 'u64',
-        gas_for_reply_deposit: 'u64',
-        reply_timeout: 'u32',
-      },
+      Config: { gas_for_token_ops: 'u64', gas_for_reply_deposit: 'u64', reply_timeout: 'u32' },
     };
 
     this.registry = new TypeRegistry();
@@ -264,7 +260,7 @@ export class Pair {
     originAddress?: string,
     value?: number | string | bigint,
     atBlock?: `0x${string}`,
-  ): Promise<null> {
+  ): Promise<{ amount_a: number | string | bigint; amount_b: number | string | bigint }> {
     const payload = this._program.registry
       .createType('(String, String, U256)', ['Pair', 'CalculateRemoveLiquidity', liquidity])
       .toHex();
@@ -277,8 +273,8 @@ export class Pair {
       at: atBlock,
     });
     throwOnErrorReply(reply.code, reply.payload.toU8a(), this._program.api.specVersion, this._program.registry);
-    const result = this._program.registry.createType('(String, String, Null)', reply.payload);
-    return result[2].toJSON() as unknown as null;
+    const result = this._program.registry.createType('(String, String, [object Object])', reply.payload);
+    return result[2].toJSON() as unknown as { amount_a: number | string | bigint; amount_b: number | string | bigint };
   }
 
   /**
@@ -676,10 +672,7 @@ export class Vft {
         callback(
           this._program.registry
             .createType('(String, String, {"to":"[u8;32]","value":"U256"})', message.payload)[2]
-            .toJSON() as unknown as {
-            to: ActorId;
-            value: number | string | bigint;
-          },
+            .toJSON() as unknown as { to: ActorId; value: number | string | bigint },
         );
       }
     });
@@ -698,10 +691,7 @@ export class Vft {
         callback(
           this._program.registry
             .createType('(String, String, {"from":"[u8;32]","value":"U256"})', message.payload)[2]
-            .toJSON() as unknown as {
-            from: ActorId;
-            value: number | string | bigint;
-          },
+            .toJSON() as unknown as { from: ActorId; value: number | string | bigint },
         );
       }
     });
@@ -720,11 +710,7 @@ export class Vft {
         callback(
           this._program.registry
             .createType('(String, String, {"owner":"[u8;32]","spender":"[u8;32]","value":"U256"})', message.payload)[2]
-            .toJSON() as unknown as {
-            owner: ActorId;
-            spender: ActorId;
-            value: number | string | bigint;
-          },
+            .toJSON() as unknown as { owner: ActorId; spender: ActorId; value: number | string | bigint },
         );
       }
     });
@@ -743,11 +729,7 @@ export class Vft {
         callback(
           this._program.registry
             .createType('(String, String, {"from":"[u8;32]","to":"[u8;32]","value":"U256"})', message.payload)[2]
-            .toJSON() as unknown as {
-            from: ActorId;
-            to: ActorId;
-            value: number | string | bigint;
-          },
+            .toJSON() as unknown as { from: ActorId; to: ActorId; value: number | string | bigint },
         );
       }
     });

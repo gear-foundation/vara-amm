@@ -1,16 +1,18 @@
 import { HexString } from '@gear-js/api';
-import { useProgramQuery } from '@gear-js/react-hooks';
+import { useAccount, useProgramQuery } from '@gear-js/react-hooks';
 
 import { usePairProgram } from '@/lib/sails/sails';
 
-export const useVftBalanceOfQuery = (pairAddress: HexString, account: HexString) => {
+export const useVftBalanceOfQuery = (pairAddress: HexString) => {
   const program = usePairProgram(pairAddress);
+  const { account } = useAccount();
 
   const { data, refetch, isFetching, error } = useProgramQuery({
     program,
     serviceName: 'vft',
     functionName: 'balanceOf',
-    args: [account],
+    args: [account?.decodedAddress || '0x'],
+    query: { enabled: !!account?.decodedAddress },
   });
 
   return { balance: data, isFetching, refetch, error };

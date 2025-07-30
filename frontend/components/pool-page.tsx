@@ -1,11 +1,12 @@
 'use client';
 
+import { HexString } from '@gear-js/api';
 import { Plus } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { AddLiquidity } from '@/features/pair';
+import { AddLiquidity, RemoveLiquidity } from '@/features/pair';
 
 // TODO: remove duplicate interfaces
 interface Token {
@@ -33,6 +34,7 @@ const userPositions = [
     liquidity: '$2,450.67',
     rewards: '12.34 VARA',
     share: '0.12%',
+    pairAddress: '0x123' as HexString,
   },
   {
     pool: 'VARA/USDC',
@@ -41,6 +43,7 @@ const userPositions = [
     liquidity: '$1,234.89',
     rewards: '5.67 VARA',
     share: '0.08%',
+    pairAddress: '0x123' as HexString,
   },
 ];
 
@@ -83,7 +86,7 @@ export function PoolPage() {
                       <CardTitle className="mono theme-text">{position.pool}</CardTitle>
                     </div>
                     <div className="flex space-x-2">
-                      <Button className="btn-secondary">REMOVE</Button>
+                      <RemoveLiquidity pairAddress={position.pairAddress} />
                       <Button className="btn-primary">ADD MORE</Button>
                     </div>
                   </CardHeader>

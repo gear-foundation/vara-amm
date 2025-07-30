@@ -1,1 +1,1 @@
-export { AddLiquidity } from './components';
+export { AddLiquidity, RemoveLiquidity } from './components';

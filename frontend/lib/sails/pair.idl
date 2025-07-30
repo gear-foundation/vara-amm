@@ -74,7 +74,7 @@ service Pair {
   /// It accounts for protocol fees (by simulating mint_fee dilution), calculates pro-rata shares
   /// based on reserves (assuming they include swap fees), and sorts amounts by token_a/token_b.
   /// Does not modify state or perform any transactions.
-  query CalculateRemoveLiquidity : (liquidity: u256) -> null;
+  query CalculateRemoveLiquidity : (liquidity: u256) -> struct { amount_a: u256, amount_b: u256 };
   /// Calculates the required input amount of an asset given a desired output amount and pair reserves.
   /// This accounts for a 0.3% fee (997/1000 multiplier).
   /// Formula: amount_in = (reserve_in * amount_out * 1000) / (reserve_out - amount_out) * 997) + 1
