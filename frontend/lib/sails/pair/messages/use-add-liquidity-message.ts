@@ -6,10 +6,10 @@ import { usePairProgram } from '@/lib/sails/sails';
 import { getErrorMessage } from '@/lib/utils';
 
 type Params = {
-  amountADesired: string;
-  amountBDesired: string;
-  amountAMin: string;
-  amountBMin: string;
+  amountADesired: bigint;
+  amountBDesired: bigint;
+  amountAMin: bigint;
+  amountBMin: bigint;
   deadline: string;
 };
 

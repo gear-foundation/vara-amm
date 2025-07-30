@@ -6,7 +6,7 @@ import { Suspense, useEffect } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader } from '@/components/ui/dialog';
-import { cn, copyToClipboard } from '@/lib/utils';
+import { copyToClipboard } from '@/lib/utils';
 
 import { CopyIcon } from '../../assets';
 import { WALLETS } from '../../consts';

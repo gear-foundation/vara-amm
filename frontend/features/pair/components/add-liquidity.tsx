@@ -9,7 +9,7 @@ import { TokenSelector } from '@/components/token-selector';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { useAddLiquidityMessage, useGetReservesQuery, useVftApproveMessage } from '@/lib/sails';
+import { useAddLiquidityMessage, useGetReservesQuery, useVftApproveMessage, useVftTotalSupplyQuery } from '@/lib/sails';
 
 interface Token {
   symbol: string;
@@ -27,6 +27,8 @@ interface Network {
   logoURI: string;
   tokens: Token[];
 }
+
+const SECONDS_IN_MINUTE = 60;
 
 const AddLiquidity = () => {
   const [token0, setToken0] = useState<Token>({
@@ -50,31 +52,41 @@ const AddLiquidity = () => {
   const [amount1, setAmount1] = useState('');
   const [showToken0Selector, setShowToken0Selector] = useState(false);
   const [showToken1Selector, setShowToken1Selector] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleToken0Select = (token: Token, network: Network) => {
+    setError(null);
     setToken0(token);
   };
 
   const handleToken1Select = (token: Token, network: Network) => {
+    setError(null);
     setToken1(token);
   };
 
   const pairAddress = '0x123';
 
-  const { reserves } = useGetReservesQuery(pairAddress);
+  const { reserves: _reserves, isFetching: isReservesFetching } = useGetReservesQuery(pairAddress);
+  const reservesExample = [10 * 10 ** 18, 3 * 10 ** 10];
+
+  const { totalSupply, isFetching: isTotalSupplyFetching } = useVftTotalSupplyQuery(pairAddress);
+
+  const isPoolEmpty = _reserves?.[0] === 0 && _reserves?.[1] === 0 && totalSupply === 0n;
 
   const { approveMessage, isPending: isApprovePending } = useVftApproveMessage(pairAddress);
-  const { addLiquidityMessage, isPending } = useAddLiquidityMessage(pairAddress);
+  const { addLiquidityMessage, isPending: isAddLiquidityPending } = useAddLiquidityMessage(pairAddress);
+  const isPending = isApprovePending || isAddLiquidityPending || isTotalSupplyFetching || isReservesFetching;
   const { account } = useAccount();
 
   const addLiquidity = async () => {
+    setError(null);
     if (!amount0 || !amount1) {
-      console.error('Please enter amounts for both tokens');
+      setError('Please enter amounts for both tokens');
       return;
     }
 
     if (!account?.decodedAddress) {
-      console.error('Wallet not connected');
+      setError('Wallet not connected');
       return;
     }
 
@@ -82,40 +94,36 @@ const AddLiquidity = () => {
     const amountBNum = parseFloat(amount1);
 
     if (isNaN(amountANum) || amountANum <= 0) {
-      console.error('Invalid amount for first token');
+      setError('Invalid amount for first token');
       return;
     }
 
     if (isNaN(amountBNum) || amountBNum <= 0) {
-      console.error('Invalid amount for second token');
+      setError('Invalid amount for second token');
       return;
     }
 
-    // Проверка баланса (базовая проверка)
     const token0Balance = parseFloat(token0.balance || '0');
     const token1Balance = parseFloat(token1.balance || '0');
 
     if (amountANum > token0Balance) {
-      console.error(`Insufficient ${token0.symbol} balance. Available: ${token0Balance}`);
+      setError(`Insufficient ${token0.symbol} balance. Available: ${token0Balance}`);
       return;
     }
 
     if (amountBNum > token1Balance) {
-      console.error(`Insufficient ${token1.symbol} balance. Available: ${token1Balance}`);
+      setError(`Insufficient ${token1.symbol} balance. Available: ${token1Balance}`);
       return;
     }
 
-    const amountADesired = amount0;
-    const amountBDesired = amount1;
+    const amountADesired = amountANum * 10 ** token0.decimals;
+    const amountBDesired = amountBNum * 10 ** token1.decimals;
 
-    // Устанавливаем минимальные суммы с учетом slippage tolerance (1%)
-    // В реальном приложении это должно быть настраиваемо пользователем
-    const slippageTolerance = 0.01; // 1%
-    const amountAMin = (amountANum * (1 - slippageTolerance)).toString();
-    const amountBMin = (amountBNum * (1 - slippageTolerance)).toString();
+    const slippageTolerance = 0.05; // 5%
+    const amountAMin = Math.floor(amountANum * (1 - slippageTolerance));
+    const amountBMin = Math.floor(amountBNum * (1 - slippageTolerance));
 
-    // Устанавливаем deadline на 20 минут от текущего времени
-    const deadline = Math.floor(Date.now() / 1000) + 1200; // 20 минут в секундах
+    const deadline = Math.floor(Date.now() / 1000) + 20 * SECONDS_IN_MINUTE;
 
     console.log('Adding liquidity with params:', {
       tokenA: `${token0.symbol} (${token0.address})`,
@@ -129,16 +137,22 @@ const AddLiquidity = () => {
     });
 
     // approve pair contract to spend token0 and token1
-    const approveToken0 = await approveMessage({
+    // TODO: get approve amount from token0 and token1 balances
+    await approveMessage({
       value: amount0,
       spender: pairAddress,
     });
 
-    addLiquidityMessage({
-      amountADesired,
-      amountBDesired,
-      amountAMin,
-      amountBMin,
+    await approveMessage({
+      value: amount1,
+      spender: pairAddress,
+    });
+
+    void addLiquidityMessage({
+      amountADesired: BigInt(amountADesired),
+      amountBDesired: BigInt(amountBDesired),
+      amountAMin: BigInt(amountAMin),
+      amountBMin: BigInt(amountBMin),
       deadline: deadline.toString(),
     });
   };
@@ -150,7 +164,7 @@ const AddLiquidity = () => {
           <CardTitle className="text-lg font-bold uppercase theme-text">ADD LIQUIDITY</CardTitle>
           <div className="text-sm text-gray-400">Fixed fee tier: 0.3%</div>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-4">
           {/* Token 0 */}
           <div className="space-y-2">
             <div className="flex justify-between text-sm text-gray-400">
@@ -162,7 +176,19 @@ const AddLiquidity = () => {
             <div className="flex items-center space-x-2">
               <Input
                 value={amount0}
-                onChange={(e) => setAmount0(e.target.value)}
+                type="number"
+                inputMode="decimal"
+                min={0}
+                max={token0.balance}
+                onChange={(e) => {
+                  setError(null);
+                  setAmount0(e.target.value);
+                  const amount = parseFloat(e.target.value) * 10 ** token0.decimals;
+                  if (!isPoolEmpty) {
+                    const newAmount1 = (amount * (reservesExample[1] / reservesExample[0])) / 10 ** token1.decimals;
+                    setAmount1(newAmount1 ? newAmount1.toString() : '');
+                  }
+                }}
                 placeholder="0.0"
                 className="input-field flex-1 text-xl"
               />
@@ -191,7 +217,19 @@ const AddLiquidity = () => {
             <div className="flex items-center space-x-2">
               <Input
                 value={amount1}
-                onChange={(e) => setAmount1(e.target.value)}
+                type="number"
+                inputMode="decimal"
+                min={0}
+                max={token1.balance}
+                onChange={(e) => {
+                  setError(null);
+                  setAmount1(e.target.value);
+                  const amount = parseFloat(e.target.value) * 10 ** token1.decimals;
+                  if (!isPoolEmpty) {
+                    const newAmount0 = (amount * (reservesExample[0] / reservesExample[1])) / 10 ** token0.decimals;
+                    setAmount0(newAmount0 ? newAmount0.toString() : '');
+                  }
+                }}
                 placeholder="0.0"
                 className="input-field flex-1 text-xl"
               />
@@ -227,6 +265,8 @@ const AddLiquidity = () => {
           <Button onClick={addLiquidity} disabled={isPending} className="btn-primary w-full py-4 text-lg">
             ADD LIQUIDITY
           </Button>
+
+          {error && <div className="text-red-500">{error}</div>}
         </CardContent>
       </Card>
 

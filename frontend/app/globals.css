@@ -4,8 +4,8 @@
 
 @layer base {
   :root {
-    --font-roboto: "Roboto", sans-serif;
-    --font-roboto-mono: "Roboto Mono", monospace;
+    --font-roboto: 'Roboto', sans-serif;
+    --font-roboto-mono: 'Roboto Mono', monospace;
   }
 
   * {
@@ -33,7 +33,8 @@
 
   .light body {
     background: #ffffff;
-    background-image: radial-gradient(circle at 25% 25%, rgba(0, 255, 133, 0.05) 0%, transparent 50%),
+    background-image:
+      radial-gradient(circle at 25% 25%, rgba(0, 255, 133, 0.05) 0%, transparent 50%),
       radial-gradient(circle at 75% 75%, rgba(0, 255, 133, 0.02) 0%, transparent 50%);
     color: #000000;
   }
@@ -59,7 +60,8 @@
 
   .dark body {
     background: #0e0e0e;
-    background-image: radial-gradient(circle at 25% 25%, rgba(0, 255, 133, 0.1) 0%, transparent 50%),
+    background-image:
+      radial-gradient(circle at 25% 25%, rgba(0, 255, 133, 0.1) 0%, transparent 50%),
       radial-gradient(circle at 75% 75%, rgba(0, 255, 133, 0.05) 0%, transparent 50%);
     color: #ffffff;
   }
@@ -129,6 +131,16 @@
     border-color: #00ff85 !important;
     outline: none;
     box-shadow: 0 10px 15px -3px rgba(0, 255, 133, 0.2);
+  }
+
+  input[type='number']::-webkit-inner-spin-button,
+  input[type='number']::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  input[type='number'] {
+    -moz-appearance: textfield;
   }
 
   .card {

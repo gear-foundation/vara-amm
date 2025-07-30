@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AddLiquidity } from '@/features/pair';
 
+// TODO: remove duplicate interfaces
 interface Token {
   symbol: string;
   name: string;

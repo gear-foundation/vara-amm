@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { GearApi, HexString, decodeAddress } from '@gear-js/api';
 import { TypeRegistry } from '@polkadot/types';
 import {
