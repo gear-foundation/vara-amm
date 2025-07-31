@@ -12,4 +12,17 @@ export const ROUTES = {
   POOL: '/pool',
 };
 
+export const LOGO_URI_BY_SYMBOL: Record<string, string> = {
+  // Vara Network
+  VARA: '/tokens/vara.png',
+  WETH: '/tokens/eth.png',
+  WUSDT: '/tokens/usdt.png',
+  WUSDC: '/tokens/usdc.png',
+  // Ethereum
+  WVARA: '/tokens/vara.png',
+  ETH: '/tokens/eth.png',
+  USDT: '/tokens/usdt.png',
+  USDC: '/tokens/usdc.png',
+};
+
 export const SECONDS_IN_MINUTE = 60;

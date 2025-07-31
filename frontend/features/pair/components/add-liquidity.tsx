@@ -1,6 +1,5 @@
 'use client';
 
-import { HexString } from '@gear-js/api';
 import { useAccount } from '@gear-js/react-hooks';
 import { Plus, ChevronDown, Info } from 'lucide-react';
 import { useState } from 'react';
@@ -12,25 +11,16 @@ import { Input } from '@/components/ui/input';
 import { SECONDS_IN_MINUTE } from '@/consts';
 import { useAddLiquidityMessage, useGetReservesQuery, useVftApproveMessage, useVftTotalSupplyQuery } from '@/lib/sails';
 
-import { Token, Network } from '../types';
+import { Token, Network, PairsTokens } from '../types';
+import { getFormattedBalance, getNetworks } from '../utils';
 
-const AddLiquidity = () => {
-  const [token0, setToken0] = useState<Token>({
-    symbol: 'ETH',
-    name: 'Ethereum',
-    address: '0x...',
-    decimals: 18,
-    logoURI: '/tokens/eth.png',
-    balance: '2.5',
-  });
-  const [token1, setToken1] = useState<Token>({
-    symbol: 'VARA',
-    name: 'Vara Token',
-    address: '0x...',
-    decimals: 18,
-    logoURI: '/tokens/vara.png',
-    balance: '0.0',
-  });
+type AddLiquidityProps = {
+  pairsTokens: PairsTokens;
+};
+
+const AddLiquidity = ({ pairsTokens }: AddLiquidityProps) => {
+  const [token0, setToken0] = useState<Token>(pairsTokens[0].token0);
+  const [token1, setToken1] = useState<Token>(pairsTokens[0].token1);
 
   const [amount0, setAmount0] = useState('');
   const [amount1, setAmount1] = useState('');
@@ -48,9 +38,11 @@ const AddLiquidity = () => {
     setToken1(token);
   };
 
-  const pairAddress = '0x123';
+  // TODO: get pair address from pairsTokens
+  const pairAddress = pairsTokens[0].pairAddress;
 
   const { reserves: _reserves, isFetching: isReservesFetching } = useGetReservesQuery(pairAddress);
+  console.log('🚀 ~ AddLiquidity ~ _reserves:', _reserves && BigInt(_reserves?.[0]));
   const reservesExample = [10 * 10 ** 18, 3 * 10 ** 10];
 
   const { totalSupply, isFetching: isTotalSupplyFetching } = useVftTotalSupplyQuery(pairAddress);
@@ -66,6 +58,11 @@ const AddLiquidity = () => {
     setError(null);
     if (!amount0 || !amount1) {
       setError('Please enter amounts for both tokens');
+      return;
+    }
+
+    if (token0.balance === undefined || token1.balance === undefined) {
+      setError('Please select tokens');
       return;
     }
 
@@ -87,8 +84,8 @@ const AddLiquidity = () => {
       return;
     }
 
-    const token0Balance = parseFloat(token0.balance || '0');
-    const token1Balance = parseFloat(token1.balance || '0');
+    const token0Balance = token0.balance;
+    const token1Balance = token1.balance;
 
     if (amountANum > token0Balance) {
       setError(`Insufficient ${token0.symbol} balance. Available: ${token0Balance}`);
@@ -141,6 +138,8 @@ const AddLiquidity = () => {
     });
   };
 
+  const networks = getNetworks(pairsTokens);
+
   return (
     <>
       <Card className="card max-w-md mx-auto">
@@ -154,7 +153,7 @@ const AddLiquidity = () => {
             <div className="flex justify-between text-sm text-gray-400">
               <span>TOKEN 1</span>
               <span>
-                Balance: {token0.balance} {token0.symbol}
+                Balance: {token0.balance ? getFormattedBalance(token0.balance, token0.decimals, token0.symbol) : '0'}
               </span>
             </div>
             <div className="flex items-center space-x-2">
@@ -163,7 +162,7 @@ const AddLiquidity = () => {
                 type="number"
                 inputMode="decimal"
                 min={0}
-                max={token0.balance}
+                max={token0.balance ? getFormattedBalance(token0.balance, token0.decimals) : undefined}
                 onChange={(e) => {
                   setError(null);
                   setAmount0(e.target.value);
@@ -195,7 +194,7 @@ const AddLiquidity = () => {
             <div className="flex justify-between text-sm text-gray-400">
               <span>TOKEN 2</span>
               <span>
-                Balance: {token1.balance} {token1.symbol}
+                Balance: {token1.balance ? getFormattedBalance(token1.balance, token1.decimals, token1.symbol) : '0'}
               </span>
             </div>
             <div className="flex items-center space-x-2">
@@ -204,7 +203,7 @@ const AddLiquidity = () => {
                 type="number"
                 inputMode="decimal"
                 min={0}
-                max={token1.balance}
+                max={token1.balance ? getFormattedBalance(token1.balance, token1.decimals) : undefined}
                 onChange={(e) => {
                   setError(null);
                   setAmount1(e.target.value);
@@ -261,6 +260,7 @@ const AddLiquidity = () => {
         onSelectToken={handleToken0Select}
         selectedToken={token0}
         title="Select first token"
+        networks={networks}
       />
 
       <TokenSelector
@@ -269,6 +269,7 @@ const AddLiquidity = () => {
         onSelectToken={handleToken1Select}
         selectedToken={token1}
         title="Select second token"
+        networks={networks}
       />
     </>
   );

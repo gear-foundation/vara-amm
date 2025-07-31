@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AddLiquidity, RemoveLiquidity } from '@/features/pair';
+import { PairsTokens } from '@/features/pair/types';
 
 const userPositions = [
   {
@@ -29,7 +30,11 @@ const userPositions = [
   },
 ];
 
-export function PoolPage() {
+type PoolPageProps = {
+  pairsTokens: PairsTokens;
+};
+
+export function PoolPage({ pairsTokens }: PoolPageProps) {
   return (
     <div className="max-w-4xl mx-auto">
       <Tabs defaultValue="positions" className="w-full">
@@ -105,7 +110,7 @@ export function PoolPage() {
         </TabsContent>
 
         <TabsContent value="new">
-          <AddLiquidity />
+          <AddLiquidity pairsTokens={pairsTokens} />
         </TabsContent>
       </Tabs>
     </div>

@@ -6,89 +6,7 @@ import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Network, Token } from '@/features/pair/types';
-
-const networks: Network[] = [
-  {
-    id: 'vara',
-    name: 'Vara Network',
-    chainId: 1,
-    logoURI: '/tokens/vara.png',
-    tokens: [
-      {
-        symbol: 'VARA',
-        name: 'Vara Token',
-        address: '0x...',
-        decimals: 18,
-        logoURI: '/tokens/vara.png',
-        balance: '1,234.56',
-      },
-      {
-        symbol: 'WETH',
-        name: 'Wrapped Ethereum',
-        address: '0x...',
-        decimals: 18,
-        logoURI: '/tokens/eth.png',
-        balance: '2.45',
-      },
-      {
-        symbol: 'WUSDT',
-        name: 'Wrapped USDT',
-        address: '0x...',
-        decimals: 6,
-        logoURI: '/tokens/usdt.png',
-        balance: '5,678.90',
-      },
-      {
-        symbol: 'WUSDC',
-        name: 'Wrapped USDC',
-        address: '0x...',
-        decimals: 6,
-        logoURI: '/tokens/usdc.png',
-        balance: '3,456.78',
-      },
-    ],
-  },
-  {
-    id: 'ethereum',
-    name: 'Ethereum',
-    chainId: 1,
-    logoURI: '/tokens/eth.png',
-    tokens: [
-      {
-        symbol: 'WVARA',
-        name: 'Wrapped VARA',
-        address: '0x...',
-        decimals: 18,
-        logoURI: '/tokens/vara.png',
-        balance: '0.00',
-      },
-      {
-        symbol: 'ETH',
-        name: 'Ethereum',
-        address: '0x...',
-        decimals: 18,
-        logoURI: '/tokens/eth.png',
-        balance: '2.5',
-      },
-      {
-        symbol: 'USDT',
-        name: 'Tether USD',
-        address: '0x...',
-        decimals: 6,
-        logoURI: '/tokens/usdt.png',
-        balance: '1,000.00',
-      },
-      {
-        symbol: 'USDC',
-        name: 'USD Coin',
-        address: '0x...',
-        decimals: 6,
-        logoURI: '/tokens/usdc.png',
-        balance: '500.00',
-      },
-    ],
-  },
-];
+import { getFormattedBalance } from '@/features/pair/utils';
 
 interface TokenSelectorProps {
   isOpen: boolean;
@@ -96,6 +14,7 @@ interface TokenSelectorProps {
   onSelectToken: (token: Token, network: Network) => void;
   selectedToken?: Token;
   title?: string;
+  networks: Network[];
 }
 
 export function TokenSelector({
@@ -104,6 +23,7 @@ export function TokenSelector({
   onSelectToken,
   selectedToken,
   title = 'Select a token',
+  networks,
 }: TokenSelectorProps) {
   const [selectedNetwork, setSelectedNetwork] = useState<Network>(networks[0]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -159,7 +79,9 @@ export function TokenSelector({
                       <div className="text-sm text-gray-400">{token.name}</div>
                     </div>
                     <div className="text-right">
-                      <div className="text-sm theme-text mono">{token.balance}</div>
+                      <div className="text-sm theme-text mono">
+                        {token.balance ? getFormattedBalance(token.balance, token.decimals) : '0'}
+                      </div>
                     </div>
                   </button>
                 ))}

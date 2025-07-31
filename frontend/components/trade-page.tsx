@@ -1,5 +1,6 @@
 'use client';
 
+import { useAccount } from '@gear-js/react-hooks';
 import { ArrowDownUp, Info, ChevronDown, ChevronUp } from 'lucide-react';
 import { useState } from 'react';
 
@@ -7,33 +8,23 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Token, Network } from '@/features/pair/types';
+import { Token, Network, PairsTokens } from '@/features/pair/types';
+import { getFormattedBalance, getNetworks } from '@/features/pair/utils';
+import { WalletConnect } from '@/features/wallet';
 
 import { TokenSelector } from './token-selector';
 import { TradePageBuy } from './trade-page-buy';
 import { TradePageSell } from './trade-page-sell';
-import { WalletConnect } from '@/features/wallet';
-import { useAccount } from '@gear-js/react-hooks';
 
-export function TradePage() {
-  const [fromToken, setFromToken] = useState<Token>({
-    symbol: 'ETH',
-    name: 'Ethereum',
-    address: '0x...',
-    decimals: 18,
-    logoURI: '/tokens/eth.png',
-    balance: '2.5',
-    network: 'Ethereum',
-  });
-  const [toToken, setToToken] = useState<Token>({
-    symbol: 'VARA',
-    name: 'Vara Token',
-    address: '0x...',
-    decimals: 18,
-    logoURI: '/tokens/vara.png',
-    balance: '0.0',
-    network: 'Vara Network',
-  });
+type TradePageProps = {
+  pairsTokens: PairsTokens;
+};
+
+export function TradePage({ pairsTokens }: TradePageProps) {
+  const [{ token0, token1 }] = pairsTokens;
+
+  const [fromToken, setFromToken] = useState<Token>(token0);
+  const [toToken, setToToken] = useState<Token>(token1);
   const [fromAmount, setFromAmount] = useState('');
   const [toAmount, setToAmount] = useState('');
   const [showFromTokenSelector, setShowFromTokenSelector] = useState(false);
@@ -85,6 +76,8 @@ export function TradePage() {
     return mockFeeUSD.toFixed(2);
   };
 
+  const networks = getNetworks(pairsTokens);
+
   return (
     <div className="max-w-md mx-auto">
       <Tabs defaultValue="swap" className="w-full">
@@ -115,7 +108,10 @@ export function TradePage() {
                 <div className="flex justify-between text-sm text-gray-400">
                   <span>FROM</span>
                   <span>
-                    Balance: {fromToken.balance} {fromToken.symbol}
+                    Balance:{' '}
+                    {fromToken.balance
+                      ? getFormattedBalance(fromToken.balance, fromToken.decimals, fromToken.symbol)
+                      : '0'}
                   </span>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -166,7 +162,8 @@ export function TradePage() {
                 <div className="flex justify-between text-sm text-gray-400">
                   <span>TO</span>
                   <span>
-                    Balance: {toToken.balance} {toToken.symbol}
+                    Balance:{' '}
+                    {toToken.balance ? getFormattedBalance(toToken.balance, toToken.decimals, toToken.symbol) : '0'}
                   </span>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -248,6 +245,7 @@ export function TradePage() {
         onSelectToken={handleFromTokenSelect}
         selectedToken={fromToken}
         title="Select token to swap from"
+        networks={networks}
       />
 
       <TokenSelector
@@ -256,6 +254,7 @@ export function TradePage() {
         onSelectToken={handleToTokenSelect}
         selectedToken={toToken}
         title="Select token to swap to"
+        networks={networks}
       />
 
       <WalletConnect isOpen={isOpenConnectWallet} onClose={closeConnectWallet} />

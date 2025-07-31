@@ -6,7 +6,7 @@ interface Token {
   address: HexString;
   decimals: number;
   logoURI: string;
-  balance?: string;
+  balance?: bigint;
   network?: string;
 }
 
@@ -18,4 +18,6 @@ interface Network {
   tokens: Token[];
 }
 
-export type { Token, Network };
+type PairsTokens = { token0: Token; token1: Token; pairAddress: HexString }[];
+
+export type { Token, Network, PairsTokens };
