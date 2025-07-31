@@ -71,6 +71,7 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           file: frontend/Dockerfile
+          context: frontend
           push: true
           tags: ${{ needs.prepair.outputs.image_name }}
           build-args: |
