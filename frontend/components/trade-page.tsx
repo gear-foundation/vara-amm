@@ -4,29 +4,16 @@ import { ArrowDownUp, Info, ChevronDown, ChevronUp } from 'lucide-react';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Token, Network } from '@/features/pair/types';
 
 import { TokenSelector } from './token-selector';
-
-interface Token {
-  symbol: string;
-  name: string;
-  address: string;
-  decimals: number;
-  logoURI: string;
-  balance?: string;
-  network?: string;
-}
-
-interface Network {
-  id: string;
-  name: string;
-  chainId: number;
-  logoURI: string;
-  tokens: Token[];
-}
+import { TradePageBuy } from './trade-page-buy';
+import { TradePageSell } from './trade-page-sell';
+import { WalletConnect } from '@/features/wallet';
+import { useAccount } from '@gear-js/react-hooks';
 
 export function TradePage() {
   const [fromToken, setFromToken] = useState<Token>({
@@ -52,7 +39,12 @@ export function TradePage() {
   const [showFromTokenSelector, setShowFromTokenSelector] = useState(false);
   const [showToTokenSelector, setShowToTokenSelector] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
-  const [isWalletConnected, setIsWalletConnected] = useState(false);
+  const { account } = useAccount();
+
+  const isWalletConnected = !!account;
+  const [isOpenConnectWallet, setIsOpenConnectWallet] = useState(false);
+  const openConnectWallet = () => setIsOpenConnectWallet(true);
+  const closeConnectWallet = () => setIsOpenConnectWallet(false);
 
   const swapTokens = () => {
     const tempToken = fromToken;
@@ -71,13 +63,9 @@ export function TradePage() {
     setToToken({ ...token, network: network.name });
   };
 
-  const connectWallet = () => {
-    setIsWalletConnected(true);
-  };
-
   const handleSwap = () => {
     if (!isWalletConnected) {
-      connectWallet();
+      openConnectWallet();
     } else {
       // Handle swap logic here
       console.log('Executing swap...');
@@ -246,214 +234,14 @@ export function TradePage() {
         </TabsContent>
 
         <TabsContent value="buy" className="mt-6">
-          <Card className="card">
-            <CardHeader>
-              <CardTitle className="text-lg font-bold uppercase theme-text">BUY CRYPTO</CardTitle>
-              <p className="text-sm text-gray-400">Choose your preferred provider to buy crypto with fiat</p>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 gap-3">
-                {/* Coinbase */}
-                <button className="flex items-center justify-between p-4 rounded-lg border border-gray-500/20 hover:border-[#00FF85]/50 hover:bg-gray-500/5 transition-all group">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                      <span className="text-white font-bold text-sm">C</span>
-                    </div>
-                    <div className="text-left">
-                      <div className="font-medium theme-text">Coinbase</div>
-                      <div className="text-xs text-gray-400">Popular & trusted</div>
-                    </div>
-                  </div>
-                  <div className="text-xs text-gray-400 group-hover:text-[#00FF85]">→</div>
-                </button>
-
-                {/* BANXA */}
-                <button className="flex items-center justify-between p-4 rounded-lg border border-gray-500/20 hover:border-[#00FF85]/50 hover:bg-gray-500/5 transition-all group">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-gray-700 rounded-lg flex items-center justify-center">
-                      <span className="text-white font-bold text-sm">B</span>
-                    </div>
-                    <div className="text-left">
-                      <div className="font-medium theme-text">BANXA</div>
-                      <div className="text-xs text-gray-400">Fast onboarding</div>
-                    </div>
-                  </div>
-                  <div className="text-xs text-gray-400 group-hover:text-[#00FF85]">→</div>
-                </button>
-
-                {/* Gate.io */}
-                <button className="flex items-center justify-between p-4 rounded-lg border border-gray-500/20 hover:border-[#00FF85]/50 hover:bg-gray-500/5 transition-all group">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
-                      <span className="text-white font-bold text-sm">G</span>
-                    </div>
-                    <div className="text-left">
-                      <div className="font-medium theme-text">Gate.io</div>
-                      <div className="text-xs text-gray-400">Global exchange</div>
-                    </div>
-                  </div>
-                  <div className="text-xs text-gray-400 group-hover:text-[#00FF85]">→</div>
-                </button>
-
-                {/* Crypto.com */}
-                <button className="flex items-center justify-between p-4 rounded-lg border border-gray-500/20 hover:border-[#00FF85]/50 hover:bg-gray-500/5 transition-all group">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
-                      <span className="text-white font-bold text-sm">C</span>
-                    </div>
-                    <div className="text-left">
-                      <div className="font-medium theme-text">Crypto.com</div>
-                      <div className="text-xs text-gray-400">Card & app integration</div>
-                    </div>
-                  </div>
-                  <div className="text-xs text-gray-400 group-hover:text-[#00FF85]">→</div>
-                </button>
-
-                {/* MEXC */}
-                <button className="flex items-center justify-between p-4 rounded-lg border border-gray-500/20 hover:border-[#00FF85]/50 hover:bg-gray-500/5 transition-all group">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center">
-                      <span className="text-white font-bold text-sm">M</span>
-                    </div>
-                    <div className="text-left">
-                      <div className="font-medium theme-text">MEXC</div>
-                      <div className="text-xs text-gray-400">Low fees</div>
-                    </div>
-                  </div>
-                  <div className="text-xs text-gray-400 group-hover:text-[#00FF85]">→</div>
-                </button>
-
-                {/* BitMart */}
-                <button className="flex items-center justify-between p-4 rounded-lg border border-gray-500/20 hover:border-[#00FF85]/50 hover:bg-gray-500/5 transition-all group">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-orange-600 rounded-lg flex items-center justify-center">
-                      <span className="text-white font-bold text-sm">B</span>
-                    </div>
-                    <div className="text-left">
-                      <div className="font-medium theme-text">BitMart</div>
-                      <div className="text-xs text-gray-400">Multiple payment methods</div>
-                    </div>
-                  </div>
-                  <div className="text-xs text-gray-400 group-hover:text-[#00FF85]">→</div>
-                </button>
-              </div>
-
-              <div className="mt-6 p-4 bg-gray-500/10 border border-gray-500/20 rounded-lg">
-                <div className="text-sm text-gray-400 mb-2">💡 Pro Tip</div>
-                <div className="text-sm theme-text">
-                  Compare fees and payment methods across providers to find the best option for your region.
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <TradePageBuy />
         </TabsContent>
 
         <TabsContent value="sell" className="mt-6">
-          <Card className="card">
-            <CardHeader>
-              <CardTitle className="text-lg font-bold uppercase theme-text">SELL CRYPTO</CardTitle>
-              <p className="text-sm text-gray-400">Choose your preferred exchange to sell crypto for fiat</p>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 gap-3">
-                {/* Coinbase */}
-                <button className="flex items-center justify-between p-4 rounded-lg border border-gray-500/20 hover:border-[#00FF85]/50 hover:bg-gray-500/5 transition-all group">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                      <span className="text-white font-bold text-sm">C</span>
-                    </div>
-                    <div className="text-left">
-                      <div className="font-medium theme-text">Coinbase</div>
-                      <div className="text-xs text-gray-400">Instant cashout available</div>
-                    </div>
-                  </div>
-                  <div className="text-xs text-gray-400 group-hover:text-[#00FF85]">→</div>
-                </button>
-
-                {/* BANXA */}
-                <button className="flex items-center justify-between p-4 rounded-lg border border-gray-500/20 hover:border-[#00FF85]/50 hover:bg-gray-500/5 transition-all group">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-gray-700 rounded-lg flex items-center justify-center">
-                      <span className="text-white font-bold text-sm">B</span>
-                    </div>
-                    <div className="text-left">
-                      <div className="font-medium theme-text">BANXA</div>
-                      <div className="text-xs text-gray-400">Bank transfer support</div>
-                    </div>
-                  </div>
-                  <div className="text-xs text-gray-400 group-hover:text-[#00FF85]">→</div>
-                </button>
-
-                {/* Gate.io */}
-                <button className="flex items-center justify-between p-4 rounded-lg border border-gray-500/20 hover:border-[#00FF85]/50 hover:bg-gray-500/5 transition-all group">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
-                      <span className="text-white font-bold text-sm">G</span>
-                    </div>
-                    <div className="text-left">
-                      <div className="font-medium theme-text">Gate.io</div>
-                      <div className="text-xs text-gray-400">P2P trading available</div>
-                    </div>
-                  </div>
-                  <div className="text-xs text-gray-400 group-hover:text-[#00FF85]">→</div>
-                </button>
-
-                {/* Crypto.com */}
-                <button className="flex items-center justify-between p-4 rounded-lg border border-gray-500/20 hover:border-[#00FF85]/50 hover:bg-gray-500/5 transition-all group">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
-                      <span className="text-white font-bold text-sm">C</span>
-                    </div>
-                    <div className="text-left">
-                      <div className="font-medium theme-text">Crypto.com</div>
-                      <div className="text-xs text-gray-400">Visa card cashout</div>
-                    </div>
-                  </div>
-                  <div className="text-xs text-gray-400 group-hover:text-[#00FF85]">→</div>
-                </button>
-
-                {/* MEXC */}
-                <button className="flex items-center justify-between p-4 rounded-lg border border-gray-500/20 hover:border-[#00FF85]/50 hover:bg-gray-500/5 transition-all group">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center">
-                      <span className="text-white font-bold text-sm">M</span>
-                    </div>
-                    <div className="text-left">
-                      <div className="font-medium theme-text">MEXC</div>
-                      <div className="text-xs text-gray-400">Competitive rates</div>
-                    </div>
-                  </div>
-                  <div className="text-xs text-gray-400 group-hover:text-[#00FF85]">→</div>
-                </button>
-
-                {/* BitMart */}
-                <button className="flex items-center justify-between p-4 rounded-lg border border-gray-500/20 hover:border-[#00FF85]/50 hover:bg-gray-500/5 transition-all group">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-orange-600 rounded-lg flex items-center justify-center">
-                      <span className="text-white font-bold text-sm">B</span>
-                    </div>
-                    <div className="text-left">
-                      <div className="font-medium theme-text">BitMart</div>
-                      <div className="text-xs text-gray-400">Multiple withdrawal options</div>
-                    </div>
-                  </div>
-                  <div className="text-xs text-gray-400 group-hover:text-[#00FF85]">→</div>
-                </button>
-              </div>
-
-              <div className="mt-6 p-4 bg-gray-500/10 border border-gray-500/20 rounded-lg">
-                <div className="text-sm text-gray-400 mb-2">⚠️ Important</div>
-                <div className="text-sm theme-text">
-                  Always verify withdrawal fees and processing times before selling. Some exchanges may require KYC
-                  verification.
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <TradePageSell />
         </TabsContent>
       </Tabs>
 
-      {/* Token Selectors */}
       <TokenSelector
         isOpen={showFromTokenSelector}
         onClose={() => setShowFromTokenSelector(false)}
@@ -469,6 +257,8 @@ export function TradePage() {
         selectedToken={toToken}
         title="Select token to swap to"
       />
+
+      <WalletConnect isOpen={isOpenConnectWallet} onClose={closeConnectWallet} />
     </div>
   );
 }

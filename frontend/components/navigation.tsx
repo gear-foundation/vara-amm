@@ -13,13 +13,13 @@ import { WalletConnect } from '@/features/wallet/components/wallet-connect/Walle
 import { prettyAddress } from '@/lib/utils';
 
 import { ThemeSwitcher } from './theme-switcher';
-import { Dialog, DialogContent, DialogHeader } from './ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 
 export function Navigation() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isOpenConnectWallet, setIsOpenConnectWallet] = useState(false);
   const openConnectWallet = () => setIsOpenConnectWallet(true);
-  const closConnectWallet = () => setIsOpenConnectWallet(false);
+  const closeConnectWallet = () => setIsOpenConnectWallet(false);
   const [isOpenChange, setIsOpenChange] = useState(false);
   const openAndCloseChange = () => setIsOpenChange(!isOpenChange);
 
@@ -122,12 +122,14 @@ export function Navigation() {
       {isOpenChange && (
         <Dialog open={isOpenChange} onOpenChange={openAndCloseChange}>
           <DialogContent className="card max-w-md mx-auto max-h-[80vh] overflow-auto flex flex-col">
-            <DialogHeader>CONNECTED ACCOUNT</DialogHeader>
+            <DialogHeader>
+              <DialogTitle>CONNECTED ACCOUNT</DialogTitle>
+            </DialogHeader>
             <WalletChange onClose={openAndCloseChange} openConnectWallet={openConnectWallet} />
           </DialogContent>
         </Dialog>
       )}
-      <WalletConnect isOpen={isOpenConnectWallet} onClose={closConnectWallet} />
+      <WalletConnect isOpen={isOpenConnectWallet} onClose={closeConnectWallet} />
     </>
   );
 }

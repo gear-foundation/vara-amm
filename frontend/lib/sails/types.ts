@@ -39,3 +39,42 @@ export interface Config {
    */
   reply_timeout: number;
 }
+
+/**
+ * State in which message processing can be.
+ */
+export type MessageStatus =
+  | { sendingMsgToLockTokenA: null }
+  /**
+   * Reply is received for a token deposit message.
+   */
+  | { tokenALocked: boolean }
+  | { sendingMsgToLockTokenB: null }
+  /**
+   * Reply is received for a token deposit message.
+   */
+  | { tokenBLocked: boolean }
+  /**
+   * Message to refund tokens is sent.
+   */
+  | { sendingMessageToReturnTokensA: null }
+  /**
+   * Reply is received for a token refund message.
+   */
+  | { tokensAReturnComplete: boolean }
+  | { sendingMsgToTransferTokenIn: null }
+  | { tokenInTransfered: boolean }
+  | { sendingMsgToTransferTokenOut: null }
+  | { tokenOutTransfered: boolean }
+  | { sendingMessageToReturnTokenIn: null }
+  | { tokenInReturnComplete: boolean }
+  | { sendingMsgToUnlockTokenA: null }
+  /**
+   * Reply is received for a token deposit message.
+   */
+  | { tokenAUnlocked: boolean }
+  | { sendingMsgToUnlockTokenB: null }
+  /**
+   * Reply is received for a token deposit message.
+   */
+  | { tokenBUnlocked: boolean };

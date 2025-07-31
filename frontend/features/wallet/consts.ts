@@ -5,7 +5,7 @@ import { atom } from 'jotai';
 
 import { EnkryptSVG, PolkadotSVG, SubWalletSVG, TalismanSVG, NovaSVG } from './assets';
 
-export const isNovaWallet = typeof window !== 'undefined' && window.walletExtension?.isNovaWallet;
+const isNovaWallet = typeof window !== 'undefined' && window.walletExtension?.isNovaWallet;
 
 export const WALLET = {
   'polkadot-js': {

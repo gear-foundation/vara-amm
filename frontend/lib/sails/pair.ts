@@ -5,12 +5,13 @@ import {
   TransactionBuilder,
   ActorId,
   throwOnErrorReply,
+  MessageId,
   getServiceNamePrefix,
   getFnNamePrefix,
   ZERO_ADDRESS,
 } from 'sails-js';
 
-import { Config } from './types';
+import { Config, MessageStatus } from './types';
 
 export class Program {
   public readonly registry: TypeRegistry;
@@ -22,7 +23,27 @@ export class Program {
     private _programId?: `0x${string}`,
   ) {
     const types: Record<string, any> = {
-      Config: { gas_for_token_ops: 'u64', gas_for_reply_deposit: 'u64', reply_timeout: 'u32' },
+      Config: { gas_for_token_ops: 'u64', gas_for_reply_deposit: 'u64', reply_timeout: 'u32', gas_for_full_tx: 'u64' },
+      MessageStatus: {
+        _enum: {
+          SendingMsgToLockTokenA: 'Null',
+          TokenALocked: 'bool',
+          SendingMsgToLockTokenB: 'Null',
+          TokenBLocked: 'bool',
+          SendingMessageToReturnTokensA: 'Null',
+          TokensAReturnComplete: 'bool',
+          SendingMsgToTransferTokenIn: 'Null',
+          TokenInTransfered: 'bool',
+          SendingMsgToTransferTokenOut: 'Null',
+          TokenOutTransfered: 'bool',
+          SendingMessageToReturnTokenIn: 'Null',
+          TokenInReturnComplete: 'bool',
+          SendingMsgToUnlockTokenA: 'Null',
+          TokenAUnlocked: 'bool',
+          SendingMsgToUnlockTokenB: 'Null',
+          TokenBUnlocked: 'bool',
+        },
+      },
     };
 
     this.registry = new TypeRegistry();
@@ -260,7 +281,7 @@ export class Pair {
     originAddress?: string,
     value?: number | string | bigint,
     atBlock?: `0x${string}`,
-  ): Promise<{ amount_a: number | string | bigint; amount_b: number | string | bigint }> {
+  ): Promise<[number | string | bigint, number | string | bigint]> {
     const payload = this._program.registry
       .createType('(String, String, U256)', ['Pair', 'CalculateRemoveLiquidity', liquidity])
       .toHex();
@@ -273,8 +294,8 @@ export class Pair {
       at: atBlock,
     });
     throwOnErrorReply(reply.code, reply.payload.toU8a(), this._program.api.specVersion, this._program.registry);
-    const result = this._program.registry.createType('(String, String, [object Object])', reply.payload);
-    return result[2].toJSON() as unknown as { amount_a: number | string | bigint; amount_b: number | string | bigint };
+    const result = this._program.registry.createType('(String, String, (U256, U256))', reply.payload);
+    return result[2].toJSON() as unknown as [number | string | bigint, number | string | bigint];
   }
 
   /**
@@ -358,6 +379,98 @@ export class Pair {
     throwOnErrorReply(reply.code, reply.payload.toU8a(), this._program.api.specVersion, this._program.registry);
     const result = this._program.registry.createType('(String, String, (U256, U256))', reply.payload);
     return result[2].toJSON() as unknown as [number | string | bigint, number | string | bigint];
+  }
+
+  public async msgsInMsgTracker(
+    originAddress?: string,
+    value?: number | string | bigint,
+    atBlock?: `0x${string}`,
+  ): Promise<Array<[MessageId, MessageStatus]>> {
+    const payload = this._program.registry.createType('(String, String)', ['Pair', 'MsgsInMsgTracker']).toHex();
+    const reply = await this._program.api.message.calculateReply({
+      destination: this._program.programId,
+      origin: originAddress ? decodeAddress(originAddress) : ZERO_ADDRESS,
+      payload,
+      value: value || 0,
+      gasLimit: this._program.api.blockGasLimit.toBigInt(),
+      at: atBlock,
+    });
+    throwOnErrorReply(reply.code, reply.payload.toU8a(), this._program.api.specVersion, this._program.registry);
+    const result = this._program.registry.createType('(String, String, Vec<([u8;32], MessageStatus)>)', reply.payload);
+    return result[2].toJSON() as unknown as Array<[MessageId, MessageStatus]>;
+  }
+
+  public subscribeToLiquidityAddedEvent(
+    callback: (data: {
+      amount_a: number | string | bigint;
+      amount_b: number | string | bigint;
+      liquidity: number | string | bigint;
+    }) => void | Promise<void>,
+  ): Promise<() => void> {
+    return this._program.api.gearEvents.subscribeToGearEvent('UserMessageSent', ({ data: { message } }) => {
+      if (!message.source.eq(this._program.programId) || !message.destination.eq(ZERO_ADDRESS)) {
+        return;
+      }
+
+      const payload = message.payload.toHex();
+      if (getServiceNamePrefix(payload) === 'Pair' && getFnNamePrefix(payload) === 'LiquidityAdded') {
+        callback(
+          this._program.registry
+            .createType(
+              '(String, String, {"amount_a":"U256","amount_b":"U256","liquidity":"U256"})',
+              message.payload,
+            )[2]
+            .toJSON() as unknown as {
+            amount_a: number | string | bigint;
+            amount_b: number | string | bigint;
+            liquidity: number | string | bigint;
+          },
+        );
+      }
+    });
+  }
+
+  public subscribeToSwapEvent(callback: (data: null) => void | Promise<void>): Promise<() => void> {
+    return this._program.api.gearEvents.subscribeToGearEvent('UserMessageSent', ({ data: { message } }) => {
+      if (!message.source.eq(this._program.programId) || !message.destination.eq(ZERO_ADDRESS)) {
+        return;
+      }
+
+      const payload = message.payload.toHex();
+      if (getServiceNamePrefix(payload) === 'Pair' && getFnNamePrefix(payload) === 'Swap') {
+        callback(null);
+      }
+    });
+  }
+
+  public subscribeToLiquidityRemovedEvent(
+    callback: (data: {
+      amount_a: number | string | bigint;
+      amount_b: number | string | bigint;
+      liquidity: number | string | bigint;
+    }) => void | Promise<void>,
+  ): Promise<() => void> {
+    return this._program.api.gearEvents.subscribeToGearEvent('UserMessageSent', ({ data: { message } }) => {
+      if (!message.source.eq(this._program.programId) || !message.destination.eq(ZERO_ADDRESS)) {
+        return;
+      }
+
+      const payload = message.payload.toHex();
+      if (getServiceNamePrefix(payload) === 'Pair' && getFnNamePrefix(payload) === 'LiquidityRemoved') {
+        callback(
+          this._program.registry
+            .createType(
+              '(String, String, {"amount_a":"U256","amount_b":"U256","liquidity":"U256"})',
+              message.payload,
+            )[2]
+            .toJSON() as unknown as {
+            amount_a: number | string | bigint;
+            amount_b: number | string | bigint;
+            liquidity: number | string | bigint;
+          },
+        );
+      }
+    });
   }
 }
 

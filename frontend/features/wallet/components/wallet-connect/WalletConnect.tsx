@@ -5,7 +5,7 @@ import Identicon from '@polkadot/react-identicon';
 import { Suspense, useEffect } from 'react';
 
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { copyToClipboard } from '@/lib/utils';
 
 import { CopyIcon } from '../../assets';
@@ -17,8 +17,9 @@ import styles from './WalletConnect.module.scss';
 declare global {
   interface Window {
     // Nova Wallet will have this window property.
-    // eslint-disable-next-line
-    walletExtension?: any;
+    walletExtension?: {
+      isNovaWallet: boolean;
+    };
   }
 }
 
@@ -80,7 +81,7 @@ export function WalletConnect({ isOpen, onClose }: Props) {
 
       const isActive = address === account?.address;
 
-      const handleClick = async () => {
+      const handleClick = () => {
         login(_account);
         onClose();
       };
@@ -136,7 +137,9 @@ export function WalletConnect({ isOpen, onClose }: Props) {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="card max-w-md mx-auto max-h-[80vh] overflow-auto flex flex-col">
-        <DialogHeader>CONNECT WALLET</DialogHeader>
+        <DialogHeader>
+          <DialogTitle>CONNECT WALLET</DialogTitle>
+        </DialogHeader>
         <div className="flex-1 overflow-auto">{render()}</div>
       </DialogContent>
     </Dialog>

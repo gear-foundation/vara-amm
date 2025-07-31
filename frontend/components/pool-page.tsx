@@ -8,24 +8,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AddLiquidity, RemoveLiquidity } from '@/features/pair';
 
-// TODO: remove duplicate interfaces
-interface Token {
-  symbol: string;
-  name: string;
-  address: string;
-  decimals: number;
-  logoURI: string;
-  balance?: string;
-}
-
-interface Network {
-  id: string;
-  name: string;
-  chainId: number;
-  logoURI: string;
-  tokens: Token[];
-}
-
 const userPositions = [
   {
     pool: 'ETH/VARA',

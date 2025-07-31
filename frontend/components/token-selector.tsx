@@ -1,28 +1,11 @@
 'use client';
 
-import { HexString } from '@gear-js/api';
 import { Search, Check } from 'lucide-react';
 import { useState } from 'react';
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-
-interface Token {
-  symbol: string;
-  name: string;
-  address: HexString;
-  decimals: number;
-  logoURI: string;
-  balance?: string;
-}
-
-interface Network {
-  id: string;
-  name: string;
-  chainId: number;
-  logoURI: string;
-  tokens: Token[];
-}
+import { Network, Token } from '@/features/pair/types';
 
 const networks: Network[] = [
   {

@@ -12,22 +12,7 @@ import { Input } from '@/components/ui/input';
 import { SECONDS_IN_MINUTE } from '@/consts';
 import { useAddLiquidityMessage, useGetReservesQuery, useVftApproveMessage, useVftTotalSupplyQuery } from '@/lib/sails';
 
-interface Token {
-  symbol: string;
-  name: string;
-  address: HexString;
-  decimals: number;
-  logoURI: string;
-  balance?: string;
-}
-
-interface Network {
-  id: string;
-  name: string;
-  chainId: number;
-  logoURI: string;
-  tokens: Token[];
-}
+import { Token, Network } from '../types';
 
 const AddLiquidity = () => {
   const [token0, setToken0] = useState<Token>({

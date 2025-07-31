@@ -10,6 +10,33 @@ type Config = struct {
   /// Timeout in blocks that current program will wait for reply from
   /// the other programs such as VFT
   reply_timeout: u32,
+  gas_for_full_tx: u64,
+};
+
+/// State in which message processing can be.
+type MessageStatus = enum {
+  SendingMsgToLockTokenA,
+  /// Reply is received for a token deposit message.
+  TokenALocked: bool,
+  SendingMsgToLockTokenB,
+  /// Reply is received for a token deposit message.
+  TokenBLocked: bool,
+  /// Message to refund tokens is sent.
+  SendingMessageToReturnTokensA,
+  /// Reply is received for a token refund message.
+  TokensAReturnComplete: bool,
+  SendingMsgToTransferTokenIn,
+  TokenInTransfered: bool,
+  SendingMsgToTransferTokenOut,
+  TokenOutTransfered: bool,
+  SendingMessageToReturnTokenIn,
+  TokenInReturnComplete: bool,
+  SendingMsgToUnlockTokenA,
+  /// Reply is received for a token deposit message.
+  TokenAUnlocked: bool,
+  SendingMsgToUnlockTokenB,
+  /// Reply is received for a token deposit message.
+  TokenBUnlocked: bool,
 };
 
 constructor {
@@ -74,7 +101,7 @@ service Pair {
   /// It accounts for protocol fees (by simulating mint_fee dilution), calculates pro-rata shares
   /// based on reserves (assuming they include swap fees), and sorts amounts by token_a/token_b.
   /// Does not modify state or perform any transactions.
-  query CalculateRemoveLiquidity : (liquidity: u256) -> struct { amount_a: u256, amount_b: u256 };
+  query CalculateRemoveLiquidity : (liquidity: u256) -> struct { u256, u256 };
   /// Calculates the required input amount of an asset given a desired output amount and pair reserves.
   /// This accounts for a 0.3% fee (997/1000 multiplier).
   /// Formula: amount_in = (reserve_in * amount_out * 1000) / (reserve_out - amount_out) * 997) + 1
@@ -92,6 +119,21 @@ service Pair {
   /// * `is_token0_to_token1` - Direction of swap (true: token0 to token1, false: token1 to token0)
   query GetAmountOut : (amount_in: u256, is_token0_to_token1: bool) -> u256;
   query GetReserves : () -> struct { u256, u256 };
+  query MsgsInMsgTracker : () -> vec struct { message_id, MessageStatus };
+
+  events {
+    LiquidityAdded: struct {
+      amount_a: u256,
+      amount_b: u256,
+      liquidity: u256,
+    };
+    Swap;
+    LiquidityRemoved: struct {
+      amount_a: u256,
+      amount_b: u256,
+      liquidity: u256,
+    };
+  }
 };
 
 service Vft {
