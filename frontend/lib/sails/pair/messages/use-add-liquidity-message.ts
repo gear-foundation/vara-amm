@@ -13,7 +13,7 @@ type Params = {
   deadline: string;
 };
 
-export const useAddLiquidityMessage = (pairAddress: HexString) => {
+export const useAddLiquidityMessage = (pairAddress?: HexString) => {
   const program = usePairProgram(pairAddress);
   const { account } = useAccount();
 
@@ -29,9 +29,10 @@ export const useAddLiquidityMessage = (pairAddress: HexString) => {
 
     const { transaction } = await prepareTransactionAsync({
       args: [amountADesired, amountBDesired, amountAMin, amountBMin, deadline],
+      gasLimit: 105_000_000_000n,
     });
 
-    await transaction.signAndSend();
+    return transaction;
   };
 
   const { mutateAsync: addLiquidityMessage, isPending } = useMutation({

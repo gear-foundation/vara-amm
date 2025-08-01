@@ -3,7 +3,7 @@ import { useAccount, useProgramQuery } from '@gear-js/react-hooks';
 
 import { usePairProgram } from '@/lib/sails/sails';
 
-export const useVftBalanceOfQuery = (pairAddress: HexString) => {
+export const useVftBalanceOfQuery = (pairAddress?: HexString) => {
   const program = usePairProgram(pairAddress);
   const { account } = useAccount();
 

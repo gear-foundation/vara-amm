@@ -24,19 +24,22 @@ export const useApproveMessage = (vftAddress: HexString) => {
   const tx = async ({ spender, value }: Params) => {
     if (!program || !account) return;
 
+    console.log('🚀 ~ tx ~ spender:', spender);
+    console.log('🚀 ~ tx ~ value:', value);
     const { transaction } = await prepareTransactionAsync({
       args: [spender, value],
     });
 
-    await transaction.signAndSend();
+    return transaction;
   };
 
-  const { mutateAsync: changeFeeToMessage, isPending } = useMutation({
+  const { mutateAsync: approveMessage, isPending } = useMutation({
     mutationFn: tx,
     onError: (error) => {
+      console.log('🚀 ~ useApproveMessage ~ error:', getErrorMessage(error));
       alert.error(getErrorMessage(error));
     },
   });
 
-  return { changeFeeToMessage, isPending };
+  return { approveMessage, isPending };
 };

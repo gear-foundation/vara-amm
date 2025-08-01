@@ -1,32 +1,55 @@
 'use client';
 
-import { useAccount } from '@gear-js/react-hooks';
+import { useAccount, useAlert, useApi } from '@gear-js/react-hooks';
+import { ISubmittableResult } from '@polkadot/types/types';
 import { Plus, ChevronDown, Info } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { TokenSelector } from '@/components/token-selector';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { SECONDS_IN_MINUTE } from '@/consts';
-import { useAddLiquidityMessage, useGetReservesQuery, useVftApproveMessage, useVftTotalSupplyQuery } from '@/lib/sails';
+import { useAddLiquidityMessage, useGetReservesQuery, useVftTotalSupplyQuery, useApproveMessage } from '@/lib/sails';
 
 import { Token, Network, PairsTokens } from '../types';
-import { getFormattedBalance, getNetworks } from '../utils';
+import {
+  getFormattedBalance,
+  getNetworks,
+  parseUnits,
+  calculatePercentage,
+  calculateProportionalAmount,
+  handleStatus,
+} from '../utils';
 
 type AddLiquidityProps = {
   pairsTokens: PairsTokens;
+  refetchBalances: () => void;
 };
 
-const AddLiquidity = ({ pairsTokens }: AddLiquidityProps) => {
+const AddLiquidity = ({ pairsTokens, refetchBalances }: AddLiquidityProps) => {
   const [token0, setToken0] = useState<Token>(pairsTokens[0].token0);
   const [token1, setToken1] = useState<Token>(pairsTokens[0].token1);
+
+  useEffect(() => {
+    setToken0((prev) => ({
+      ...prev,
+      balance: pairsTokens.find((pair) => pair.token0.address === prev.address)?.token0.balance,
+    }));
+    setToken1((prev) => ({
+      ...prev,
+      balance: pairsTokens.find((pair) => pair.token1.address === prev.address)?.token1.balance,
+    }));
+  }, [pairsTokens]);
 
   const [amount0, setAmount0] = useState('');
   const [amount1, setAmount1] = useState('');
   const [showToken0Selector, setShowToken0Selector] = useState(false);
   const [showToken1Selector, setShowToken1Selector] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const { api } = useApi();
+  const alert = useAlert();
 
   const handleToken0Select = (token: Token, network: Network) => {
     setError(null);
@@ -38,24 +61,49 @@ const AddLiquidity = ({ pairsTokens }: AddLiquidityProps) => {
     setToken1(token);
   };
 
-  // TODO: get pair address from pairsTokens
-  const pairAddress = pairsTokens[0].pairAddress;
+  const selectedPair = pairsTokens.find(
+    (pair) =>
+      (pair.token0.address === token0.address && pair.token1.address === token1.address) ||
+      (pair.token0.address === token1.address && pair.token1.address === token0.address),
+  );
+  const pairAddress = selectedPair?.pairAddress;
 
-  const { reserves: _reserves, isFetching: isReservesFetching } = useGetReservesQuery(pairAddress);
-  console.log('🚀 ~ AddLiquidity ~ _reserves:', _reserves && BigInt(_reserves?.[0]));
-  const reservesExample = [10 * 10 ** 18, 3 * 10 ** 10];
+  const { reserves, isFetching: isReservesFetching, refetch: refreshReserves } = useGetReservesQuery(pairAddress);
+  const {
+    totalSupply,
+    isFetching: isTotalSupplyFetching,
+    refetch: refreshTotalSupply,
+  } = useVftTotalSupplyQuery(pairAddress);
 
-  const { totalSupply, isFetching: isTotalSupplyFetching } = useVftTotalSupplyQuery(pairAddress);
+  const isPoolEmpty = reserves?.[0] === 0n && reserves?.[1] === 0n && totalSupply === 0n;
 
-  const isPoolEmpty = _reserves?.[0] === 0 && _reserves?.[1] === 0 && totalSupply === 0n;
+  const { approveMessage: token0ApproveMessage, isPending: isToken0ApprovePending } = useApproveMessage(token0.address);
+  const { approveMessage: token1ApproveMessage, isPending: isToken1ApprovePending } = useApproveMessage(token1.address);
 
-  const { approveMessage, isPending: isApprovePending } = useVftApproveMessage(pairAddress);
   const { addLiquidityMessage, isPending: isAddLiquidityPending } = useAddLiquidityMessage(pairAddress);
-  const isPending = isApprovePending || isAddLiquidityPending || isTotalSupplyFetching || isReservesFetching;
+  const isPending =
+    isToken0ApprovePending ||
+    isToken1ApprovePending ||
+    isAddLiquidityPending ||
+    isTotalSupplyFetching ||
+    isReservesFetching ||
+    loading;
+
   const { account } = useAccount();
 
   const addLiquidity = async () => {
     setError(null);
+
+    if (!api) {
+      setError('API is not ready');
+      return;
+    }
+
+    if (!pairAddress) {
+      setError('Pair not found');
+      return;
+    }
+
     if (!amount0 || !amount1) {
       setError('Please enter amounts for both tokens');
       return;
@@ -87,24 +135,28 @@ const AddLiquidity = ({ pairsTokens }: AddLiquidityProps) => {
     const token0Balance = token0.balance;
     const token1Balance = token1.balance;
 
-    if (amountANum > token0Balance) {
-      setError(`Insufficient ${token0.symbol} balance. Available: ${token0Balance}`);
+    const amountADesired = parseUnits(amountANum.toString(), token0.decimals);
+    const amountBDesired = parseUnits(amountBNum.toString(), token1.decimals);
+
+    if (amountADesired > token0Balance) {
+      setError(
+        `Insufficient ${token0.symbol} balance. Available: ${getFormattedBalance(token0Balance, token0.decimals, token0.symbol)}`,
+      );
       return;
     }
 
-    if (amountBNum > token1Balance) {
-      setError(`Insufficient ${token1.symbol} balance. Available: ${token1Balance}`);
+    if (amountBDesired > token1Balance) {
+      setError(
+        `Insufficient ${token1.symbol} balance. Available: ${getFormattedBalance(token1Balance, token1.decimals, token1.symbol)}`,
+      );
       return;
     }
-
-    const amountADesired = amountANum * 10 ** token0.decimals;
-    const amountBDesired = amountBNum * 10 ** token1.decimals;
 
     const slippageTolerance = 0.05; // 5%
-    const amountAMin = Math.floor(amountANum * (1 - slippageTolerance));
-    const amountBMin = Math.floor(amountBNum * (1 - slippageTolerance));
+    const amountAMin = calculatePercentage(amountADesired, slippageTolerance);
+    const amountBMin = calculatePercentage(amountBDesired, slippageTolerance);
 
-    const deadline = Math.floor(Date.now() / 1000) + 20 * SECONDS_IN_MINUTE;
+    const deadline = (Math.floor(Date.now() / 1000) + 20 * SECONDS_IN_MINUTE) * 1000;
 
     console.log('Adding liquidity with params:', {
       tokenA: `${token0.symbol} (${token0.address})`,
@@ -117,25 +169,53 @@ const AddLiquidity = ({ pairsTokens }: AddLiquidityProps) => {
       recipient: account.decodedAddress,
     });
 
-    // approve pair contract to spend token0 and token1
-    // TODO: get approve amount from token0 and token1 balances
-    await approveMessage({
-      value: amount0,
+    console.log('before approve token0');
+    const token0ApproveTx = await token0ApproveMessage({
+      value: amountADesired,
       spender: pairAddress,
     });
 
-    await approveMessage({
-      value: amount1,
+    console.log('before approve token1');
+    const token1ApproveTx = await token1ApproveMessage({
+      value: amountBDesired,
       spender: pairAddress,
     });
 
-    void addLiquidityMessage({
-      amountADesired: BigInt(amountADesired),
-      amountBDesired: BigInt(amountBDesired),
-      amountAMin: BigInt(amountAMin),
-      amountBMin: BigInt(amountBMin),
+    console.log('before add liquidity');
+    const addLiquidityTx = await addLiquidityMessage({
+      amountADesired,
+      amountBDesired,
+      amountAMin,
+      amountBMin,
       deadline: deadline.toString(),
     });
+
+    if (!token0ApproveTx?.extrinsic || !token1ApproveTx?.extrinsic || !addLiquidityTx?.extrinsic) {
+      setError('Failed to create batch');
+      return;
+    }
+    setLoading(true);
+
+    const batch = api.tx.utility.batch([
+      token0ApproveTx?.extrinsic,
+      token1ApproveTx?.extrinsic,
+      addLiquidityTx?.extrinsic,
+    ]);
+
+    const { address, signer } = account;
+    const statusCallback = (result: ISubmittableResult) =>
+      handleStatus(api, result, {
+        onSuccess: () => {
+          void refreshReserves();
+          void refreshTotalSupply();
+          void refetchBalances();
+          alert.success('Liquidity added successfully');
+        },
+        onError: (_error) => alert.error(_error),
+        onFinally: () => setLoading(false),
+      });
+
+    await batch.signAndSend(address, { signer }, statusCallback);
   };
 
   const networks = getNetworks(pairsTokens);
@@ -166,10 +246,15 @@ const AddLiquidity = ({ pairsTokens }: AddLiquidityProps) => {
                 onChange={(e) => {
                   setError(null);
                   setAmount0(e.target.value);
-                  const amount = parseFloat(e.target.value) * 10 ** token0.decimals;
-                  if (!isPoolEmpty) {
-                    const newAmount1 = (amount * (reservesExample[1] / reservesExample[0])) / 10 ** token1.decimals;
-                    setAmount1(newAmount1 ? newAmount1.toString() : '');
+                  if (!isPoolEmpty && reserves) {
+                    const newAmount1 = calculateProportionalAmount(
+                      e.target.value,
+                      token0.decimals,
+                      reserves[0],
+                      reserves[1],
+                      token1.decimals,
+                    );
+                    setAmount1(newAmount1);
                   }
                 }}
                 placeholder="0.0"
@@ -207,10 +292,15 @@ const AddLiquidity = ({ pairsTokens }: AddLiquidityProps) => {
                 onChange={(e) => {
                   setError(null);
                   setAmount1(e.target.value);
-                  const amount = parseFloat(e.target.value) * 10 ** token1.decimals;
-                  if (!isPoolEmpty) {
-                    const newAmount0 = (amount * (reservesExample[0] / reservesExample[1])) / 10 ** token0.decimals;
-                    setAmount0(newAmount0 ? newAmount0.toString() : '');
+                  if (!isPoolEmpty && reserves) {
+                    const newAmount0 = calculateProportionalAmount(
+                      e.target.value,
+                      token1.decimals,
+                      reserves[1],
+                      reserves[0],
+                      token0.decimals,
+                    );
+                    setAmount0(newAmount0);
                   }
                 }}
                 placeholder="0.0"

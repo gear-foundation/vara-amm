@@ -3,7 +3,7 @@ import { useProgramQuery } from '@gear-js/react-hooks';
 
 import { usePairProgram } from '@/lib/sails/sails';
 
-export const useVftTotalSupplyQuery = (pairAddress: HexString) => {
+export const useVftTotalSupplyQuery = (pairAddress?: HexString) => {
   const program = usePairProgram(pairAddress);
 
   const { data, refetch, isFetching, error } = useProgramQuery({

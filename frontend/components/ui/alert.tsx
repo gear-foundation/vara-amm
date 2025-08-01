@@ -1,43 +1,66 @@
-import { cva, type VariantProps } from 'class-variance-authority';
+import { cva } from 'class-variance-authority';
 import * as React from 'react';
 
+import { CrossSVG } from '@/assets/images';
 import { cn } from '@/lib/utils';
+
+import alertStyles from './alert.module.scss';
+import { Button } from './button';
+
+type Options = {
+  type: 'info' | 'error' | 'loading' | 'success';
+  variant?: 'alert' | 'notification';
+  style?: React.CSSProperties;
+  title?: string;
+  timeout?: number;
+  isClosed?: boolean;
+};
+
+type AlertType = {
+  id: string;
+  content: React.ReactNode;
+  options: Options;
+  footer?: React.ReactNode;
+};
+
+type Props = {
+  alert: AlertType;
+  close: () => void;
+};
 
 const alertVariants = cva(
   'relative w-full rounded-lg border p-4 [&>svg~*]:pl-7 [&>svg+div]:translate-y-[-3px] [&>svg]:absolute [&>svg]:left-4 [&>svg]:top-4 [&>svg]:text-foreground',
   {
     variants: {
-      variant: {
-        default: 'bg-background text-foreground',
-        destructive: 'border-destructive/50 text-destructive dark:border-destructive [&>svg]:text-destructive',
+      type: {
+        info: 'bg-background text-foreground',
+        error: 'border-destructive/50 text-destructive dark:border-destructive [&>svg]:text-destructive',
+        loading: 'bg-background text-foreground',
+        success: 'bg-background text-foreground',
       },
     },
     defaultVariants: {
-      variant: 'default',
+      type: 'info',
     },
   },
 );
 
-const Alert = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement> & VariantProps<typeof alertVariants>
->(({ className, variant, ...props }, ref) => (
-  <div ref={ref} role="alert" className={cn(alertVariants({ variant }), className)} {...props} />
-));
-Alert.displayName = 'Alert';
+const Alert = ({ alert, close }: Props) => {
+  const { content, footer, options } = alert;
+  const { type, title } = options;
 
-const AlertTitle = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLHeadingElement>>(
-  ({ className, ...props }, ref) => (
-    <h5 ref={ref} className={cn('mb-1 font-medium leading-none tracking-tight', className)} {...props} />
-  ),
-);
-AlertTitle.displayName = 'AlertTitle';
+  return (
+    <div role="alert" className={cn(alertVariants({ type }))}>
+      <header className={cn('flex items-center justify-between')}>
+        <h5 className={cn('mb-1 font-medium leading-none tracking-tight')}>{title || type}</h5>
+        <Button variant="ghost" size="icon" onClick={close} className="button">
+          <CrossSVG />
+        </Button>
+      </header>
+      <div className={cn('text-sm [&_p]:leading-relaxed')}>{content}</div>
+      {footer && <p className={cn('text-sm')}>{footer}</p>}
+    </div>
+  );
+};
 
-const AlertDescription = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLParagraphElement>>(
-  ({ className, ...props }, ref) => (
-    <div ref={ref} className={cn('text-sm [&_p]:leading-relaxed', className)} {...props} />
-  ),
-);
-AlertDescription.displayName = 'AlertDescription';
-
-export { Alert, AlertTitle, AlertDescription };
+export { Alert, alertStyles };

@@ -10,7 +10,7 @@ type Params = {
   value: string;
 };
 
-export const useVftApproveMessage = (pairAddress: HexString) => {
+export const useVftApproveMessage = (pairAddress?: HexString) => {
   const program = usePairProgram(pairAddress);
   const { account } = useAccount();
 

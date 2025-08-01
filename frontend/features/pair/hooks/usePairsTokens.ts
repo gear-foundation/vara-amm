@@ -4,8 +4,9 @@ import { useBalanceOfQuery, useDecimalsQuery, useNameQuery, useSymbolQuery } fro
 
 import { PairsTokens, Token } from '../types';
 
-const usePairsTokens = (): PairsTokens | undefined => {
+const usePairsTokens = (): { pairsTokens: PairsTokens | undefined; refetchBalances: () => void } => {
   const { pairs } = usePairsQuery();
+  console.log('🚀 ~ usePairsTokens ~ pairs:', pairs);
   const pairAddress = pairs?.[0]?.[1];
   const ftAddresses = pairs?.[0]?.[0];
 
@@ -18,8 +19,8 @@ const usePairsTokens = (): PairsTokens | undefined => {
   const { decimals: decimals0 } = useDecimalsQuery(ftAddresses?.[0]);
   const { decimals: decimals1 } = useDecimalsQuery(ftAddresses?.[1]);
 
-  const { balance: balance0 } = useBalanceOfQuery(ftAddresses?.[0]);
-  const { balance: balance1 } = useBalanceOfQuery(ftAddresses?.[1]);
+  const { balance: balance0, refetch: refetchBalance0 } = useBalanceOfQuery(ftAddresses?.[0]);
+  const { balance: balance1, refetch: refetchBalance1 } = useBalanceOfQuery(ftAddresses?.[1]);
 
   const token0: Token | undefined =
     symbol0 && name0 && decimals0 && ftAddresses
@@ -53,7 +54,13 @@ const usePairsTokens = (): PairsTokens | undefined => {
   console.log('🚀 ~ usePairsTokens ~ pairTokens:', pairTokens);
 
   // TODO: return array of all tokens
-  return pairTokens ? [pairTokens] : undefined;
+  return {
+    pairsTokens: pairTokens ? [pairTokens] : undefined,
+    refetchBalances: () => {
+      void refetchBalance0();
+      void refetchBalance1();
+    },
+  };
 };
 
 export { usePairsTokens };

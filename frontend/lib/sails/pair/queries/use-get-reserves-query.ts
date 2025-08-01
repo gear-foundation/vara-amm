@@ -3,7 +3,7 @@ import { useProgramQuery } from '@gear-js/react-hooks';
 
 import { usePairProgram } from '@/lib/sails/sails';
 
-export const useGetReservesQuery = (pairAddress: HexString) => {
+export const useGetReservesQuery = (pairAddress?: HexString) => {
   const program = usePairProgram(pairAddress);
 
   const { data, refetch, isFetching, error } = useProgramQuery({
@@ -13,5 +13,5 @@ export const useGetReservesQuery = (pairAddress: HexString) => {
     args: [],
   });
 
-  return { reserves: data, isFetching, refetch, error };
+  return { reserves: data ? [BigInt(data[0]), BigInt(data[1])] : undefined, isFetching, refetch, error };
 };

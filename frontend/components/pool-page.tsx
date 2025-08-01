@@ -8,6 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AddLiquidity, RemoveLiquidity } from '@/features/pair';
 import { PairsTokens } from '@/features/pair/types';
+import { usePairsQuery, useVftBalanceOfQuery } from '@/lib/sails';
+import { useAccount } from '@gear-js/react-hooks';
 
 const userPositions = [
   {
@@ -32,9 +34,15 @@ const userPositions = [
 
 type PoolPageProps = {
   pairsTokens: PairsTokens;
+  refetchBalances: () => void;
 };
 
-export function PoolPage({ pairsTokens }: PoolPageProps) {
+export function PoolPage({ pairsTokens, refetchBalances }: PoolPageProps) {
+  const { pairs } = usePairsQuery();
+  // TODO: add all pairs
+  const { balance: vftBalance0 } = useVftBalanceOfQuery(pairs?.[0]?.[1]);
+  console.log('🚀 ~ PoolPage ~ vftBalance0:', vftBalance0);
+
   return (
     <div className="max-w-4xl mx-auto">
       <Tabs defaultValue="positions" className="w-full">
@@ -110,7 +118,7 @@ export function PoolPage({ pairsTokens }: PoolPageProps) {
         </TabsContent>
 
         <TabsContent value="new">
-          <AddLiquidity pairsTokens={pairsTokens} />
+          <AddLiquidity pairsTokens={pairsTokens} refetchBalances={refetchBalances} />
         </TabsContent>
       </Tabs>
     </div>
