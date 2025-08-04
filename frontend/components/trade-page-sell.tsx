@@ -10,7 +10,11 @@ const TradePageSell = () => {
       <CardContent className="space-y-4">
         <div className="grid grid-cols-1 gap-3">
           {/* Coinbase */}
-          <button className="flex items-center justify-between p-4 rounded-lg border border-gray-500/20 hover:border-[#00FF85]/50 hover:bg-gray-500/5 transition-all group">
+          <a
+            href="https://www.coinbase.com/sell"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-between p-4 rounded-lg border border-gray-500/20 hover:border-[#00FF85]/50 hover:bg-gray-500/5 transition-all group cursor-pointer">
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-sm">C</span>
@@ -21,10 +25,14 @@ const TradePageSell = () => {
               </div>
             </div>
             <div className="text-xs text-gray-400 group-hover:text-[#00FF85]">→</div>
-          </button>
+          </a>
 
           {/* BANXA */}
-          <button className="flex items-center justify-between p-4 rounded-lg border border-gray-500/20 hover:border-[#00FF85]/50 hover:bg-gray-500/5 transition-all group">
+          <a
+            href="https://checkout.banxa.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-between p-4 rounded-lg border border-gray-500/20 hover:border-[#00FF85]/50 hover:bg-gray-500/5 transition-all group cursor-pointer">
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 bg-gray-700 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-sm">B</span>
@@ -35,10 +43,14 @@ const TradePageSell = () => {
               </div>
             </div>
             <div className="text-xs text-gray-400 group-hover:text-[#00FF85]">→</div>
-          </button>
+          </a>
 
           {/* Gate.io */}
-          <button className="flex items-center justify-between p-4 rounded-lg border border-gray-500/20 hover:border-[#00FF85]/50 hover:bg-gray-500/5 transition-all group">
+          <a
+            href="https://www.gate.io"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-between p-4 rounded-lg border border-gray-500/20 hover:border-[#00FF85]/50 hover:bg-gray-500/5 transition-all group cursor-pointer">
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-sm">G</span>
@@ -49,10 +61,14 @@ const TradePageSell = () => {
               </div>
             </div>
             <div className="text-xs text-gray-400 group-hover:text-[#00FF85]">→</div>
-          </button>
+          </a>
 
           {/* Crypto.com */}
-          <button className="flex items-center justify-between p-4 rounded-lg border border-gray-500/20 hover:border-[#00FF85]/50 hover:bg-gray-500/5 transition-all group">
+          <a
+            href="https://crypto.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-between p-4 rounded-lg border border-gray-500/20 hover:border-[#00FF85]/50 hover:bg-gray-500/5 transition-all group cursor-pointer">
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-sm">C</span>
@@ -63,10 +79,14 @@ const TradePageSell = () => {
               </div>
             </div>
             <div className="text-xs text-gray-400 group-hover:text-[#00FF85]">→</div>
-          </button>
+          </a>
 
           {/* MEXC */}
-          <button className="flex items-center justify-between p-4 rounded-lg border border-gray-500/20 hover:border-[#00FF85]/50 hover:bg-gray-500/5 transition-all group">
+          <a
+            href="https://www.mexc.com/buy-crypto"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-between p-4 rounded-lg border border-gray-500/20 hover:border-[#00FF85]/50 hover:bg-gray-500/5 transition-all group cursor-pointer">
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-sm">M</span>
@@ -77,10 +97,14 @@ const TradePageSell = () => {
               </div>
             </div>
             <div className="text-xs text-gray-400 group-hover:text-[#00FF85]">→</div>
-          </button>
+          </a>
 
           {/* BitMart */}
-          <button className="flex items-center justify-between p-4 rounded-lg border border-gray-500/20 hover:border-[#00FF85]/50 hover:bg-gray-500/5 transition-all group">
+          <a
+            href="https://www.bitmart.com/buy-sell/en-AU?type=sell&coin=BTC&currency=USD"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-between p-4 rounded-lg border border-gray-500/20 hover:border-[#00FF85]/50 hover:bg-gray-500/5 transition-all group cursor-pointer">
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 bg-orange-600 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-sm">B</span>
@@ -91,7 +115,7 @@ const TradePageSell = () => {
               </div>
             </div>
             <div className="text-xs text-gray-400 group-hover:text-[#00FF85]">→</div>
-          </button>
+          </a>
         </div>
 
         <div className="mt-6 p-4 bg-gray-500/10 border border-gray-500/20 rounded-lg">
