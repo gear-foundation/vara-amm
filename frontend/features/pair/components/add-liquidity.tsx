@@ -20,6 +20,7 @@ import {
   calculatePercentage,
   calculateProportionalAmount,
   handleStatus,
+  getSelectedPair,
 } from '../utils';
 
 type AddLiquidityProps = {
@@ -63,13 +64,7 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
     setToken1(token);
   };
 
-  const selectedPair = pairsTokens.find(
-    (pair) =>
-      (pair.token0.address === token0.address && pair.token1.address === token1.address) ||
-      (pair.token0.address === token1.address && pair.token1.address === token0.address),
-  );
-  const pairAddress = selectedPair?.pairAddress;
-  const isPairReverse = token0.address === selectedPair?.token1.address;
+  const { pairAddress, isPairReverse } = getSelectedPair(pairsTokens, token0, token1) || {};
 
   const { reserves, isFetching: isReservesFetching, refetch: refreshReserves } = useGetReservesQuery(pairAddress);
   const {
@@ -156,8 +151,8 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
     }
 
     const slippageTolerance = 0.05; // 5%
-    const amountAMin = calculatePercentage(amountADesired, slippageTolerance);
-    const amountBMin = calculatePercentage(amountBDesired, slippageTolerance);
+    const amountAMin = calculatePercentage(amountADesired, 1 - slippageTolerance);
+    const amountBMin = calculatePercentage(amountBDesired, 1 - slippageTolerance);
 
     const deadline = (Math.floor(Date.now() / 1000) + 20 * SECONDS_IN_MINUTE) * 1000;
 
@@ -248,9 +243,8 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
                 max={token0.balance ? getFormattedBalance(token0.balance, token0.decimals) : undefined}
                 onChange={(e) => {
                   setError(null);
-                  // ! TODO:
                   setAmount0(e.target.value);
-                  if (!isPoolEmpty && reserves) {
+                  if (!isPoolEmpty && reserves && isPairReverse !== undefined) {
                     const newAmount1 = calculateProportionalAmount(
                       e.target.value,
                       token0.decimals,
@@ -297,7 +291,7 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
                 onChange={(e) => {
                   setError(null);
                   setAmount1(e.target.value);
-                  if (!isPoolEmpty && reserves) {
+                  if (!isPoolEmpty && reserves && isPairReverse !== undefined) {
                     const newAmount0 = calculateProportionalAmount(
                       e.target.value,
                       token1.decimals,
@@ -341,9 +335,14 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
             </div>
           </div>
 
-          <Button onClick={addLiquidity} disabled={isPending} className="btn-primary w-full py-4 text-lg">
+          <Button
+            onClick={addLiquidity}
+            disabled={isPending || !pairAddress}
+            className="btn-primary w-full py-4 text-lg">
             ADD LIQUIDITY
           </Button>
+
+          {!pairAddress && <div className="text-red-500"> Pair not found</div>}
 
           {error && <div className="text-red-500">{error}</div>}
         </CardContent>

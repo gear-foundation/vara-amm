@@ -61,7 +61,7 @@ const parseUnits = (value: string, decimals: number): bigint => {
 };
 
 const calculatePercentage = (amount: bigint, percentage: number): bigint => {
-  const multiplier = BigInt(Math.floor((1 - percentage) * 10000));
+  const multiplier = BigInt(Math.floor(percentage * 10000));
   return (amount * multiplier) / 10000n;
 };
 
@@ -102,6 +102,26 @@ const calculateProportionalAmount = (
   } catch {
     return '';
   }
+};
+
+const getSelectedPair = (pairsTokens: PairsTokens, token0: Token, token1: Token) => {
+  const pairIndex = pairsTokens.findIndex(
+    (pair) =>
+      (pair.token0.address === token0.address && pair.token1.address === token1.address) ||
+      (pair.token0.address === token1.address && pair.token1.address === token0.address),
+  );
+  if (pairIndex === -1) {
+    return null;
+  }
+
+  const selectedPair = pairsTokens[pairIndex];
+  const isPairReverse = token0.address === selectedPair?.token1.address;
+
+  return {
+    pairAddress: selectedPair.pairAddress,
+    isPairReverse,
+    pairIndex,
+  };
 };
 
 const handleStatus = (
@@ -146,5 +166,6 @@ export {
   calculatePercentage,
   formatUnits,
   calculateProportionalAmount,
+  getSelectedPair,
   handleStatus,
 };

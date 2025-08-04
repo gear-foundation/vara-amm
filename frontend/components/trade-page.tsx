@@ -8,9 +8,19 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { INPUT_PERCENTAGES } from '@/consts';
+import { usePairsBalances } from '@/features/pair';
 import { Token, Network, PairsTokens } from '@/features/pair/types';
-import { getFormattedBalance, getNetworks } from '@/features/pair/utils';
+import {
+  calculatePercentage,
+  formatUnits,
+  getFormattedBalance,
+  getNetworks,
+  getSelectedPair,
+  parseUnits,
+} from '@/features/pair/utils';
 import { WalletConnect } from '@/features/wallet';
+import { usePairsQuery } from '@/lib/sails';
 
 import { TokenSelector } from './token-selector';
 import { TradePageBuy } from './trade-page-buy';
@@ -21,10 +31,14 @@ type TradePageProps = {
 };
 
 export function TradePage({ pairsTokens }: TradePageProps) {
-  const [{ token0, token1 }] = pairsTokens;
+  const [fromToken, setFromToken] = useState<Token>(pairsTokens[0].token0);
+  const [toToken, setToToken] = useState<Token>(pairsTokens[0].token1);
+  const [lastInputTouch, setLastInputTouch] = useState<'from' | 'to'>('from');
 
-  const [fromToken, setFromToken] = useState<Token>(token0);
-  const [toToken, setToToken] = useState<Token>(token1);
+  const { pairs } = usePairsQuery();
+  const { pairBalances, refetchPairBalances, pairPrograms } = usePairsBalances({ pairs });
+  const { pairAddress, isPairReverse, pairIndex } = getSelectedPair(pairsTokens, fromToken, toToken) || {};
+
   const [fromAmount, setFromAmount] = useState('');
   const [toAmount, setToAmount] = useState('');
   const [showFromTokenSelector, setShowFromTokenSelector] = useState(false);
@@ -71,12 +85,32 @@ export function TradePage({ pairsTokens }: TradePageProps) {
   };
 
   const calculateFeeInUSD = () => {
-    // Mock calculation - in real app this would be based on actual amounts and prices
-    const mockFeeUSD = Number.parseFloat(fromAmount || '0') * 0.003 * 2500; // Assuming ETH price of $2500
+    // TODO: remove mock
+    const ETH_PRICE = 2500;
+    const FEE = 0.003;
+    const mockFeeUSD = Number.parseFloat(fromAmount || '0') * FEE * ETH_PRICE;
     return mockFeeUSD.toFixed(2);
   };
 
   const networks = getNetworks(pairsTokens);
+
+  const getAmount = async (amount: string, isReverse?: boolean) => {
+    if (pairIndex === undefined || !pairPrograms) return '';
+    const pairProgram = pairPrograms[pairIndex];
+    const isToken0ToToken1 = isReverse ? !isPairReverse : isPairReverse;
+    const decimalsIn = isToken0ToToken1 ? toToken.decimals : fromToken.decimals;
+    const decimalsOut = isToken0ToToken1 ? fromToken.decimals : toToken.decimals;
+    const amountIn = parseUnits(amount, decimalsIn);
+
+    let amountOut = 0n;
+    if (isToken0ToToken1) {
+      amountOut = await pairProgram.pair.getAmountIn(amountIn, isToken0ToToken1);
+    } else {
+      amountOut = await pairProgram.pair.getAmountOut(amountIn, !isToken0ToToken1);
+    }
+
+    return formatUnits(amountOut, decimalsOut);
+  };
 
   return (
     <div className="max-w-md mx-auto">
@@ -117,7 +151,12 @@ export function TradePage({ pairsTokens }: TradePageProps) {
                 <div className="flex items-center space-x-2">
                   <Input
                     value={fromAmount}
-                    onChange={(e) => setFromAmount(e.target.value)}
+                    onChange={async (e) => {
+                      setLastInputTouch('from');
+                      setFromAmount(e.target.value);
+                      const amountOut = await getAmount(e.target.value);
+                      setToAmount(amountOut);
+                    }}
                     placeholder="0.0"
                     className="input-field flex-1 text-xl"
                   />
@@ -134,13 +173,23 @@ export function TradePage({ pairsTokens }: TradePageProps) {
                   </Button>
                 </div>
                 <div className="flex space-x-2">
-                  {['25%', '50%', '75%', 'MAX'].map((percent) => (
+                  {INPUT_PERCENTAGES.map(({ label, value }) => (
                     <Button
-                      key={percent}
+                      key={value}
                       variant="ghost"
                       size="sm"
-                      className="text-xs bg-gray-500/20 hover:bg-gray-500/30 theme-text">
-                      {percent}
+                      className="text-xs bg-gray-500/20 hover:bg-gray-500/30 theme-text"
+                      onClick={async () => {
+                        const amountIn = formatUnits(
+                          calculatePercentage(fromToken.balance || 0n, value),
+                          fromToken.decimals || 0,
+                        );
+                        const amountOut = await getAmount(amountIn);
+                        setFromAmount(amountIn);
+                        setToAmount(amountOut);
+                        setLastInputTouch('from');
+                      }}>
+                      {label}
                     </Button>
                   ))}
                 </div>
@@ -169,7 +218,12 @@ export function TradePage({ pairsTokens }: TradePageProps) {
                 <div className="flex items-center space-x-2">
                   <Input
                     value={toAmount}
-                    onChange={(e) => setToAmount(e.target.value)}
+                    onChange={async (e) => {
+                      setLastInputTouch('to');
+                      setToAmount(e.target.value);
+                      const amountIn = await getAmount(e.target.value, true);
+                      setFromAmount(amountIn);
+                    }}
                     placeholder="0.0"
                     className="input-field flex-1 text-xl"
                   />
@@ -195,6 +249,7 @@ export function TradePage({ pairsTokens }: TradePageProps) {
                   <div className="flex items-center space-x-2">
                     <span className="text-sm theme-text">
                       1 {fromToken.symbol} = 1,250 {toToken.symbol}
+                      {/* TODO: remove mock */}
                     </span>
                     <Info className="w-3 h-3 text-gray-400" />
                   </div>

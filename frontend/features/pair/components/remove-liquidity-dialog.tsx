@@ -65,8 +65,8 @@ const RemoveLiquidityDialog = ({
     }
 
     const slippage = 0.05;
-    const amountAMin = calculatePercentage(BigInt(removeLiquidityAmounts[0]), slippage);
-    const amountBMin = calculatePercentage(BigInt(removeLiquidityAmounts[1]), slippage);
+    const amountAMin = calculatePercentage(BigInt(removeLiquidityAmounts[0]), 1 - slippage);
+    const amountBMin = calculatePercentage(BigInt(removeLiquidityAmounts[1]), 1 - slippage);
 
     const deadline = (Math.floor(Date.now() / 1000) + 20 * SECONDS_IN_MINUTE) * 1000;
 
@@ -107,7 +107,7 @@ const RemoveLiquidityDialog = ({
               size="sm"
               className="text-xs bg-gray-500/20 hover:bg-gray-500/30 theme-text"
               onClick={() =>
-                setUserInput(String(formatUnits(calculatePercentage(userLpBalance || 0n, 1 - value), lpDecimals || 0)))
+                setUserInput(formatUnits(calculatePercentage(userLpBalance || 0n, value), lpDecimals || 0))
               }>
               {label}
             </Button>
