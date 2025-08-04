@@ -25,11 +25,13 @@ import {
 type AddLiquidityProps = {
   pairsTokens: PairsTokens;
   refetchBalances: () => void;
+  defaultToken0: Token | null;
+  defaultToken1: Token | null;
 };
 
-const AddLiquidity = ({ pairsTokens, refetchBalances }: AddLiquidityProps) => {
-  const [token0, setToken0] = useState<Token>(pairsTokens[0].token0);
-  const [token1, setToken1] = useState<Token>(pairsTokens[0].token1);
+const AddLiquidity = ({ pairsTokens, refetchBalances, defaultToken0, defaultToken1 }: AddLiquidityProps) => {
+  const [token0, setToken0] = useState<Token>(defaultToken0 || pairsTokens[0].token0);
+  const [token1, setToken1] = useState<Token>(defaultToken1 || pairsTokens[0].token1);
 
   useEffect(() => {
     setToken0((prev) => ({

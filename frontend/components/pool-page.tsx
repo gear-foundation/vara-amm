@@ -1,12 +1,13 @@
 'use client';
 
 import { Plus } from 'lucide-react';
+import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AddLiquidity, RemoveLiquidity, usePairsBalances, useLpUserFees } from '@/features/pair';
-import { PairsTokens } from '@/features/pair/types';
+import { PairsTokens, Token } from '@/features/pair/types';
 import { usePairsQuery } from '@/lib/sails';
 
 type PoolPageProps = {
@@ -16,6 +17,7 @@ type PoolPageProps = {
 
 export function PoolPage({ pairsTokens, refetchBalances: refetchVftBalances }: PoolPageProps) {
   const { pairs } = usePairsQuery();
+  const [activeTab, setActiveTab] = useState<'positions' | 'new'>('positions');
   const { pairBalances, refetchPairBalances, pairPrograms } = usePairsBalances({ pairs });
   // ! TODO: use as rewards
   const { lpUserFees, refetchLpUserFees } = useLpUserFees({ pairPrograms });
@@ -45,12 +47,19 @@ export function PoolPage({ pairsTokens, refetchBalances: refetchVftBalances }: P
     };
   });
 
+  const [defaultToken0, setDefaultToken0] = useState<Token | null>(null);
+  const [defaultToken1, setDefaultToken1] = useState<Token | null>(null);
+
   return (
     <div className="max-w-4xl mx-auto">
-      <Tabs defaultValue="positions" className="w-full">
+      <Tabs value={activeTab} className="w-full" onValueChange={(value) => setActiveTab(value as 'positions' | 'new')}>
         <TabsList className="card p-1 mb-8">
           <TabsTrigger
             value="positions"
+            onClick={() => {
+              setDefaultToken0(null);
+              setDefaultToken1(null);
+            }}
             className="data-[state=active]:bg-[#00FF85] data-[state=active]:text-black font-bold uppercase">
             YOUR POSITIONS
           </TabsTrigger>
@@ -91,7 +100,17 @@ export function PoolPage({ pairsTokens, refetchBalances: refetchVftBalances }: P
                           refetchBalances={refetchBalances}
                         />
                       )}
-                      <Button className="btn-primary">ADD MORE</Button>
+                      <Button
+                        className="btn-primary"
+                        onClick={() => {
+                          if (position) {
+                            setActiveTab('new');
+                            setDefaultToken0(position.token0);
+                            setDefaultToken1(position.token1);
+                          }
+                        }}>
+                        ADD MORE
+                      </Button>
                     </div>
                   </CardHeader>
                   <CardContent>
@@ -127,7 +146,12 @@ export function PoolPage({ pairsTokens, refetchBalances: refetchVftBalances }: P
         </TabsContent>
 
         <TabsContent value="new">
-          <AddLiquidity pairsTokens={pairsTokens} refetchBalances={refetchBalances} />
+          <AddLiquidity
+            pairsTokens={pairsTokens}
+            refetchBalances={refetchBalances}
+            defaultToken0={defaultToken0}
+            defaultToken1={defaultToken1}
+          />
         </TabsContent>
       </Tabs>
     </div>
