@@ -4,30 +4,41 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { SECONDS_IN_MINUTE } from '@/consts';
+import { INPUT_PERCENTAGES, SECONDS_IN_MINUTE } from '@/consts';
 import {
-  useCalculateLpUserFeeQuery,
   useCalculateRemoveLiquidityQuery,
   useRemoveLiquidityMessage,
   useVftBalanceOfQuery,
   useVftDecimalsQuery,
 } from '@/lib/sails';
 
+import { Token } from '../types';
+import { calculatePercentage, formatUnits, parseUnits } from '../utils';
+
 type RemoveLiquidityDialogProps = {
   isOpen: boolean;
   onClose: () => void;
+  refetchBalances: () => void;
   pairAddress: HexString;
+  token0: Token;
+  token1: Token;
 };
 
-const RemoveLiquidityDialog = ({ isOpen, onClose, pairAddress }: RemoveLiquidityDialogProps) => {
+const RemoveLiquidityDialog = ({
+  isOpen,
+  onClose,
+  refetchBalances,
+  pairAddress,
+  token0,
+  token1,
+}: RemoveLiquidityDialogProps) => {
   const [error, setError] = useState<string | null>(null);
   const [userInput, setUserInput] = useState<string>('');
-  const { lpUserFee } = useCalculateLpUserFeeQuery(pairAddress);
   const { removeLiquidityMessage, isPending: isRemoveLiquidityPending } = useRemoveLiquidityMessage(pairAddress);
   const { balance: userLpBalance, isFetching: isUserLpBalanceFetching } = useVftBalanceOfQuery(pairAddress);
   const { decimals: lpDecimals, isFetching: isLpDecimalsFetching } = useVftDecimalsQuery(pairAddress);
 
-  const lpInput = lpDecimals && userInput ? Number(userInput) * 10 ** lpDecimals : 0;
+  const lpInput = lpDecimals && userInput ? parseUnits(userInput, lpDecimals) : 0n;
   const { removeLiquidityAmounts, isFetching: isRemoveLiquidityAmountsFetching } = useCalculateRemoveLiquidityQuery(
     pairAddress,
     String(lpInput),
@@ -54,10 +65,10 @@ const RemoveLiquidityDialog = ({ isOpen, onClose, pairAddress }: RemoveLiquidity
     }
 
     const slippage = 0.05;
-    const amountAMin = BigInt(removeLiquidityAmounts.amount_a) * BigInt(1 - slippage);
-    const amountBMin = BigInt(removeLiquidityAmounts.amount_b) * BigInt(1 - slippage);
+    const amountAMin = calculatePercentage(BigInt(removeLiquidityAmounts[0]), slippage);
+    const amountBMin = calculatePercentage(BigInt(removeLiquidityAmounts[1]), slippage);
 
-    const deadline = Math.floor(Date.now() / 1000) + 20 * SECONDS_IN_MINUTE;
+    const deadline = (Math.floor(Date.now() / 1000) + 20 * SECONDS_IN_MINUTE) * 1000;
 
     await removeLiquidityMessage({
       liquidity: String(lpInput),
@@ -65,6 +76,8 @@ const RemoveLiquidityDialog = ({ isOpen, onClose, pairAddress }: RemoveLiquidity
       amountBMin: String(amountBMin),
       deadline: String(deadline),
     });
+    refetchBalances();
+    onClose();
   };
 
   return (
@@ -77,9 +90,7 @@ const RemoveLiquidityDialog = ({ isOpen, onClose, pairAddress }: RemoveLiquidity
         <div className="flex flex-col space-y-4 flex-1">
           <div className="flex justify-between text-sm text-gray-400">
             <span>LP TOKEN</span>
-            <span>
-              Balance: {userLpBalance} {lpDecimals}
-            </span>
+            {lpDecimals && <span>Balance: {formatUnits(BigInt(userLpBalance || 0), lpDecimals)}</span>}
           </div>
           <Input
             value={userInput}
@@ -88,15 +99,29 @@ const RemoveLiquidityDialog = ({ isOpen, onClose, pairAddress }: RemoveLiquidity
             onChange={(e) => setUserInput(e.target.value)}
           />
         </div>
-
-        <div className="flex justify-between text-sm text-gray-400">
-          <span>TOKEN 0</span>
-          <span>Expected amount: {removeLiquidityAmounts?.amount_a}</span>
+        <div className="flex space-x-2">
+          {INPUT_PERCENTAGES.map(({ label, value }) => (
+            <Button
+              key={label}
+              variant="ghost"
+              size="sm"
+              className="text-xs bg-gray-500/20 hover:bg-gray-500/30 theme-text"
+              onClick={() =>
+                setUserInput(String(formatUnits(calculatePercentage(userLpBalance || 0n, 1 - value), lpDecimals || 0)))
+              }>
+              {label}
+            </Button>
+          ))}
         </div>
 
         <div className="flex justify-between text-sm text-gray-400">
-          <span>TOKEN 1</span>
-          <span>Expected amount: {removeLiquidityAmounts?.amount_b}</span>
+          <span>{token0.symbol}</span>
+          <span>Expected amount: {formatUnits(BigInt(removeLiquidityAmounts?.[0] || 0), token0.decimals)}</span>
+        </div>
+
+        <div className="flex justify-between text-sm text-gray-400">
+          <span>{token1.symbol}</span>
+          <span>Expected amount: {formatUnits(BigInt(removeLiquidityAmounts?.[1] || 0), token1.decimals)}</span>
         </div>
 
         {error && <p className="text-red-500">{error}</p>}

@@ -8,7 +8,7 @@ import { usePairsTokens } from '@/features/pair';
 import { withProviders } from '../hocs';
 
 function Trade() {
-  const pairsTokens = usePairsTokens();
+  const { pairsTokens } = usePairsTokens();
 
   return (
     <div className="min-h-screen">

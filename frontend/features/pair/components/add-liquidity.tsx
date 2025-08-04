@@ -66,7 +66,11 @@ const AddLiquidity = ({ pairsTokens, refetchBalances }: AddLiquidityProps) => {
       (pair.token0.address === token0.address && pair.token1.address === token1.address) ||
       (pair.token0.address === token1.address && pair.token1.address === token0.address),
   );
+  console.log('🚀 ~ AddLiquidity ~ selectedPair:', selectedPair);
   const pairAddress = selectedPair?.pairAddress;
+  const isPairReverse = token0.address === selectedPair?.token1.address;
+  console.log('🚀 ~ AddLiquidity ~ isPairReverse:', isPairReverse);
+  console.log('🚀 ~ AddLiquidity ~ pairsTokens:', pairsTokens);
 
   const { reserves, isFetching: isReservesFetching, refetch: refreshReserves } = useGetReservesQuery(pairAddress);
   const {
@@ -183,10 +187,10 @@ const AddLiquidity = ({ pairsTokens, refetchBalances }: AddLiquidityProps) => {
 
     console.log('before add liquidity');
     const addLiquidityTx = await addLiquidityMessage({
-      amountADesired,
-      amountBDesired,
-      amountAMin,
-      amountBMin,
+      amountADesired: isPairReverse ? amountBDesired : amountADesired,
+      amountBDesired: isPairReverse ? amountADesired : amountBDesired,
+      amountAMin: isPairReverse ? amountBMin : amountAMin,
+      amountBMin: isPairReverse ? amountAMin : amountBMin,
       deadline: deadline.toString(),
     });
 
@@ -245,6 +249,7 @@ const AddLiquidity = ({ pairsTokens, refetchBalances }: AddLiquidityProps) => {
                 max={token0.balance ? getFormattedBalance(token0.balance, token0.decimals) : undefined}
                 onChange={(e) => {
                   setError(null);
+                  // ! TODO:
                   setAmount0(e.target.value);
                   if (!isPoolEmpty && reserves) {
                     const newAmount1 = calculateProportionalAmount(
@@ -253,6 +258,7 @@ const AddLiquidity = ({ pairsTokens, refetchBalances }: AddLiquidityProps) => {
                       reserves[0],
                       reserves[1],
                       token1.decimals,
+                      isPairReverse,
                     );
                     setAmount1(newAmount1);
                   }
@@ -299,6 +305,7 @@ const AddLiquidity = ({ pairsTokens, refetchBalances }: AddLiquidityProps) => {
                       reserves[1],
                       reserves[0],
                       token0.decimals,
+                      isPairReverse,
                     );
                     setAmount0(newAmount0);
                   }

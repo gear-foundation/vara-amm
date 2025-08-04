@@ -1,47 +1,49 @@
 'use client';
 
-import { HexString } from '@gear-js/api';
 import { Plus } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { AddLiquidity, RemoveLiquidity } from '@/features/pair';
+import { AddLiquidity, RemoveLiquidity, usePairsBalances, useLpUserFees } from '@/features/pair';
 import { PairsTokens } from '@/features/pair/types';
-import { usePairsQuery, useVftBalanceOfQuery } from '@/lib/sails';
-import { useAccount } from '@gear-js/react-hooks';
-
-const userPositions = [
-  {
-    pool: 'ETH/VARA',
-    token0: { symbol: 'ETH', logoURI: '/tokens/eth.png' },
-    token1: { symbol: 'VARA', logoURI: '/tokens/vara.png' },
-    liquidity: '$2,450.67',
-    rewards: '12.34 VARA',
-    share: '0.12%',
-    pairAddress: '0x123' as HexString,
-  },
-  {
-    pool: 'VARA/USDC',
-    token0: { symbol: 'VARA', logoURI: '/tokens/vara.png' },
-    token1: { symbol: 'USDC', logoURI: '/tokens/usdc.png' },
-    liquidity: '$1,234.89',
-    rewards: '5.67 VARA',
-    share: '0.08%',
-    pairAddress: '0x123' as HexString,
-  },
-];
+import { usePairsQuery } from '@/lib/sails';
 
 type PoolPageProps = {
   pairsTokens: PairsTokens;
   refetchBalances: () => void;
 };
 
-export function PoolPage({ pairsTokens, refetchBalances }: PoolPageProps) {
+export function PoolPage({ pairsTokens, refetchBalances: refetchVftBalances }: PoolPageProps) {
   const { pairs } = usePairsQuery();
-  // TODO: add all pairs
-  const { balance: vftBalance0 } = useVftBalanceOfQuery(pairs?.[0]?.[1]);
-  console.log('🚀 ~ PoolPage ~ vftBalance0:', vftBalance0);
+  const { pairBalances, refetchPairBalances, pairPrograms } = usePairsBalances({ pairs });
+  // ! TODO: use as rewards
+  const { lpUserFees, refetchLpUserFees } = useLpUserFees({ pairPrograms });
+  console.log('🚀 ~ PoolPage ~ lpUserFees:', lpUserFees);
+
+  const refetchBalances = () => {
+    void refetchPairBalances();
+    void refetchLpUserFees();
+    refetchVftBalances();
+  };
+
+  const pairsWithUserLiquidity = pairs?.filter((_, index) => pairBalances?.[index] !== 0n);
+
+  const userPositions = pairsWithUserLiquidity?.map((pair) => {
+    const { token0, token1 } = pairsTokens.find(({ pairAddress }) => pairAddress === pair[1]) || {};
+
+    if (!token0 || !token1) return null;
+
+    return {
+      pool: `${token0.symbol}/${token1.symbol}`,
+      token0,
+      token1,
+      liquidity: '$2,450.67',
+      rewards: '0 VARA',
+      share: '0.0%',
+      pairAddress: pair[1],
+    };
+  });
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -60,7 +62,7 @@ export function PoolPage({ pairsTokens, refetchBalances }: PoolPageProps) {
         </TabsList>
 
         <TabsContent value="positions">
-          {userPositions.length > 0 ? (
+          {userPositions && userPositions.length > 0 ? (
             <div className="grid gap-6">
               {userPositions.map((position, index) => (
                 <Card key={index} className="card">
@@ -68,20 +70,27 @@ export function PoolPage({ pairsTokens, refetchBalances }: PoolPageProps) {
                     <div className="flex items-center space-x-3">
                       <div className="flex -space-x-2">
                         <img
-                          src={position.token0.logoURI || '/placeholder.svg'}
-                          alt={position.token0.symbol}
+                          src={position?.token0.logoURI || '/placeholder.svg'}
+                          alt={position?.token0.symbol}
                           className="w-8 h-8 rounded-full border-2 border-gray-500/20"
                         />
                         <img
-                          src={position.token1.logoURI || '/placeholder.svg'}
-                          alt={position.token1.symbol}
+                          src={position?.token1.logoURI || '/placeholder.svg'}
+                          alt={position?.token1.symbol}
                           className="w-8 h-8 rounded-full border-2 border-gray-500/20"
                         />
                       </div>
-                      <CardTitle className="mono theme-text">{position.pool}</CardTitle>
+                      <CardTitle className="mono theme-text">{position?.pool}</CardTitle>
                     </div>
                     <div className="flex space-x-2">
-                      <RemoveLiquidity pairAddress={position.pairAddress} />
+                      {position?.pairAddress && (
+                        <RemoveLiquidity
+                          pairAddress={position.pairAddress}
+                          token0={position.token0}
+                          token1={position.token1}
+                          refetchBalances={refetchBalances}
+                        />
+                      )}
                       <Button className="btn-primary">ADD MORE</Button>
                     </div>
                   </CardHeader>
@@ -89,15 +98,15 @@ export function PoolPage({ pairsTokens, refetchBalances }: PoolPageProps) {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
                         <div className="text-sm text-gray-400 uppercase">LIQUIDITY</div>
-                        <div className="text-lg font-medium mono theme-text">{position.liquidity}</div>
+                        <div className="text-lg font-medium mono theme-text">{position?.liquidity}</div>
                       </div>
                       <div>
                         <div className="text-sm text-gray-400 uppercase">REWARDS</div>
-                        <div className="text-lg font-medium mono theme-text">{position.rewards}</div>
+                        <div className="text-lg font-medium mono theme-text">{position?.rewards}</div>
                       </div>
                       <div>
                         <div className="text-sm text-gray-400 uppercase">POOL SHARE</div>
-                        <div className="text-lg font-medium mono theme-text">{position.share}</div>
+                        <div className="text-lg font-medium mono theme-text">{position?.share}</div>
                       </div>
                     </div>
                   </CardContent>

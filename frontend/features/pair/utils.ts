@@ -11,9 +11,13 @@ const getNetworks = (pairsTokens: PairsTokens): Network[] => {
       name: 'Vara Network',
       chainId: 1,
       logoURI: '/tokens/vara.png',
-      tokens: pairsTokens.reduce<Token[]>((acc, pairToken) => {
-        acc.push(pairToken.token0);
-        acc.push(pairToken.token1);
+      tokens: pairsTokens.reduce<Token[]>((acc, { token0, token1 }) => {
+        if (!acc.some(({ address }) => address === token0.address)) {
+          acc.push(token0);
+        }
+        if (!acc.some(({ address }) => address === token1.address)) {
+          acc.push(token1);
+        }
         return acc;
       }, []),
     },
@@ -82,14 +86,18 @@ const calculateProportionalAmount = (
   reserve0: bigint,
   reserve1: bigint,
   outputDecimals: number,
+  isPairReverse: boolean,
 ): string => {
   if (!inputAmount || inputAmount === '0' || reserve0 === 0n || reserve1 === 0n) {
     return '';
   }
 
+  const inputReserve = isPairReverse ? reserve1 : reserve0;
+  const outputReserve = isPairReverse ? reserve0 : reserve1;
+
   try {
     const inputAmountWei = parseUnits(inputAmount, inputDecimals);
-    const outputAmountWei = (inputAmountWei * reserve1) / reserve0;
+    const outputAmountWei = (inputAmountWei * outputReserve) / inputReserve;
     return formatUnits(outputAmountWei, outputDecimals);
   } catch {
     return '';
