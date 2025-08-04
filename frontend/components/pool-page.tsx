@@ -6,8 +6,9 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { AddLiquidity, RemoveLiquidity, usePairsBalances, useLpUserFees } from '@/features/pair';
+import { AddLiquidity, RemoveLiquidity, usePairsBalances, useLpUserFees, useLpDecimals } from '@/features/pair';
 import { PairsTokens, Token } from '@/features/pair/types';
+import { formatUnits } from '@/features/pair/utils';
 import { usePairsQuery } from '@/lib/sails';
 
 type PoolPageProps = {
@@ -19,6 +20,7 @@ export function PoolPage({ pairsTokens, refetchBalances: refetchVftBalances }: P
   const { pairs } = usePairsQuery();
   const [activeTab, setActiveTab] = useState<'positions' | 'new'>('positions');
   const { pairBalances, refetchPairBalances, pairPrograms } = usePairsBalances({ pairs });
+  const { lpDecimals } = useLpDecimals({ pairPrograms });
   // ! TODO: use as rewards
   const { lpUserFees, refetchLpUserFees } = useLpUserFees({ pairPrograms });
   console.log('🚀 ~ PoolPage ~ lpUserFees:', lpUserFees);
@@ -29,23 +31,24 @@ export function PoolPage({ pairsTokens, refetchBalances: refetchVftBalances }: P
     refetchVftBalances();
   };
 
-  const pairsWithUserLiquidity = pairs?.filter((_, index) => pairBalances?.[index] !== 0n);
-
-  const userPositions = pairsWithUserLiquidity?.map((pair) => {
+  const pairsWithUserLiquidity = pairs?.map((pair, index) => {
     const { token0, token1 } = pairsTokens.find(({ pairAddress }) => pairAddress === pair[1]) || {};
 
-    if (!token0 || !token1) return null;
+    if (!token0 || !token1) throw new Error('Token not found');
 
     return {
       pool: `${token0.symbol}/${token1.symbol}`,
       token0,
       token1,
-      liquidity: '$2,450.67',
-      rewards: '0 VARA',
-      share: '0.0%',
+      liquidity: pairBalances?.[index] || 0n, // TODO: use $ price
+      decimals: lpDecimals?.[index] || 18,
+      rewards: lpUserFees?.[index] || 0n, // TODO: '0 VARA',
+      share: '0.0%', // TODO: use share
       pairAddress: pair[1],
     };
   });
+
+  const userPositions = pairsWithUserLiquidity?.filter((pair) => pair?.liquidity !== 0n);
 
   const [defaultToken0, setDefaultToken0] = useState<Token | null>(null);
   const [defaultToken1, setDefaultToken1] = useState<Token | null>(null);
@@ -75,7 +78,7 @@ export function PoolPage({ pairsTokens, refetchBalances: refetchVftBalances }: P
             <div className="grid gap-6">
               {userPositions.map((position, index) => (
                 <Card key={index} className="card">
-                  <CardHeader className="flex flex-row items-center justify-between">
+                  <CardHeader className="flex flex-col items-start justify-between sm:flex-row sm:items-center">
                     <div className="flex items-center space-x-3">
                       <div className="flex -space-x-2">
                         <img
@@ -92,22 +95,19 @@ export function PoolPage({ pairsTokens, refetchBalances: refetchVftBalances }: P
                       <CardTitle className="mono theme-text">{position?.pool}</CardTitle>
                     </div>
                     <div className="flex space-x-2">
-                      {position?.pairAddress && (
-                        <RemoveLiquidity
-                          pairAddress={position.pairAddress}
-                          token0={position.token0}
-                          token1={position.token1}
-                          refetchBalances={refetchBalances}
-                        />
-                      )}
+                      <RemoveLiquidity
+                        pairAddress={position.pairAddress}
+                        token0={position.token0}
+                        token1={position.token1}
+                        refetchBalances={refetchBalances}
+                      />
+
                       <Button
                         className="btn-primary"
                         onClick={() => {
-                          if (position) {
-                            setActiveTab('new');
-                            setDefaultToken0(position.token0);
-                            setDefaultToken1(position.token1);
-                          }
+                          setActiveTab('new');
+                          setDefaultToken0(position.token0);
+                          setDefaultToken1(position.token1);
                         }}>
                         ADD MORE
                       </Button>
@@ -117,15 +117,17 @@ export function PoolPage({ pairsTokens, refetchBalances: refetchVftBalances }: P
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
                         <div className="text-sm text-gray-400 uppercase">LIQUIDITY</div>
-                        <div className="text-lg font-medium mono theme-text">{position?.liquidity}</div>
+                        <div className="text-lg font-medium mono theme-text">
+                          {formatUnits(position.liquidity, position.decimals)}
+                        </div>
                       </div>
                       <div>
                         <div className="text-sm text-gray-400 uppercase">REWARDS</div>
-                        <div className="text-lg font-medium mono theme-text">{position?.rewards}</div>
+                        <div className="text-lg font-medium mono theme-text">{position.rewards}</div>
                       </div>
                       <div>
                         <div className="text-sm text-gray-400 uppercase">POOL SHARE</div>
-                        <div className="text-lg font-medium mono theme-text">{position?.share}</div>
+                        <div className="text-lg font-medium mono theme-text">{position.share}</div>
                       </div>
                     </div>
                   </CardContent>
@@ -148,7 +150,10 @@ export function PoolPage({ pairsTokens, refetchBalances: refetchVftBalances }: P
         <TabsContent value="new">
           <AddLiquidity
             pairsTokens={pairsTokens}
-            refetchBalances={refetchBalances}
+            onSuccess={() => {
+              refetchBalances();
+              setActiveTab('positions');
+            }}
             defaultToken0={defaultToken0}
             defaultToken1={defaultToken1}
           />

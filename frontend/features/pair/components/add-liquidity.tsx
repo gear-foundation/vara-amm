@@ -24,12 +24,12 @@ import {
 
 type AddLiquidityProps = {
   pairsTokens: PairsTokens;
-  refetchBalances: () => void;
+  onSuccess: () => void;
   defaultToken0: Token | null;
   defaultToken1: Token | null;
 };
 
-const AddLiquidity = ({ pairsTokens, refetchBalances, defaultToken0, defaultToken1 }: AddLiquidityProps) => {
+const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: AddLiquidityProps) => {
   const [token0, setToken0] = useState<Token>(defaultToken0 || pairsTokens[0].token0);
   const [token1, setToken1] = useState<Token>(defaultToken1 || pairsTokens[0].token1);
 
@@ -68,11 +68,8 @@ const AddLiquidity = ({ pairsTokens, refetchBalances, defaultToken0, defaultToke
       (pair.token0.address === token0.address && pair.token1.address === token1.address) ||
       (pair.token0.address === token1.address && pair.token1.address === token0.address),
   );
-  console.log('🚀 ~ AddLiquidity ~ selectedPair:', selectedPair);
   const pairAddress = selectedPair?.pairAddress;
   const isPairReverse = token0.address === selectedPair?.token1.address;
-  console.log('🚀 ~ AddLiquidity ~ isPairReverse:', isPairReverse);
-  console.log('🚀 ~ AddLiquidity ~ pairsTokens:', pairsTokens);
 
   const { reserves, isFetching: isReservesFetching, refetch: refreshReserves } = useGetReservesQuery(pairAddress);
   const {
@@ -214,7 +211,7 @@ const AddLiquidity = ({ pairsTokens, refetchBalances, defaultToken0, defaultToke
         onSuccess: () => {
           void refreshReserves();
           void refreshTotalSupply();
-          void refetchBalances();
+          onSuccess();
           alert.success('Liquidity added successfully');
         },
         onError: (_error) => alert.error(_error),
