@@ -1,5 +1,6 @@
 'use client';
 
+import { useAccount } from '@gear-js/react-hooks';
 import { Plus } from 'lucide-react';
 import { useState } from 'react';
 
@@ -9,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AddLiquidity, RemoveLiquidity, usePairsBalances, useLpUserFees, useLpDecimals } from '@/features/pair';
 import { PairsTokens, Token } from '@/features/pair/types';
 import { formatUnits } from '@/features/pair/utils';
+import { WalletConnect } from '@/features/wallet';
 import { usePairsQuery } from '@/lib/sails';
 
 type PoolPageProps = {
@@ -17,6 +19,11 @@ type PoolPageProps = {
 };
 
 export function PoolPage({ pairsTokens, refetchBalances: refetchVftBalances }: PoolPageProps) {
+  const [isOpenConnectWallet, setIsOpenConnectWallet] = useState(false);
+  const openConnectWallet = () => setIsOpenConnectWallet(true);
+  const closeConnectWallet = () => setIsOpenConnectWallet(false);
+  const { account } = useAccount();
+
   const { pairs } = usePairsQuery();
   const [activeTab, setActiveTab] = useState<'positions' | 'new'>('positions');
   const { pairBalances, refetchPairBalances, pairPrograms } = usePairsBalances({ pairs });
@@ -138,10 +145,16 @@ export function PoolPage({ pairsTokens, refetchBalances: refetchVftBalances }: P
             <Card className="card">
               <CardContent className="text-center py-12">
                 <div className="text-gray-400 mb-4">No liquidity positions found</div>
-                <Button className="btn-primary">
-                  <Plus className="w-4 h-4 mr-2" />
-                  CREATE FIRST POSITION
-                </Button>
+                {account ? (
+                  <Button className="btn-primary" onClick={() => setActiveTab('new')}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    CREATE FIRST POSITION
+                  </Button>
+                ) : (
+                  <Button onClick={openConnectWallet} className="btn-primary py-4">
+                    CONNECT WALLET
+                  </Button>
+                )}
               </CardContent>
             </Card>
           )}
@@ -156,9 +169,12 @@ export function PoolPage({ pairsTokens, refetchBalances: refetchVftBalances }: P
             }}
             defaultToken0={defaultToken0}
             defaultToken1={defaultToken1}
+            openConnectWallet={openConnectWallet}
           />
         </TabsContent>
       </Tabs>
+
+      <WalletConnect isOpen={isOpenConnectWallet} onClose={closeConnectWallet} />
     </div>
   );
 }

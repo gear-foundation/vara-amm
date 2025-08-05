@@ -100,10 +100,6 @@ const usePairsTokens = (): UsePairsTokensResult => {
   } = useQuery<TokenDataMap, Error>({
     queryKey: ['pairsTokensData', vftAddresses, account?.decodedAddress],
     queryFn: async ({ client }) => {
-      if (!account?.decodedAddress) {
-        throw new Error('No account');
-      }
-
       const cachedData: TokenDataMap | undefined = client.getQueryData([
         'pairsTokensData',
         vftAddresses,
@@ -111,7 +107,7 @@ const usePairsTokens = (): UsePairsTokensResult => {
       ]);
 
       // if has cachedData - refetch only balances
-      if (cachedData) {
+      if (cachedData && account) {
         const tokenDataMap = new Map(cachedData);
         const tokenPrograms = getVftPrograms();
         const tokenBalancesPromises = tokenPrograms.map(({ program }) => program.vft.balanceOf(account.decodedAddress));

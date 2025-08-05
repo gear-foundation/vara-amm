@@ -101,90 +101,87 @@ export function TradePage({ pairsTokens, refetchBalances }: TradePageProps) {
   };
 
   const handleSwap = async () => {
-    if (!isWalletConnected) {
-      openConnectWallet();
-    } else {
-      if (!pairPrograms || pairIndex === undefined || isPairReverse === undefined || !api || !pairAddress) return;
-      const slippage = 0.05;
-      const deadline = (Math.floor(Date.now() / 1000) + 20 * SECONDS_IN_MINUTE) * 1000;
-      const isToken0ToToken1 = !isPairReverse;
+    if (!pairPrograms || pairIndex === undefined || isPairReverse === undefined || !api || !pairAddress || !account)
+      return;
+    const slippage = 0.05;
+    const deadline = (Math.floor(Date.now() / 1000) + 20 * SECONDS_IN_MINUTE) * 1000;
+    const isToken0ToToken1 = !isPairReverse;
 
-      let batch: ReturnType<typeof api.tx.utility.batch>;
+    let batch: ReturnType<typeof api.tx.utility.batch>;
 
-      if (lastInputTouch === 'from') {
-        const amountIn = parseUnits(fromAmount, fromToken.decimals);
-        const amountOut = await pairPrograms[pairIndex].pair.getAmountOut(amountIn, isToken0ToToken1);
-        const amountOutMin = calculatePercentage(amountOut, 1 - slippage).toString();
+    if (lastInputTouch === 'from') {
+      const amountIn = parseUnits(fromAmount, fromToken.decimals);
+      const amountOut = await pairPrograms[pairIndex].pair.getAmountOut(amountIn, isToken0ToToken1);
+      const amountOutMin = calculatePercentage(amountOut, 1 - slippage).toString();
 
-        console.log('swapExactTokensForTokensMessage', {
-          amountIn: amountIn.toString(),
-          amountOutMin,
-          isToken0ToToken1,
-          deadline: deadline.toString(),
-        });
+      console.log('swapExactTokensForTokensMessage', {
+        amountIn: amountIn.toString(),
+        amountOutMin,
+        isToken0ToToken1,
+        deadline: deadline.toString(),
+      });
 
-        const approveTx = await approveMessage({ value: amountIn, spender: pairAddress });
+      const approveTx = await approveMessage({ value: amountIn, spender: pairAddress });
 
-        const swapExactTokensForTokensTx = await swapExactTokensForTokensMessage({
-          amountIn: amountIn.toString(),
-          amountOutMin,
-          isToken0ToToken1,
-          deadline: deadline.toString(),
-        });
+      const swapExactTokensForTokensTx = await swapExactTokensForTokensMessage({
+        amountIn: amountIn.toString(),
+        amountOutMin,
+        isToken0ToToken1,
+        deadline: deadline.toString(),
+      });
 
-        if (!approveTx?.extrinsic || !swapExactTokensForTokensTx?.extrinsic) {
-          alert.error('Failed to create batch');
-          return;
-        }
-
-        batch = api.tx.utility.batch([approveTx.extrinsic, swapExactTokensForTokensTx.extrinsic]);
-      } else {
-        const amountOut = parseUnits(toAmount, toToken.decimals);
-        const amountIn = await pairPrograms[pairIndex].pair.getAmountIn(amountOut, isToken0ToToken1);
-        const amountInMax = calculatePercentage(amountIn, 1 + slippage).toString();
-
-        console.log('swapTokensForExactTokensMessage', {
-          amountOut: amountOut.toString(),
-          amountInMax,
-          isToken0ToToken1,
-          deadline: deadline.toString(),
-        });
-
-        const swapTokensForExactTokensTx = await swapTokensForExactTokensMessage({
-          amountOut: amountOut.toString(),
-          amountInMax,
-          isToken0ToToken1,
-          deadline: deadline.toString(),
-        });
-
-        const approveTx = await approveMessage({ value: amountInMax, spender: pairAddress });
-        if (!approveTx?.extrinsic || !swapTokensForExactTokensTx?.extrinsic) {
-          alert.error('Failed to create batch');
-          return;
-        }
-
-        batch = api.tx.utility.batch([approveTx.extrinsic, swapTokensForExactTokensTx.extrinsic]);
+      if (!approveTx?.extrinsic || !swapExactTokensForTokensTx?.extrinsic) {
+        alert.error('Failed to create batch');
+        return;
       }
 
-      setLoading(true);
+      batch = api.tx.utility.batch([approveTx.extrinsic, swapExactTokensForTokensTx.extrinsic]);
+    } else {
+      const amountOut = parseUnits(toAmount, toToken.decimals);
+      const amountIn = await pairPrograms[pairIndex].pair.getAmountIn(amountOut, isToken0ToToken1);
+      const amountInMax = calculatePercentage(amountIn, 1 + slippage).toString();
 
-      const { address, signer } = account;
-      const statusCallback = (result: ISubmittableResult) => {
-        return handleStatus(api, result, {
-          // TODO: SEEMS LIKE BATCH SUCCESS EVERYTIME ON FAILED TX
-          onSuccess: () => {
-            alert.success('Swap successful');
-            void refetchBalances();
-            setToAmount('');
-            setFromAmount('');
-          },
-          onError: (_error) => alert.error(_error),
-          onFinally: () => setLoading(false),
-        });
-      };
+      console.log('swapTokensForExactTokensMessage', {
+        amountOut: amountOut.toString(),
+        amountInMax,
+        isToken0ToToken1,
+        deadline: deadline.toString(),
+      });
 
-      await batch.signAndSend(address, { signer }, statusCallback);
+      const swapTokensForExactTokensTx = await swapTokensForExactTokensMessage({
+        amountOut: amountOut.toString(),
+        amountInMax,
+        isToken0ToToken1,
+        deadline: deadline.toString(),
+      });
+
+      const approveTx = await approveMessage({ value: amountInMax, spender: pairAddress });
+      if (!approveTx?.extrinsic || !swapTokensForExactTokensTx?.extrinsic) {
+        alert.error('Failed to create batch');
+        return;
+      }
+
+      batch = api.tx.utility.batch([approveTx.extrinsic, swapTokensForExactTokensTx.extrinsic]);
     }
+
+    setLoading(true);
+
+    const { address, signer } = account;
+    const statusCallback = (result: ISubmittableResult) => {
+      return handleStatus(api, result, {
+        // TODO: SEEMS LIKE BATCH SUCCESS EVERYTIME ON FAILED TX
+        onSuccess: () => {
+          alert.success('Swap successful');
+          void refetchBalances();
+          setToAmount('');
+          setFromAmount('');
+        },
+        onError: (_error) => alert.error(_error),
+        onFinally: () => setLoading(false),
+      });
+    };
+
+    await batch.signAndSend(address, { signer }, statusCallback);
   };
 
   const getSwapDirection = () => {
@@ -435,9 +432,15 @@ export function TradePage({ pairsTokens, refetchBalances }: TradePageProps) {
 
               {error && <div className="text-red-500">{error}</div>}
 
-              <Button onClick={handleSwap} disabled={isSwapDisabled} className="btn-primary w-full py-4 text-lg">
-                {isWalletConnected ? 'SWAP TOKENS' : 'CONNECT WALLET'}
-              </Button>
+              {isWalletConnected ? (
+                <Button onClick={handleSwap} disabled={isSwapDisabled} className="btn-primary w-full py-4 text-lg">
+                  SWAP TOKENS
+                </Button>
+              ) : (
+                <Button onClick={openConnectWallet} className="btn-primary w-full py-4 text-lg">
+                  CONNECT WALLET
+                </Button>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

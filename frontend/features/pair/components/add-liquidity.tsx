@@ -28,9 +28,16 @@ type AddLiquidityProps = {
   onSuccess: () => void;
   defaultToken0: Token | null;
   defaultToken1: Token | null;
+  openConnectWallet: () => void;
 };
 
-const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: AddLiquidityProps) => {
+const AddLiquidity = ({
+  pairsTokens,
+  onSuccess,
+  defaultToken0,
+  defaultToken1,
+  openConnectWallet,
+}: AddLiquidityProps) => {
   const [token0, setToken0] = useState<Token>(defaultToken0 || pairsTokens[0].token0);
   const [token1, setToken1] = useState<Token>(defaultToken1 || pairsTokens[0].token1);
 
@@ -333,12 +340,18 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
             </div>
           </div>
 
-          <Button
-            onClick={addLiquidity}
-            disabled={isPending || !pairAddress}
-            className="btn-primary w-full py-4 text-lg">
-            ADD LIQUIDITY
-          </Button>
+          {account ? (
+            <Button
+              onClick={addLiquidity}
+              disabled={isPending || !pairAddress}
+              className="btn-primary w-full py-4 text-lg">
+              ADD LIQUIDITY
+            </Button>
+          ) : (
+            <Button onClick={openConnectWallet} className="btn-primary w-full py-4 text-lg">
+              CONNECT WALLET
+            </Button>
+          )}
 
           {!pairAddress && <div className="text-red-500"> Pair not found</div>}
 
