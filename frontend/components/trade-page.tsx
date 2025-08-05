@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { INPUT_PERCENTAGES, SECONDS_IN_MINUTE } from '@/consts';
+import { INPUT_PERCENTAGES, SECONDS_IN_MINUTE, SLIPPAGE } from '@/consts';
 import { usePairsBalances } from '@/features/pair';
 import { Token, Network, PairsTokens } from '@/features/pair/types';
 import {
@@ -103,7 +103,6 @@ export function TradePage({ pairsTokens, refetchBalances }: TradePageProps) {
   const handleSwap = async () => {
     if (!pairPrograms || pairIndex === undefined || isPairReverse === undefined || !api || !pairAddress || !account)
       return;
-    const slippage = 0.05;
     const deadline = (Math.floor(Date.now() / 1000) + 20 * SECONDS_IN_MINUTE) * 1000;
     const isToken0ToToken1 = !isPairReverse;
 
@@ -112,7 +111,7 @@ export function TradePage({ pairsTokens, refetchBalances }: TradePageProps) {
     if (lastInputTouch === 'from') {
       const amountIn = parseUnits(fromAmount, fromToken.decimals);
       const amountOut = await pairPrograms[pairIndex].pair.getAmountOut(amountIn, isToken0ToToken1);
-      const amountOutMin = calculatePercentage(amountOut, 1 - slippage).toString();
+      const amountOutMin = calculatePercentage(amountOut, 1 - SLIPPAGE).toString();
 
       console.log('swapExactTokensForTokensMessage', {
         amountIn: amountIn.toString(),
@@ -139,7 +138,7 @@ export function TradePage({ pairsTokens, refetchBalances }: TradePageProps) {
     } else {
       const amountOut = parseUnits(toAmount, toToken.decimals);
       const amountIn = await pairPrograms[pairIndex].pair.getAmountIn(amountOut, isToken0ToToken1);
-      const amountInMax = calculatePercentage(amountIn, 1 + slippage).toString();
+      const amountInMax = calculatePercentage(amountIn, 1 + SLIPPAGE).toString();
 
       console.log('swapTokensForExactTokensMessage', {
         amountOut: amountOut.toString(),
@@ -424,7 +423,7 @@ export function TradePage({ pairsTokens, refetchBalances }: TradePageProps) {
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-400">Max slippage</span>
-                      <span className="theme-text">Auto 0.50%</span>
+                      <span className="theme-text">Auto {SLIPPAGE * 100}%</span>
                     </div>
                   </div>
                 )}

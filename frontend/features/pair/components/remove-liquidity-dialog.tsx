@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { INPUT_PERCENTAGES, SECONDS_IN_MINUTE } from '@/consts';
+import { INPUT_PERCENTAGES, SECONDS_IN_MINUTE, SLIPPAGE } from '@/consts';
 import {
   useCalculateRemoveLiquidityQuery,
   useRemoveLiquidityMessage,
@@ -64,9 +64,8 @@ const RemoveLiquidityDialog = ({
       return;
     }
 
-    const slippage = 0.05;
-    const amountAMin = calculatePercentage(BigInt(removeLiquidityAmounts[0]), 1 - slippage);
-    const amountBMin = calculatePercentage(BigInt(removeLiquidityAmounts[1]), 1 - slippage);
+    const amountAMin = calculatePercentage(BigInt(removeLiquidityAmounts[0]), 1 - SLIPPAGE);
+    const amountBMin = calculatePercentage(BigInt(removeLiquidityAmounts[1]), 1 - SLIPPAGE);
 
     const deadline = (Math.floor(Date.now() / 1000) + 20 * SECONDS_IN_MINUTE) * 1000;
 

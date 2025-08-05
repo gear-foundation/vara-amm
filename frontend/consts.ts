@@ -27,6 +27,8 @@ export const LOGO_URI_BY_SYMBOL: Record<string, string> = {
 
 export const SECONDS_IN_MINUTE = 60;
 
+export const SLIPPAGE = 0.05;
+
 export const INPUT_PERCENTAGES = [
   { label: '25%', value: 0.25 },
   { label: '50%', value: 0.5 },
