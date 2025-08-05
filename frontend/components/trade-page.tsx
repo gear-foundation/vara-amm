@@ -43,13 +43,26 @@ export function TradePage({ pairsTokens, refetchBalances }: TradePageProps) {
   const alert = useAlert();
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [lastInputTouch, setLastInputTouch] = useState<'from' | 'to'>('from');
   const [fromToken, setFromToken] = useState<Token>(pairsTokens[0].token0);
   const [toToken, setToToken] = useState<Token>(pairsTokens[0].token1);
-  const [lastInputTouch, setLastInputTouch] = useState<'from' | 'to'>('from');
 
   const { pairs } = usePairsQuery();
   const { pairPrograms } = usePairsBalances({ pairs });
-  const { pairAddress, isPairReverse, pairIndex } = getSelectedPair(pairsTokens, fromToken, toToken) || {};
+  const { selectedPair, isPairReverse, pairIndex } = getSelectedPair(pairsTokens, fromToken, toToken) || {};
+  const pairAddress = selectedPair?.pairAddress;
+
+  useEffect(() => {
+    setFromToken((prev) => ({
+      ...prev,
+      balance: isPairReverse ? selectedPair?.token1.balance : selectedPair?.token0.balance,
+    }));
+    setToToken((prev) => ({
+      ...prev,
+      balance: isPairReverse ? selectedPair?.token0.balance : selectedPair?.token1.balance,
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pairsTokens]);
 
   const { approveMessage } = useApproveMessage(fromToken.address);
 
@@ -158,10 +171,12 @@ export function TradePage({ pairsTokens, refetchBalances }: TradePageProps) {
       const { address, signer } = account;
       const statusCallback = (result: ISubmittableResult) => {
         return handleStatus(api, result, {
-          // SUCCESS IS WORKING ON FAILED TX
+          // TODO: SEEMS LIKE BATCH SUCCESS EVERYTIME ON FAILED TX
           onSuccess: () => {
             alert.success('Swap successful');
             void refetchBalances();
+            setToAmount('');
+            setFromAmount('');
           },
           onError: (_error) => alert.error(_error),
           onFinally: () => setLoading(false),

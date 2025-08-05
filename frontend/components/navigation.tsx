@@ -22,7 +22,7 @@ export function Navigation() {
   const [isOpenChange, setIsOpenChange] = useState(false);
   const openAndCloseChange = () => setIsOpenChange(!isOpenChange);
 
-  const { account } = useAccount();
+  const { account, isAccountReady } = useAccount();
 
   return (
     <>
@@ -60,19 +60,23 @@ export function Navigation() {
             {/* Theme Switcher & Wallet Connection */}
             <div className="hidden md:flex items-center space-x-4">
               <ThemeSwitcher />
-              {account ? (
-                <Button
-                  onClick={openAndCloseChange}
-                  variant="outline"
-                  className="flex items-center space-x-2 bg-[#00FF85]/10 border border-[#00FF85]/20 rounded-xl px-4 py-2">
-                  <div className="w-6 h-6 bg-[#00FF85] rounded-full"></div>
-                  <span className="mono text-sm theme-text">{prettyAddress(account.decodedAddress)}</span>
-                </Button>
-              ) : (
-                <Button onClick={openConnectWallet} className="btn-primary">
-                  <Wallet className="w-4 h-4 mr-2" />
-                  CONNECT WALLET
-                </Button>
+              {isAccountReady && (
+                <>
+                  {account ? (
+                    <Button
+                      onClick={openAndCloseChange}
+                      variant="outline"
+                      className="flex items-center space-x-2 bg-[#00FF85]/10 border border-[#00FF85]/20 rounded-xl px-4 py-2">
+                      <div className="w-6 h-6 bg-[#00FF85] rounded-full"></div>
+                      <span className="mono text-sm theme-text">{prettyAddress(account.decodedAddress)}</span>
+                    </Button>
+                  ) : (
+                    <Button onClick={openConnectWallet} className="btn-primary">
+                      <Wallet className="w-4 h-4 mr-2" />
+                      CONNECT WALLET
+                    </Button>
+                  )}
+                </>
               )}
             </div>
 
@@ -119,7 +123,7 @@ export function Navigation() {
       </nav>
 
       {isOpenChange && (
-        <Dialog open={isOpenChange} onOpenChange={openAndCloseChange}>
+        <Dialog open={isOpenChange} onOpenChange={openAndCloseChange} aria-describedby="change-account-dialog">
           <DialogContent className="card max-w-md mx-auto max-h-[80vh] overflow-auto flex flex-col">
             <DialogHeader>
               <DialogTitle>CONNECTED ACCOUNT</DialogTitle>

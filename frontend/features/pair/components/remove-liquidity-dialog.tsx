@@ -81,7 +81,7 @@ const RemoveLiquidityDialog = ({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={onClose} aria-describedby="remove-liquidity-dialog">
       <DialogContent className="card max-w-md mx-auto max-h-[80vh] overflow-hidden flex flex-col">
         <DialogHeader className="pb-4">
           <DialogTitle className="text-lg font-bold uppercase theme-text">Remove Liquidity</DialogTitle>

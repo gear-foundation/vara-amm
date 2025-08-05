@@ -112,20 +112,21 @@ const usePairsTokens = (): UsePairsTokensResult => {
 
       // if has cachedData - refetch only balances
       if (cachedData) {
+        const tokenDataMap = new Map(cachedData);
         const tokenPrograms = getVftPrograms();
         const tokenBalancesPromises = tokenPrograms.map(({ program }) => program.vft.balanceOf(account.decodedAddress));
 
         const tokenBalances = await Promise.all(tokenBalancesPromises);
         tokenBalances.forEach((balance, index) => {
-          const token = cachedData.get(vftAddresses[index]);
+          const token = tokenDataMap.get(vftAddresses[index]);
           if (token && balance) {
-            cachedData.set(vftAddresses[index], {
+            tokenDataMap.set(vftAddresses[index], {
               ...token,
               balance,
             });
           }
         });
-        return cachedData;
+        return tokenDataMap;
       }
 
       if (!pairs || !api) {
@@ -151,7 +152,6 @@ const usePairsTokens = (): UsePairsTokensResult => {
       return tokenDataMap;
     },
     enabled: !!pairs && pairs.length > 0 && !!api,
-    refetchInterval: 30000,
   });
 
   const pairsTokens = useMemo(() => {

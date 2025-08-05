@@ -135,7 +135,7 @@ export function WalletConnect({ isOpen, onClose }: Props) {
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={onClose} aria-describedby="wallet-connect-dialog">
       <DialogContent className="card max-w-md mx-auto max-h-[80vh] overflow-auto flex flex-col">
         <DialogHeader>
           <DialogTitle>CONNECT WALLET</DialogTitle>

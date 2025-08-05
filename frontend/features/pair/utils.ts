@@ -118,7 +118,7 @@ const getSelectedPair = (pairsTokens: PairsTokens, token0: Token, token1: Token)
   const isPairReverse = token0.address === selectedPair?.token1.address;
 
   return {
-    pairAddress: selectedPair.pairAddress,
+    selectedPair,
     isPairReverse,
     pairIndex,
   };
@@ -146,7 +146,6 @@ const handleStatus = (
     .filter(({ event }) => event.section === 'system')
     .forEach(({ event }) => {
       const { method } = event;
-      console.log('🚀 ~ handleStatus ~ event:', event);
 
       if (method === 'ExtrinsicSuccess' || method === 'ExtrinsicFailed') onFinally();
 

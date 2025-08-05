@@ -64,7 +64,8 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
     setToken1(token);
   };
 
-  const { pairAddress, isPairReverse } = getSelectedPair(pairsTokens, token0, token1) || {};
+  const { selectedPair, isPairReverse } = getSelectedPair(pairsTokens, token0, token1) || {};
+  const pairAddress = selectedPair?.pairAddress;
 
   const { reserves, isFetching: isReservesFetching, refetch: refreshReserves } = useGetReservesQuery(pairAddress);
   const {

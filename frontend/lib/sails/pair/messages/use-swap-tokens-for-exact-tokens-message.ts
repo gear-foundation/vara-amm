@@ -37,7 +37,6 @@ export const useSwapTokensForExactTokensMessage = (pairAddress?: HexString) => {
   const { mutateAsync: swapTokensForExactTokensMessage, isPending } = useMutation({
     mutationFn: tx,
     onError: (error) => {
-      console.log('🚀 ~ useSwapTokensForExactTokensMessage ~ error:', error);
       alert.error(getErrorMessage(error));
     },
   });
