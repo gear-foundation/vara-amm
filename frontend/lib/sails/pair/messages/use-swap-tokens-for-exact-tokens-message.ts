@@ -12,7 +12,7 @@ type Params = {
   deadline: string;
 };
 
-export const useSwapTokensForExactTokensMessage = (pairAddress: HexString) => {
+export const useSwapTokensForExactTokensMessage = (pairAddress?: HexString) => {
   const program = usePairProgram(pairAddress);
   const { account } = useAccount();
 
@@ -28,14 +28,16 @@ export const useSwapTokensForExactTokensMessage = (pairAddress: HexString) => {
 
     const { transaction } = await prepareTransactionAsync({
       args: [amountOut, amountInMax, isToken0ToToken1, deadline],
+      gasLimit: 105_000_000_000n,
     });
 
-    await transaction.signAndSend();
+    return transaction;
   };
 
   const { mutateAsync: swapTokensForExactTokensMessage, isPending } = useMutation({
     mutationFn: tx,
     onError: (error) => {
+      console.log('🚀 ~ useSwapTokensForExactTokensMessage ~ error:', error);
       alert.error(getErrorMessage(error));
     },
   });

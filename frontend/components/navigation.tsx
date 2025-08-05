@@ -1,12 +1,11 @@
 'use client';
 
 import { useAccount } from '@gear-js/react-hooks';
-import { Search, Wallet, Menu, X } from 'lucide-react';
+import { Wallet, Menu, X } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { ROUTES } from '@/consts';
 import { WalletChange } from '@/features/wallet';
 import { WalletConnect } from '@/features/wallet/components/wallet-connect/WalletConnect';
@@ -42,21 +41,21 @@ export function Navigation() {
               <Link href={ROUTES.TRADE} className="theme-text font-medium uppercase tracking-wide transition-colors">
                 TRADE
               </Link>
-              <Link href={ROUTES.EXPLORE} className="theme-text font-medium uppercase tracking-wide transition-colors">
+              {/* <Link href={ROUTES.EXPLORE} className="theme-text font-medium uppercase tracking-wide transition-colors">
                 EXPLORE
-              </Link>
+              </Link> */}
               <Link href={ROUTES.POOL} className="theme-text font-medium uppercase tracking-wide transition-colors">
                 POOL
               </Link>
             </div>
 
             {/* Search Bar */}
-            <div className="hidden md:flex items-center flex-1 max-w-md mx-8">
+            {/* <div className="hidden md:flex items-center flex-1 max-w-md mx-8">
               <div className="relative w-full">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <Input placeholder="Search tokens, pools..." className="input-field pl-10 w-full" />
               </div>
-            </div>
+            </div> */}
 
             {/* Theme Switcher & Wallet Connection */}
             <div className="hidden md:flex items-center space-x-4">
@@ -93,9 +92,9 @@ export function Navigation() {
                 <Link href={ROUTES.TRADE} className="theme-text font-medium uppercase tracking-wide">
                   TRADE
                 </Link>
-                <Link href={ROUTES.EXPLORE} className="theme-text font-medium uppercase tracking-wide">
+                {/* <Link href={ROUTES.EXPLORE} className="theme-text font-medium uppercase tracking-wide">
                   EXPLORE
-                </Link>
+                </Link> */}
                 <Link href={ROUTES.POOL} className="theme-text font-medium uppercase tracking-wide">
                   POOL
                 </Link>

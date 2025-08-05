@@ -1,14 +1,15 @@
 'use client';
 
-import { useAccount } from '@gear-js/react-hooks';
+import { useAccount, useAlert, useApi } from '@gear-js/react-hooks';
+import { ISubmittableResult } from '@polkadot/types/types';
 import { ArrowDownUp, Info, ChevronDown, ChevronUp } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { INPUT_PERCENTAGES } from '@/consts';
+import { INPUT_PERCENTAGES, SECONDS_IN_MINUTE } from '@/consts';
 import { usePairsBalances } from '@/features/pair';
 import { Token, Network, PairsTokens } from '@/features/pair/types';
 import {
@@ -17,10 +18,16 @@ import {
   getFormattedBalance,
   getNetworks,
   getSelectedPair,
+  handleStatus,
   parseUnits,
 } from '@/features/pair/utils';
 import { WalletConnect } from '@/features/wallet';
-import { usePairsQuery } from '@/lib/sails';
+import {
+  useApproveMessage,
+  usePairsQuery,
+  useSwapExactTokensForTokensMessage,
+  useSwapTokensForExactTokensMessage,
+} from '@/lib/sails';
 
 import { TokenSelector } from './token-selector';
 import { TradePageBuy } from './trade-page-buy';
@@ -28,16 +35,28 @@ import { TradePageSell } from './trade-page-sell';
 
 type TradePageProps = {
   pairsTokens: PairsTokens;
+  refetchBalances: () => void;
 };
 
-export function TradePage({ pairsTokens }: TradePageProps) {
+export function TradePage({ pairsTokens, refetchBalances }: TradePageProps) {
+  const { api } = useApi();
+  const alert = useAlert();
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const [fromToken, setFromToken] = useState<Token>(pairsTokens[0].token0);
   const [toToken, setToToken] = useState<Token>(pairsTokens[0].token1);
   const [lastInputTouch, setLastInputTouch] = useState<'from' | 'to'>('from');
 
   const { pairs } = usePairsQuery();
-  const { pairBalances, refetchPairBalances, pairPrograms } = usePairsBalances({ pairs });
+  const { pairPrograms } = usePairsBalances({ pairs });
   const { pairAddress, isPairReverse, pairIndex } = getSelectedPair(pairsTokens, fromToken, toToken) || {};
+
+  const { approveMessage } = useApproveMessage(fromToken.address);
+
+  const { swapTokensForExactTokensMessage, isPending: isSwapTokensForExactTokensPending } =
+    useSwapTokensForExactTokensMessage(pairAddress);
+  const { swapExactTokensForTokensMessage, isPending: isSwapExactTokensForTokensPending } =
+    useSwapExactTokensForTokensMessage(pairAddress);
 
   const [fromAmount, setFromAmount] = useState('');
   const [toAmount, setToAmount] = useState('');
@@ -68,12 +87,88 @@ export function TradePage({ pairsTokens }: TradePageProps) {
     setToToken({ ...token, network: network.name });
   };
 
-  const handleSwap = () => {
+  const handleSwap = async () => {
     if (!isWalletConnected) {
       openConnectWallet();
     } else {
-      // Handle swap logic here
-      console.log('Executing swap...');
+      if (!pairPrograms || pairIndex === undefined || isPairReverse === undefined || !api || !pairAddress) return;
+      const slippage = 0.05;
+      const deadline = (Math.floor(Date.now() / 1000) + 20 * SECONDS_IN_MINUTE) * 1000;
+      const isToken0ToToken1 = !isPairReverse;
+
+      let batch: ReturnType<typeof api.tx.utility.batch>;
+
+      if (lastInputTouch === 'from') {
+        const amountIn = parseUnits(fromAmount, fromToken.decimals);
+        const amountOut = await pairPrograms[pairIndex].pair.getAmountOut(amountIn, isToken0ToToken1);
+        const amountOutMin = calculatePercentage(amountOut, 1 - slippage).toString();
+
+        console.log('swapExactTokensForTokensMessage', {
+          amountIn: amountIn.toString(),
+          amountOutMin,
+          isToken0ToToken1,
+          deadline: deadline.toString(),
+        });
+
+        const approveTx = await approveMessage({ value: amountIn, spender: pairAddress });
+
+        const swapExactTokensForTokensTx = await swapExactTokensForTokensMessage({
+          amountIn: amountIn.toString(),
+          amountOutMin,
+          isToken0ToToken1,
+          deadline: deadline.toString(),
+        });
+
+        if (!approveTx?.extrinsic || !swapExactTokensForTokensTx?.extrinsic) {
+          alert.error('Failed to create batch');
+          return;
+        }
+
+        batch = api.tx.utility.batch([approveTx.extrinsic, swapExactTokensForTokensTx.extrinsic]);
+      } else {
+        const amountOut = parseUnits(toAmount, toToken.decimals);
+        const amountIn = await pairPrograms[pairIndex].pair.getAmountIn(amountOut, isToken0ToToken1);
+        const amountInMax = calculatePercentage(amountIn, 1 + slippage).toString();
+
+        console.log('swapTokensForExactTokensMessage', {
+          amountOut: amountOut.toString(),
+          amountInMax,
+          isToken0ToToken1,
+          deadline: deadline.toString(),
+        });
+
+        const swapTokensForExactTokensTx = await swapTokensForExactTokensMessage({
+          amountOut: amountOut.toString(),
+          amountInMax,
+          isToken0ToToken1,
+          deadline: deadline.toString(),
+        });
+
+        const approveTx = await approveMessage({ value: amountInMax, spender: pairAddress });
+        if (!approveTx?.extrinsic || !swapTokensForExactTokensTx?.extrinsic) {
+          alert.error('Failed to create batch');
+          return;
+        }
+
+        batch = api.tx.utility.batch([approveTx.extrinsic, swapTokensForExactTokensTx.extrinsic]);
+      }
+
+      setLoading(true);
+
+      const { address, signer } = account;
+      const statusCallback = (result: ISubmittableResult) => {
+        return handleStatus(api, result, {
+          // SUCCESS IS WORKING ON FAILED TX
+          onSuccess: () => {
+            alert.success('Swap successful');
+            void refetchBalances();
+          },
+          onError: (_error) => alert.error(_error),
+          onFinally: () => setLoading(false),
+        });
+      };
+
+      await batch.signAndSend(address, { signer }, statusCallback);
     }
   };
 
@@ -84,51 +179,81 @@ export function TradePage({ pairsTokens }: TradePageProps) {
     return `${fromToken.network} → ${toToken.network}`;
   };
 
-  const calculateFeeInUSD = () => {
-    // TODO: remove mock
-    const ETH_PRICE = 2500;
+  const calculateFee = () => {
     const FEE = 0.003;
-    const mockFeeUSD = Number.parseFloat(fromAmount || '0') * FEE * ETH_PRICE;
-    return mockFeeUSD.toFixed(2);
+    const amount = parseUnits(fromAmount || '0', fromToken.decimals);
+    const fee = calculatePercentage(amount, FEE);
+    return formatUnits(fee, fromToken.decimals) + ' ' + fromToken.symbol;
   };
 
   const networks = getNetworks(pairsTokens);
 
   const getAmount = async (amount: string, isReverse?: boolean) => {
-    if (pairIndex === undefined || !pairPrograms) return '';
+    if (pairIndex === undefined || !pairPrograms || isPairReverse === undefined) return '';
     const pairProgram = pairPrograms[pairIndex];
-    const isToken0ToToken1 = isReverse ? !isPairReverse : isPairReverse;
-    const decimalsIn = isToken0ToToken1 ? toToken.decimals : fromToken.decimals;
-    const decimalsOut = isToken0ToToken1 ? fromToken.decimals : toToken.decimals;
+    const isToken0ToToken1 = !isReverse ? !isPairReverse : isPairReverse;
+
+    const decimalsIn = isReverse ? toToken.decimals : fromToken.decimals;
+    const decimalsOut = isReverse ? fromToken.decimals : toToken.decimals;
     const amountIn = parseUnits(amount, decimalsIn);
 
     let amountOut = 0n;
-    if (isToken0ToToken1) {
-      amountOut = await pairProgram.pair.getAmountIn(amountIn, isToken0ToToken1);
+    if (lastInputTouch === 'from') {
+      amountOut = await pairProgram.pair.getAmountOut(amountIn, isToken0ToToken1);
     } else {
-      amountOut = await pairProgram.pair.getAmountOut(amountIn, !isToken0ToToken1);
+      amountOut = await pairProgram.pair.getAmountIn(amountIn, !isToken0ToToken1);
     }
 
     return formatUnits(amountOut, decimalsOut);
   };
 
+  const [oneOutAmount, setOneOutAmount] = useState('');
+
+  useEffect(() => {
+    const fetchOneOutAmount = async () => {
+      const amount = await getAmount('1');
+      setOneOutAmount(amount);
+    };
+    void fetchOneOutAmount();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fromToken, toToken, pairPrograms, pairIndex]);
+
+  const checkBalances = (amount: string) => {
+    const amountIn = parseUnits(amount, fromToken.decimals);
+
+    if (!fromToken.balance || amountIn > fromToken.balance) {
+      setError('Insufficient balance');
+    } else {
+      setError('');
+    }
+  };
+
+  const isSwapDisabled =
+    !pairAddress ||
+    isSwapTokensForExactTokensPending ||
+    isSwapExactTokensForTokensPending ||
+    loading ||
+    !!error ||
+    !Number(fromAmount) ||
+    !Number(toAmount);
+
   return (
     <div className="max-w-md mx-auto">
       <Tabs defaultValue="swap" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 card p-1">
+        <TabsList className="card p-1 w-full flex">
           <TabsTrigger
             value="swap"
-            className="data-[state=active]:bg-[#00FF85] data-[state=active]:text-black font-bold uppercase">
+            className="data-[state=active]:bg-[#00FF85] data-[state=active]:text-black font-bold uppercase flex-1">
             SWAP
           </TabsTrigger>
           <TabsTrigger
             value="buy"
-            className="data-[state=active]:bg-[#00FF85] data-[state=active]:text-black font-bold uppercase">
+            className="data-[state=active]:bg-[#00FF85] data-[state=active]:text-black font-bold uppercase flex-1">
             BUY
           </TabsTrigger>
           <TabsTrigger
             value="sell"
-            className="data-[state=active]:bg-[#00FF85] data-[state=active]:text-black font-bold uppercase">
+            className="data-[state=active]:bg-[#00FF85] data-[state=active]:text-black font-bold uppercase flex-1">
             SELL
           </TabsTrigger>
         </TabsList>
@@ -152,9 +277,13 @@ export function TradePage({ pairsTokens }: TradePageProps) {
                   <Input
                     value={fromAmount}
                     onChange={async (e) => {
+                      const value = e.target.value;
+                      if (Number(value) < 0 || isNaN(Number(value))) return;
+
+                      checkBalances(value);
                       setLastInputTouch('from');
-                      setFromAmount(e.target.value);
-                      const amountOut = await getAmount(e.target.value);
+                      setFromAmount(value);
+                      const amountOut = await getAmount(value);
                       setToAmount(amountOut);
                     }}
                     placeholder="0.0"
@@ -162,7 +291,8 @@ export function TradePage({ pairsTokens }: TradePageProps) {
                   />
                   <Button
                     onClick={() => setShowFromTokenSelector(true)}
-                    className="btn-secondary flex items-center space-x-2 min-w-[120px]">
+                    className="btn-secondary flex items-center space-x-2 min-w-[120px]"
+                    variant="secondary">
                     <img
                       src={fromToken.logoURI || '/placeholder.svg'}
                       alt={fromToken.name}
@@ -201,6 +331,7 @@ export function TradePage({ pairsTokens }: TradePageProps) {
                   onClick={swapTokens}
                   variant="ghost"
                   size="icon"
+                  disabled={isSwapTokensForExactTokensPending || isSwapExactTokensForTokensPending || loading}
                   className="rounded-full bg-gray-500/20 border-2 border-gray-500/30 hover:border-[#00FF85] hover:bg-[#00FF85]/10 theme-text hover:text-[#00FF85] transition-all duration-200">
                   <ArrowDownUp className="w-4 h-4" />
                 </Button>
@@ -219,17 +350,22 @@ export function TradePage({ pairsTokens }: TradePageProps) {
                   <Input
                     value={toAmount}
                     onChange={async (e) => {
+                      const value = e.target.value;
+                      if (Number(value) < 0 || isNaN(Number(value))) return;
+
                       setLastInputTouch('to');
-                      setToAmount(e.target.value);
-                      const amountIn = await getAmount(e.target.value, true);
+                      setToAmount(value);
+                      const amountIn = await getAmount(value, true);
                       setFromAmount(amountIn);
+                      checkBalances(amountIn);
                     }}
                     placeholder="0.0"
                     className="input-field flex-1 text-xl"
                   />
                   <Button
                     onClick={() => setShowToTokenSelector(true)}
-                    className="btn-secondary flex items-center space-x-2 min-w-[120px]">
+                    className="btn-secondary flex items-center space-x-2 min-w-[120px]"
+                    variant="secondary">
                     <img
                       src={toToken.logoURI || '/placeholder.svg'}
                       alt={toToken.name}
@@ -247,10 +383,14 @@ export function TradePage({ pairsTokens }: TradePageProps) {
                   onClick={() => setShowDetails(!showDetails)}
                   className="w-full flex items-center justify-between p-3 hover:bg-gray-500/5 transition-colors">
                   <div className="flex items-center space-x-2">
-                    <span className="text-sm theme-text">
-                      1 {fromToken.symbol} = 1,250 {toToken.symbol}
-                      {/* TODO: remove mock */}
-                    </span>
+                    {pairAddress ? (
+                      <span className="text-sm theme-text">
+                        1 {fromToken.symbol} = {oneOutAmount} {toToken.symbol}
+                        {/* TODO: remove mock */}
+                      </span>
+                    ) : (
+                      <div className="text-red-500"> Pair not found</div>
+                    )}
                     <Info className="w-3 h-3 text-gray-400" />
                   </div>
                   {showDetails ? (
@@ -264,7 +404,7 @@ export function TradePage({ pairsTokens }: TradePageProps) {
                   <div className="px-3 pb-3 space-y-2 border-t border-gray-500/10">
                     <div className="flex justify-between text-sm pt-2">
                       <span className="text-gray-400">Fee (0.3%)</span>
-                      <span className="theme-text">${calculateFeeInUSD()}</span>
+                      <span className="theme-text">{calculateFee()}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-400">Swap direction</span>
@@ -278,7 +418,9 @@ export function TradePage({ pairsTokens }: TradePageProps) {
                 )}
               </div>
 
-              <Button onClick={handleSwap} className="btn-primary w-full py-4 text-lg">
+              {error && <div className="text-red-500">{error}</div>}
+
+              <Button onClick={handleSwap} disabled={isSwapDisabled} className="btn-primary w-full py-4 text-lg">
                 {isWalletConnected ? 'SWAP TOKENS' : 'CONNECT WALLET'}
               </Button>
             </CardContent>

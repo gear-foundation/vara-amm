@@ -146,6 +146,7 @@ const handleStatus = (
     .filter(({ event }) => event.section === 'system')
     .forEach(({ event }) => {
       const { method } = event;
+      console.log('🚀 ~ handleStatus ~ event:', event);
 
       if (method === 'ExtrinsicSuccess' || method === 'ExtrinsicFailed') onFinally();
 

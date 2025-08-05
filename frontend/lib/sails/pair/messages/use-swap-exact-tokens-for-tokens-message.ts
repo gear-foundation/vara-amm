@@ -12,7 +12,7 @@ type Params = {
   deadline: string;
 };
 
-export const useSwapExactTokensForTokensMessage = (pairAddress: HexString) => {
+export const useSwapExactTokensForTokensMessage = (pairAddress?: HexString) => {
   const program = usePairProgram(pairAddress);
   const { account } = useAccount();
 
@@ -28,9 +28,10 @@ export const useSwapExactTokensForTokensMessage = (pairAddress: HexString) => {
 
     const { transaction } = await prepareTransactionAsync({
       args: [amountIn, amountOutMin, isToken0ToToken1, deadline],
+      gasLimit: 105_000_000_000n,
     });
 
-    await transaction.signAndSend();
+    return transaction;
   };
 
   const { mutateAsync: swapExactTokensForTokensMessage, isPending } = useMutation({

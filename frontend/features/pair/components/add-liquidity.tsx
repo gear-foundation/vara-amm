@@ -167,19 +167,16 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
       recipient: account.decodedAddress,
     });
 
-    console.log('before approve token0');
     const token0ApproveTx = await token0ApproveMessage({
       value: amountADesired,
       spender: pairAddress,
     });
 
-    console.log('before approve token1');
     const token1ApproveTx = await token1ApproveMessage({
       value: amountBDesired,
       spender: pairAddress,
     });
 
-    console.log('before add liquidity');
     const addLiquidityTx = await addLiquidityMessage({
       amountADesired: isPairReverse ? amountBDesired : amountADesired,
       amountBDesired: isPairReverse ? amountADesired : amountBDesired,
@@ -195,9 +192,9 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
     setLoading(true);
 
     const batch = api.tx.utility.batch([
-      token0ApproveTx?.extrinsic,
-      token1ApproveTx?.extrinsic,
-      addLiquidityTx?.extrinsic,
+      token0ApproveTx.extrinsic,
+      token1ApproveTx.extrinsic,
+      addLiquidityTx.extrinsic,
     ]);
 
     const { address, signer } = account;

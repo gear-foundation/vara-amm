@@ -21,9 +21,7 @@ export function PoolPage({ pairsTokens, refetchBalances: refetchVftBalances }: P
   const [activeTab, setActiveTab] = useState<'positions' | 'new'>('positions');
   const { pairBalances, refetchPairBalances, pairPrograms } = usePairsBalances({ pairs });
   const { lpDecimals } = useLpDecimals({ pairPrograms });
-  // ! TODO: use as rewards
   const { lpUserFees, refetchLpUserFees } = useLpUserFees({ pairPrograms });
-  console.log('🚀 ~ PoolPage ~ lpUserFees:', lpUserFees);
 
   const refetchBalances = () => {
     void refetchPairBalances();
@@ -42,7 +40,7 @@ export function PoolPage({ pairsTokens, refetchBalances: refetchVftBalances }: P
       token1,
       liquidity: pairBalances?.[index] || 0n, // TODO: use $ price
       decimals: lpDecimals?.[index] || 18,
-      rewards: lpUserFees?.[index] || 0n, // TODO: '0 VARA',
+      rewards: lpUserFees?.[index] || 0n, // TODO: 'DISPLAY IN VARA?',
       share: '0.0%', // TODO: use share
       pairAddress: pair[1],
     };
@@ -117,17 +115,19 @@ export function PoolPage({ pairsTokens, refetchBalances: refetchVftBalances }: P
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
                         <div className="text-sm text-gray-400 uppercase">LIQUIDITY</div>
-                        <div className="text-lg font-medium mono theme-text">
-                          {formatUnits(position.liquidity, position.decimals)}
+                        <div className="text-sm font-medium mono theme-text">
+                          {formatUnits(position.liquidity, position.decimals)} LP
                         </div>
                       </div>
                       <div>
                         <div className="text-sm text-gray-400 uppercase">REWARDS</div>
-                        <div className="text-lg font-medium mono theme-text">{position.rewards}</div>
+                        <div className="text-sm font-medium mono theme-text">
+                          {formatUnits(position.rewards, position.decimals)} LP
+                        </div>
                       </div>
                       <div>
                         <div className="text-sm text-gray-400 uppercase">POOL SHARE</div>
-                        <div className="text-lg font-medium mono theme-text">{position.share}</div>
+                        <div className="text-sm font-medium mono theme-text">{position.share}</div>
                       </div>
                     </div>
                   </CardContent>
