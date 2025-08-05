@@ -7,9 +7,16 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { AddLiquidity, RemoveLiquidity, usePairsBalances, useLpUserFees, useLpDecimals } from '@/features/pair';
+import {
+  AddLiquidity,
+  RemoveLiquidity,
+  usePairsBalances,
+  useLpUserFees,
+  useLpDecimals,
+  usePairsTotalSupply,
+} from '@/features/pair';
 import { PairsTokens, Token } from '@/features/pair/types';
-import { formatUnits } from '@/features/pair/utils';
+import { formatUnits, calculateExistingPoolShare } from '@/features/pair/utils';
 import { WalletConnect } from '@/features/wallet';
 import { usePairsQuery } from '@/lib/sails';
 
@@ -29,10 +36,12 @@ export function PoolPage({ pairsTokens, refetchBalances: refetchVftBalances }: P
   const { pairBalances, refetchPairBalances, pairPrograms } = usePairsBalances({ pairs });
   const { lpDecimals } = useLpDecimals({ pairPrograms });
   const { lpUserFees, refetchLpUserFees } = useLpUserFees({ pairPrograms });
+  const { pairTotalSupplies, refetchPairTotalSupplies } = usePairsTotalSupply({ pairPrograms });
 
   const refetchBalances = () => {
     void refetchPairBalances();
     void refetchLpUserFees();
+    void refetchPairTotalSupplies();
     refetchVftBalances();
   };
 
@@ -41,14 +50,18 @@ export function PoolPage({ pairsTokens, refetchBalances: refetchVftBalances }: P
 
     if (!token0 || !token1) throw new Error('Token not found');
 
+    const userLpBalance = (pairBalances && pairBalances[index]) || 0n;
+    const totalSupply = (pairTotalSupplies && pairTotalSupplies[index]) || 0n;
+    const poolShare = calculateExistingPoolShare(userLpBalance, totalSupply);
+
     return {
       pool: `${token0.symbol}/${token1.symbol}`,
       token0,
       token1,
-      liquidity: pairBalances?.[index] || 0n, // TODO: use $ price
+      liquidity: userLpBalance,
       decimals: lpDecimals?.[index] || 18,
       rewards: lpUserFees?.[index] || 0n, // TODO: 'DISPLAY IN VARA?',
-      share: '0.0%', // TODO: use share
+      share: `${poolShare}%`,
       pairAddress: pair[1],
     };
   });

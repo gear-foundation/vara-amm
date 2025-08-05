@@ -124,6 +124,109 @@ const getSelectedPair = (pairsTokens: PairsTokens, token0: Token, token1: Token)
   };
 };
 
+const integerSqrt = (value: bigint): bigint => {
+  if (value < 0n) {
+    throw new Error('Square root of negative number');
+  }
+  if (value < 2n) {
+    return value;
+  }
+
+  let x = value;
+  let y = (x + 1n) / 2n;
+
+  while (y < x) {
+    x = y;
+    y = (x + value / x) / 2n;
+  }
+
+  return x;
+};
+
+const calculateLPTokens = (
+  amount0: string,
+  amount1: string,
+  token0Decimals: number,
+  token1Decimals: number,
+  reserve0: bigint,
+  reserve1: bigint,
+  totalSupply: bigint,
+  isPairReverse: boolean,
+): bigint => {
+  if (!amount0 || !amount1 || amount0 === '0' || amount1 === '0') {
+    return 0n;
+  }
+
+  try {
+    const amount0Wei = parseUnits(amount0, token0Decimals);
+    const amount1Wei = parseUnits(amount1, token1Decimals);
+
+    const amountA = isPairReverse ? amount1Wei : amount0Wei;
+    const amountB = isPairReverse ? amount0Wei : amount1Wei;
+
+    let liquidity: bigint;
+
+    if (totalSupply === 0n) {
+      const product = amountA * amountB;
+      const sqrt = integerSqrt(product);
+      const MINIMUM_LIQUIDITY = 1000n;
+
+      if (sqrt < MINIMUM_LIQUIDITY) {
+        return 0n;
+      }
+
+      liquidity = sqrt - MINIMUM_LIQUIDITY;
+    } else {
+      if (reserve0 === 0n || reserve1 === 0n) {
+        return 0n;
+      }
+
+      const liquidityA = (amountA * totalSupply) / reserve0;
+      const liquidityB = (amountB * totalSupply) / reserve1;
+
+      liquidity = liquidityA < liquidityB ? liquidityA : liquidityB;
+    }
+
+    return liquidity;
+  } catch {
+    return 0n;
+  }
+};
+
+const calculatePoolShare = (totalSupply: bigint, lpTokens: bigint): string => {
+  try {
+    if (lpTokens === 0n) {
+      return '0.00';
+    }
+
+    const newTotalSupply = totalSupply + lpTokens;
+
+    if (newTotalSupply === 0n) {
+      return '0.00';
+    }
+
+    const sharePercentage = (lpTokens * 10000n) / newTotalSupply;
+
+    return (Number(sharePercentage) / 100).toFixed(2);
+  } catch {
+    return '0.00';
+  }
+};
+
+const calculateExistingPoolShare = (userLpBalance: bigint, totalSupply: bigint): string => {
+  try {
+    if (userLpBalance === 0n || totalSupply === 0n) {
+      return '0.00';
+    }
+
+    const sharePercentage = (userLpBalance * 10000n) / totalSupply;
+
+    return (Number(sharePercentage) / 100).toFixed(2);
+  } catch {
+    return '0.00';
+  }
+};
+
 const handleStatus = (
   api: GearApi,
   { status, events }: ISubmittableResult,
@@ -168,4 +271,7 @@ export {
   calculateProportionalAmount,
   getSelectedPair,
   handleStatus,
+  calculateLPTokens,
+  calculatePoolShare,
+  calculateExistingPoolShare,
 };

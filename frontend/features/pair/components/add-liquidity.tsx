@@ -21,6 +21,9 @@ import {
   calculateProportionalAmount,
   handleStatus,
   getSelectedPair,
+  calculateLPTokens,
+  calculatePoolShare,
+  formatUnits,
 } from '../utils';
 
 type AddLiquidityProps = {
@@ -61,12 +64,12 @@ const AddLiquidity = ({
   const { api } = useApi();
   const alert = useAlert();
 
-  const handleToken0Select = (token: Token, network: Network) => {
+  const handleToken0Select = (token: Token, _network: Network) => {
     setError(null);
     setToken0(token);
   };
 
-  const handleToken1Select = (token: Token, network: Network) => {
+  const handleToken1Select = (token: Token, _network: Network) => {
     setError(null);
     setToken1(token);
   };
@@ -82,6 +85,25 @@ const AddLiquidity = ({
   } = useVftTotalSupplyQuery(pairAddress);
 
   const isPoolEmpty = reserves?.[0] === 0n && reserves?.[1] === 0n && totalSupply === 0n;
+
+  const lpTokensToMint =
+    reserves && totalSupply !== undefined && isPairReverse !== undefined
+      ? calculateLPTokens(
+          amount0,
+          amount1,
+          token0.decimals,
+          token1.decimals,
+          reserves[0],
+          reserves[1],
+          totalSupply,
+          isPairReverse,
+        )
+      : 0n;
+
+  const poolSharePercentage =
+    reserves && totalSupply !== undefined && isPairReverse !== undefined
+      ? calculatePoolShare(totalSupply, lpTokensToMint)
+      : '0';
 
   const { approveMessage: token0ApproveMessage, isPending: isToken0ApprovePending } = useApproveMessage(token0.address);
   const { approveMessage: token1ApproveMessage, isPending: isToken1ApprovePending } = useApproveMessage(token1.address);
@@ -325,7 +347,7 @@ const AddLiquidity = ({
           <div className="bg-gray-500/10 border border-gray-500/20 rounded-lg p-4 space-y-3">
             <div className="flex justify-between text-sm">
               <span className="text-gray-400">Pool Share</span>
-              <span className="theme-text">0.12%</span>
+              <span className="theme-text">{poolSharePercentage}%</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-400">Fee Tier</span>
@@ -334,7 +356,7 @@ const AddLiquidity = ({
             <div className="flex items-center justify-between text-sm">
               <span className="text-gray-400">LP Tokens</span>
               <div className="flex items-center space-x-1">
-                <span className="theme-text">1,234.56</span>
+                <span className="theme-text">{formatUnits(lpTokensToMint, 18)}</span>
                 <Info className="w-3 h-3 text-gray-400" />
               </div>
             </div>
