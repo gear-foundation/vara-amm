@@ -11,7 +11,7 @@ const TradePageSell = () => {
         <div className="grid grid-cols-1 gap-3">
           {/* Coinbase */}
           <a
-            href="https://www.coinbase.com/sell"
+            href="https://www.coinbase.com/advanced-trade/spot/VARA-USD"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center justify-between p-4 rounded-lg border border-gray-500/20 hover:border-[#00FF85]/50 hover:bg-gray-500/5 transition-all group cursor-pointer">
@@ -29,7 +29,7 @@ const TradePageSell = () => {
 
           {/* BANXA */}
           <a
-            href="https://checkout.banxa.com/"
+            href="https://gear.banxa.com/?coinType=VARA"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center justify-between p-4 rounded-lg border border-gray-500/20 hover:border-[#00FF85]/50 hover:bg-gray-500/5 transition-all group cursor-pointer">
@@ -47,7 +47,7 @@ const TradePageSell = () => {
 
           {/* Gate.io */}
           <a
-            href="https://www.gate.io"
+            href="https://www.gate.io/trade/VARA_USDT"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center justify-between p-4 rounded-lg border border-gray-500/20 hover:border-[#00FF85]/50 hover:bg-gray-500/5 transition-all group cursor-pointer">
@@ -65,7 +65,7 @@ const TradePageSell = () => {
 
           {/* Crypto.com */}
           <a
-            href="https://crypto.com"
+            href="https://crypto.com/price/vara-network"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center justify-between p-4 rounded-lg border border-gray-500/20 hover:border-[#00FF85]/50 hover:bg-gray-500/5 transition-all group cursor-pointer">
@@ -83,7 +83,7 @@ const TradePageSell = () => {
 
           {/* MEXC */}
           <a
-            href="https://www.mexc.com/buy-crypto"
+            href="https://www.mexc.com/price/VARA"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center justify-between p-4 rounded-lg border border-gray-500/20 hover:border-[#00FF85]/50 hover:bg-gray-500/5 transition-all group cursor-pointer">
@@ -101,7 +101,7 @@ const TradePageSell = () => {
 
           {/* BitMart */}
           <a
-            href="https://www.bitmart.com/buy-sell/en-AU?type=sell&coin=BTC&currency=USD"
+            href="https://www.bitmart.com/trade/?type=spot&symbol=VARA_USDT"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center justify-between p-4 rounded-lg border border-gray-500/20 hover:border-[#00FF85]/50 hover:bg-gray-500/5 transition-all group cursor-pointer">
