@@ -6684,10 +6684,10 @@ sails-js-util@^0.4.2:
   resolved "https://registry.yarnpkg.com/sails-js-util/-/sails-js-util-0.4.3.tgz#11919ce88bbe169764516ed763c93d37bea5f08c"
   integrity sha512-A4DkFJxcbSqfpOQ9wSuE7TG4iUFkgUv/noSb8KHq5Fc3PpndGf58NStTjk3F33A969Y9Ac1pvy2wB3F5hh18tA==
 
-sails-js@0.4.2:
-  version "0.4.2"
-  resolved "https://registry.yarnpkg.com/sails-js/-/sails-js-0.4.2.tgz#de50d081ab09d813b71752e954f8dfe52b10e036"
-  integrity sha512-Lv7BhOS9pmsiPKgjHUBGqUize7pj3bAELfimEjFhSR5e53HO6yXRlCah0YKYqyLbqP25RbyzyCDB2lsQZ2ojyQ==
+sails-js@0.4.3:
+  version "0.4.3"
+  resolved "https://registry.yarnpkg.com/sails-js/-/sails-js-0.4.3.tgz#4f1ae4b5c03f84819081101c08a993559edab9b5"
+  integrity sha512-TvRmxrLaLwCRJj3+TktcRoJ3G8YQpcGRVz71vu0uvjlYQG+N4BDn7EGhkAlzNbaBBYgbUfrtOw8YLAxCsFQmkg==
   dependencies:
     sails-js-util "^0.4.2"
   optionalDependencies:

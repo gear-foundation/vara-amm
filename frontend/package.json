@@ -36,7 +36,7 @@
     "react-dom": "19.1.0",
     "react-hook-form": "7.54.1",
     "react-router-dom": "^7.7.1",
-    "sails-js": "0.4.2",
+    "sails-js": "0.4.3",
     "sass": "1.89.2",
     "shadcn": "latest",
     "tailwind-merge": "3.0.1",
