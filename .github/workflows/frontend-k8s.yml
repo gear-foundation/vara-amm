@@ -75,8 +75,8 @@ jobs:
           push: true
           tags: ${{ needs.prepair.outputs.image_name }}
           build-args: |
-            NEXT_PUBLIC_NODE_ADDRESS=${{ secrets.NEXT_PUBLIC_NODE_ADDRESS }}
-            NEXT_PUBLIC_FACTORY_PROGRAM_ID=${{ secrets.NEXT_PUBLIC_FACTORY_PROGRAM_ID }}
+            VITE_NODE_ADDRESS=${{ secrets.VITE_NODE_ADDRESS }}
+            VITE_FACTORY_PROGRAM_ID=${{ secrets.VITE_FACTORY_PROGRAM_ID }}
 
   deploy-to-k8s:
     needs: [prepair, build-and-push-image]
