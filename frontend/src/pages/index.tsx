@@ -19,7 +19,7 @@ export function Routing() {
           key={path}
           path={path}
           element={
-            <Suspense fallback={<Loader />}>
+            <Suspense fallback={<Loader size="lg" text="Loading..." className="py-20" />}>
               <Page />
             </Suspense>
           }
