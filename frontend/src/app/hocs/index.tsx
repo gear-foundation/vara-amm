@@ -5,6 +5,7 @@ import {
   type ProviderProps,
 } from '@gear-js/react-hooks';
 import type { ComponentType } from 'react';
+import { BrowserRouter } from 'react-router-dom';
 
 import { ThemeProvider } from '@/components/theme-provider';
 import { Alert, alertStyles } from '@/components/ui/alert';
@@ -29,7 +30,7 @@ function AlertProvider({ children }: ProviderProps) {
   );
 }
 
-const providers = [ThemeProvider, ApiProvider, QueryProvider, AccountProvider, AlertProvider];
+const providers = [BrowserRouter, ApiProvider, QueryProvider, AccountProvider, ThemeProvider, AlertProvider];
 
 function withProviders(Component: ComponentType) {
   return () => providers.reduceRight((children, Provider) => <Provider>{children}</Provider>, <Component />);

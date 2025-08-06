@@ -6,6 +6,9 @@ import { useAccountAvailableBalanceSync } from '@/features/wallet/hooks';
 import { useFactoryProgram } from '@/lib/sails';
 
 import { Routing } from './pages';
+import './styles/globals.css';
+import './app/globals.css';
+// TODO: check globals.css
 
 function Component() {
   const { isApiReady } = useApi();
