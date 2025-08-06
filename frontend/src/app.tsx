@@ -1,11 +1,11 @@
 import { useAccount, useApi } from '@gear-js/react-hooks';
 
 import { withProviders } from '@/app/hocs';
+import { Navigation } from '@/components/navigation';
 import { Loader } from '@/components/ui/loader';
 import { useAccountAvailableBalanceSync } from '@/features/wallet/hooks';
 import { useFactoryProgram } from '@/lib/sails';
-
-import { Routing } from './pages';
+import { Routing } from '@/pages';
 
 function Component() {
   const { isApiReady } = useApi();
@@ -16,7 +16,14 @@ function Component() {
 
   const isAppReady = isApiReady && isAccountReady && program;
 
-  return <main>{isAppReady ? <Routing /> : <Loader size="lg" text="Loading..." className="py-20" />}</main>;
+  return (
+    <main className="min-h-screen">
+      <Navigation />
+      <div className="container mx-auto px-4 py-8">
+        {isAppReady ? <Routing /> : <Loader size="lg" text="Loading..." className="py-20" />}
+      </div>
+    </main>
+  );
 }
 
 export const App = withProviders(Component);
