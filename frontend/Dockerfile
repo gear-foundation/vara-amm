@@ -7,9 +7,9 @@ RUN corepack enable
 
 WORKDIR /app
 
-COPY package.json pnpm-lock.yaml* ./
+COPY package.json yarn.lock* ./
 
-RUN pnpm install --frozen-lockfile
+RUN yarn install --frozen-lockfile
 
 FROM base AS builder
 
@@ -29,12 +29,12 @@ ENV VITE_FACTORY_PROGRAM_ID=$VITE_FACTORY_PROGRAM_ID
 
 RUN npm install -g serve
 
-RUN pnpm build
+RUN yarn build
 
 FROM base AS runner
 WORKDIR /app
 
-ENV NODE_ENV production
+ENV NODE_ENV=production
 
 RUN npm install -g serve
 
@@ -42,6 +42,6 @@ COPY --from=builder /app/build ./build
 
 EXPOSE 3000
 
-ENV PORT 3000
+ENV PORT=3000
 
 CMD ["serve", "-s", "build", "-l", "3000"] 
