@@ -397,7 +397,6 @@ export function TradePage({ pairsTokens, refetchBalances }: TradePageProps) {
                     {pairAddress ? (
                       <span className="text-sm theme-text">
                         1 {fromToken.symbol} = {oneOutAmount} {toToken.symbol}
-                        {/* TODO: remove mock */}
                       </span>
                     ) : (
                       <div className="text-red-500"> Pair not found</div>
@@ -457,7 +456,6 @@ export function TradePage({ pairsTokens, refetchBalances }: TradePageProps) {
         isOpen={showFromTokenSelector}
         onClose={() => setShowFromTokenSelector(false)}
         onSelectToken={handleFromTokenSelect}
-        selectedToken={fromToken}
         title="Select token to swap from"
         networks={networks}
       />
@@ -466,7 +464,6 @@ export function TradePage({ pairsTokens, refetchBalances }: TradePageProps) {
         isOpen={showToTokenSelector}
         onClose={() => setShowToTokenSelector(false)}
         onSelectToken={handleToTokenSelect}
-        selectedToken={toToken}
         title="Select token to swap to"
         networks={networks}
       />

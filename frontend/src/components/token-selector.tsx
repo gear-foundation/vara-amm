@@ -10,8 +10,6 @@ interface TokenSelectorProps {
   isOpen: boolean;
   onClose: () => void;
   onSelectToken: (token: Token, network: Network) => void;
-  // TODO: remove this prop
-  selectedToken?: Token;
   title?: string;
   networks: Network[];
 }

@@ -387,7 +387,6 @@ const AddLiquidity = ({
         isOpen={showToken0Selector}
         onClose={() => setShowToken0Selector(false)}
         onSelectToken={handleToken0Select}
-        selectedToken={token0}
         title="Select first token"
         networks={networks}
       />
@@ -396,7 +395,6 @@ const AddLiquidity = ({
         isOpen={showToken1Selector}
         onClose={() => setShowToken1Selector(false)}
         onSelectToken={handleToken1Select}
-        selectedToken={token1}
         title="Select second token"
         networks={networks}
       />
