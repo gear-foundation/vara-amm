@@ -1,4 +1,5 @@
 /* eslint-disable */
+// @ts-nocheck
 import { GearApi, HexString, decodeAddress } from '@gear-js/api';
 import { TypeRegistry } from '@polkadot/types';
 import {

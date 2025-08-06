@@ -3,7 +3,7 @@ import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 
-import { Token } from '../types';
+import type { Token } from '../types';
 
 import { RemoveLiquidityDialog } from './remove-liquidity-dialog';
 

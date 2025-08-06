@@ -1,5 +1,5 @@
 import { useAccount, useAlert, useApi } from '@gear-js/react-hooks';
-import { ISubmittableResult } from '@polkadot/types/types';
+import type { ISubmittableResult } from '@polkadot/types/types';
 import { Plus, ChevronDown, Info } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { SECONDS_IN_MINUTE } from '@/consts';
 import { useAddLiquidityMessage, useGetReservesQuery, useVftTotalSupplyQuery, useApproveMessage } from '@/lib/sails';
 
-import { Token, Network, PairsTokens } from '../types';
+import type { Token, Network, PairsTokens } from '../types';
 import {
   getFormattedBalance,
   getNetworks,
@@ -238,6 +238,9 @@ const AddLiquidity = ({
         onFinally: () => setLoading(false),
       });
 
+    // TODO: check versions of polkadot and types
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
     await batch.signAndSend(address, { signer }, statusCallback);
   };
 

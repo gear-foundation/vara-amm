@@ -7,7 +7,7 @@ import { LOGO_URI_BY_SYMBOL } from '@/consts';
 import { usePairsQuery } from '@/lib/sails';
 import { Program as VftProgram } from '@/lib/sails/extended-vft';
 
-import { PairsTokens, Token } from '../types';
+import type { PairsTokens, Token } from '../types';
 
 const fetchTokenData = async (
   program: VftProgram,

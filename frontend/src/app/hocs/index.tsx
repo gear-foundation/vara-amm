@@ -2,10 +2,11 @@ import {
   ApiProvider as GearApiProvider,
   AlertProvider as GearAlertProvider,
   AccountProvider as GearAccountProvider,
-  ProviderProps,
+  type ProviderProps,
 } from '@gear-js/react-hooks';
-import { ComponentType } from 'react';
+import type { ComponentType } from 'react';
 
+import { ThemeProvider } from '@/components/theme-provider';
 import { Alert, alertStyles } from '@/components/ui/alert';
 
 import { ENV } from '../../consts';
@@ -28,7 +29,7 @@ function AlertProvider({ children }: ProviderProps) {
   );
 }
 
-const providers = [ApiProvider, QueryProvider, AccountProvider, AlertProvider];
+const providers = [ThemeProvider, ApiProvider, QueryProvider, AccountProvider, AlertProvider];
 
 function withProviders(Component: ComponentType) {
   return () => providers.reduceRight((children, Provider) => <Provider>{children}</Provider>, <Component />);

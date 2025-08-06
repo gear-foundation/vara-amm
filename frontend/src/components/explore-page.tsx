@@ -1,3 +1,5 @@
+// TODO: check eslint when page added
+/* eslint-disable */
 import { TrendingUp, TrendingDown, Plus, ChevronUp, ChevronDown } from 'lucide-react';
 import type React from 'react';
 import { useState } from 'react';

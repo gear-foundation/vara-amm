@@ -1,5 +1,5 @@
 import { useAccount, useAlert, useApi } from '@gear-js/react-hooks';
-import { ISubmittableResult } from '@polkadot/types/types';
+import type { ISubmittableResult } from '@polkadot/types/types';
 import { ArrowDownUp, Info, ChevronDown, ChevronUp } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { INPUT_PERCENTAGES, SECONDS_IN_MINUTE, SLIPPAGE } from '@/consts';
 import { usePairsBalances } from '@/features/pair';
-import { Token, Network, PairsTokens } from '@/features/pair/types';
+import type { Token, Network, PairsTokens } from '@/features/pair/types';
 import {
   calculatePercentage,
   formatUnits,
@@ -178,6 +178,8 @@ export function TradePage({ pairsTokens, refetchBalances }: TradePageProps) {
       });
     };
 
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
     await batch.signAndSend(address, { signer }, statusCallback);
   };
 

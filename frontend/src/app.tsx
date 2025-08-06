@@ -3,8 +3,8 @@ import { useAccount, useApi } from '@gear-js/react-hooks';
 import { withProviders } from '@/app/hocs';
 import { Loader } from '@/components/ui/loader';
 import { useAccountAvailableBalanceSync } from '@/features/wallet/hooks';
-
 import { useFactoryProgram } from '@/lib/sails';
+
 import { Routing } from './pages';
 
 function Component() {

@@ -1,7 +1,7 @@
 import { useAccount } from '@gear-js/react-hooks';
 import { Wallet, Menu, X } from 'lucide-react';
-import Link from 'next/link';
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
 import { ROUTES } from '@/consts';
@@ -28,7 +28,7 @@ export function Navigation() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
-            <Link href="/" className="flex items-center space-x-2">
+            <Link to={ROUTES.HOME} className="flex items-center space-x-2">
               <div className="text-2xl font-bold uppercase tracking-wider theme-text">
                 VARA<span className="accent-text">ΞDEX</span>
               </div>
@@ -36,13 +36,13 @@ export function Navigation() {
 
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center space-x-8 ml-12">
-              <Link href={ROUTES.TRADE} className="theme-text font-medium uppercase tracking-wide transition-colors">
+              <Link to={ROUTES.TRADE} className="theme-text font-medium uppercase tracking-wide transition-colors">
                 TRADE
               </Link>
               {/* <Link href={ROUTES.EXPLORE} className="theme-text font-medium uppercase tracking-wide transition-colors">
                 EXPLORE
               </Link> */}
-              <Link href={ROUTES.POOL} className="theme-text font-medium uppercase tracking-wide transition-colors">
+              <Link to={ROUTES.POOL} className="theme-text font-medium uppercase tracking-wide transition-colors">
                 POOL
               </Link>
             </div>
@@ -91,13 +91,13 @@ export function Navigation() {
           {isMenuOpen && (
             <div className="md:hidden py-4" style={{ borderTop: '1px solid var(--border)' }}>
               <div className="flex flex-col space-y-4">
-                <Link href={ROUTES.TRADE} className="theme-text font-medium uppercase tracking-wide">
+                <Link to={ROUTES.TRADE} className="theme-text font-medium uppercase tracking-wide">
                   TRADE
                 </Link>
                 {/* <Link href={ROUTES.EXPLORE} className="theme-text font-medium uppercase tracking-wide">
                   EXPLORE
                 </Link> */}
-                <Link href={ROUTES.POOL} className="theme-text font-medium uppercase tracking-wide">
+                <Link to={ROUTES.POOL} className="theme-text font-medium uppercase tracking-wide">
                   POOL
                 </Link>
 

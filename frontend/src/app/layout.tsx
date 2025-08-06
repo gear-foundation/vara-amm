@@ -1,30 +1,21 @@
-import type { Metadata } from 'next';
-import { Roboto, Roboto_Mono } from 'next/font/google';
 import type React from 'react';
 
 import { ThemeProvider } from '@/components/theme-provider';
 import './globals.css';
 
-const roboto = Roboto({
-  subsets: ['latin'],
-  weight: ['300', '400', '500', '700'],
-  variable: '--font-roboto',
-});
-
-const robotoMono = Roboto_Mono({
-  subsets: ['latin'],
-  variable: '--font-roboto-mono',
-});
-
-export const metadata: Metadata = {
-  title: 'VaraΞDEX - Decentralized Exchange',
-  description: 'Trade, explore, and provide liquidity on Vara Network',
-  generator: 'v0.dev',
-};
-
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${roboto.variable} ${robotoMono.variable} dark`}>
+    <html lang="en" className="dark">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Roboto+Mono:wght@300;400;500;700&display=swap"
+          rel="stylesheet"
+        />
+        <title>VaraΞDEX - Decentralized Exchange</title>
+        <meta name="description" content="Trade, explore, and provide liquidity on Vara Network" />
+      </head>
       <body className="font-roboto antialiased min-h-screen">
         <ThemeProvider>{children}</ThemeProvider>
       </body>

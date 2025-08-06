@@ -1,8 +1,8 @@
 import { GearApi } from '@gear-js/api';
-import { ISubmittableResult } from '@polkadot/types/types';
+import type { ISubmittableResult } from '@polkadot/types/types';
 import { formatBalance } from '@polkadot/util';
 
-import { Network, PairsTokens, Token } from './types';
+import type { Network, PairsTokens, Token } from './types';
 
 const getNetworks = (pairsTokens: PairsTokens): Network[] => {
   return [

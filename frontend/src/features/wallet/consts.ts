@@ -1,4 +1,4 @@
-import { Entries } from '@gear-js/react-hooks';
+import { type Entries } from '@gear-js/react-hooks';
 import { atom } from 'jotai';
 
 import { EnkryptSVG, PolkadotSVG, SubWalletSVG, TalismanSVG, NovaSVG } from './assets';

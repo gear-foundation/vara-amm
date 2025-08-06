@@ -1,8 +1,8 @@
 import { lazy, Suspense } from 'react';
 import { Routes, Route } from 'react-router-dom';
 
-import { ROUTES } from '@/consts';
 import { Loader } from '@/components/ui/loader';
+import { ROUTES } from '@/consts';
 
 const routes = [
   { path: ROUTES.HOME, Page: lazy(() => import('./home')) },
