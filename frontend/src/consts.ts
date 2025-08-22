@@ -2,6 +2,7 @@ import type { HexString } from '@gear-js/api';
 
 export const ENV = {
   NODE_ADDRESS: import.meta.env.VITE_NODE_ADDRESS as string,
+  EXPLORER_URL: import.meta.env.VITE_EXPLORER_URL as string,
   FACTORY_PROGRAM_ID: import.meta.env.VITE_FACTORY_PROGRAM_ID as HexString,
 };
 

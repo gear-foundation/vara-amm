@@ -195,53 +195,51 @@ const AddLiquidity = ({
       recipient: account.decodedAddress,
     });
 
-    const token0ApproveTx = await token0ApproveMessage({
-      value: amountADesired,
-      spender: pairAddress,
-    });
-
-    const token1ApproveTx = await token1ApproveMessage({
-      value: amountBDesired,
-      spender: pairAddress,
-    });
-
-    const addLiquidityTx = await addLiquidityMessage({
-      amountADesired: isPairReverse ? amountBDesired : amountADesired,
-      amountBDesired: isPairReverse ? amountADesired : amountBDesired,
-      amountAMin: isPairReverse ? amountBMin : amountAMin,
-      amountBMin: isPairReverse ? amountAMin : amountBMin,
-      deadline: deadline.toString(),
-    });
-
-    if (!token0ApproveTx?.extrinsic || !token1ApproveTx?.extrinsic || !addLiquidityTx?.extrinsic) {
-      setError('Failed to create batch');
-      return;
-    }
-    setLoading(true);
-
-    const batch = api.tx.utility.batch([
-      token0ApproveTx.extrinsic,
-      token1ApproveTx.extrinsic,
-      addLiquidityTx.extrinsic,
-    ]);
-
-    const { address, signer } = account;
-    const statusCallback = (result: ISubmittableResult) =>
-      handleStatus(api, result, {
-        onSuccess: () => {
-          void refreshReserves();
-          void refreshTotalSupply();
-          onSuccess();
-          alert.success('Liquidity added successfully');
-        },
-        onError: (_error) => alert.error(_error),
-        onFinally: () => setLoading(false),
+    try {
+      const token0ApproveTx = await token0ApproveMessage({
+        value: amountADesired,
+        spender: pairAddress,
       });
-
-    // TODO: check versions of polkadot and types
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
-    await batch.signAndSend(address, { signer }, statusCallback);
+      const token1ApproveTx = await token1ApproveMessage({
+        value: amountBDesired,
+        spender: pairAddress,
+      });
+      const addLiquidityTx = await addLiquidityMessage({
+        amountADesired: isPairReverse ? amountBDesired : amountADesired,
+        amountBDesired: isPairReverse ? amountADesired : amountBDesired,
+        amountAMin: isPairReverse ? amountBMin : amountAMin,
+        amountBMin: isPairReverse ? amountAMin : amountBMin,
+        deadline: deadline.toString(),
+      });
+      if (!token0ApproveTx?.extrinsic || !token1ApproveTx?.extrinsic || !addLiquidityTx?.extrinsic) {
+        setError('Failed to create batch');
+        return;
+      }
+      setLoading(true);
+      const batch = api.tx.utility.batch([
+        token0ApproveTx.extrinsic,
+        token1ApproveTx.extrinsic,
+        addLiquidityTx.extrinsic,
+      ]);
+      const { address, signer } = account;
+      const statusCallback = (result: ISubmittableResult) =>
+        handleStatus(api, result, {
+          onSuccess: () => {
+            void refreshReserves();
+            void refreshTotalSupply();
+            onSuccess();
+            alert.success('Liquidity added successfully');
+          },
+          onError: (_error) => alert.error(_error),
+          onFinally: () => setLoading(false),
+        });
+      // TODO: check versions of polkadot and types
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore
+      await batch.signAndSend(address, { signer }, statusCallback);
+    } catch (_error) {
+      console.error('Error adding liquidity:', _error);
+    }
   };
 
   const networks = getNetworks(pairsTokens);

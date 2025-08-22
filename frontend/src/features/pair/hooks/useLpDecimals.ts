@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
-import { Program as PairProgram } from '@/lib/sails/pair';
+import { SailsProgram as PairProgram } from '@/lib/sails/pair';
 
 type UseLpDecimalsProps = {
   pairPrograms?: PairProgram[];

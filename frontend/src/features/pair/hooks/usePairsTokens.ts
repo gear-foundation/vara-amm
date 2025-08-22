@@ -5,7 +5,7 @@ import { useCallback, useMemo, useRef } from 'react';
 
 import { LOGO_URI_BY_SYMBOL } from '@/consts';
 import { usePairsQuery } from '@/lib/sails';
-import { Program as VftProgram } from '@/lib/sails/extended-vft';
+import { SailsProgram as VftProgram } from '@/lib/sails/extended-vft';
 
 import type { PairsTokens, Token } from '../types';
 
@@ -137,7 +137,6 @@ const usePairsTokens = (): UsePairsTokensResult => {
 
       const tokenDataResults = await Promise.all(tokenDataPromises);
 
-      // Создаем карту данных токенов
       const tokenDataMap = new Map<HexString, NonNullable<(typeof tokenDataResults)[0]>>();
       tokenDataResults.forEach((data, index) => {
         if (data) {

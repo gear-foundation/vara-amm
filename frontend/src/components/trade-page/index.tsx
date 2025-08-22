@@ -27,9 +27,10 @@ import {
   useSwapTokensForExactTokensMessage,
 } from '@/lib/sails';
 
-import { TokenSelector } from './token-selector';
-import { TradePageBuy } from './trade-page-buy';
-import { TradePageSell } from './trade-page-sell';
+import { TokenSelector } from '../token-selector';
+
+import { TradePageBuy } from './buy';
+import { TradePageSell } from './sell';
 
 type TradePageProps = {
   pairsTokens: PairsTokens;
