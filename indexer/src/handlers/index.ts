@@ -1,3 +1,1 @@
-export * from './stub';
-
-// TODO: export all created handlers here
+export * from "./pair";

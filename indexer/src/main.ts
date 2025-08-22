@@ -1,8 +1,11 @@
 import { TypeormDatabase } from "@subsquid/typeorm-store";
 
 import { BaseHandler } from "./handlers/base";
-import * as handlers from "./handlers";
+import { PairHandler } from "./handlers";
+import { FactoryManager } from "./services/factory-manager";
+import { config } from "./config";
 import { processor } from "./processor";
+import { GearApi, HexString } from "@gear-js/api";
 
 export class GearProcessor {
   private _handlers: BaseHandler[] = [];
@@ -90,19 +93,25 @@ export class GearProcessor {
 }
 
 async function main() {
-  const processor = new GearProcessor();
+  const api = await GearApi.create({ providerAddress: config.rpcUrl });
+  const gearProcessor = new GearProcessor();
 
-  for (const [name, Handler] of Object.entries(handlers)) {
-    if (Handler.prototype instanceof BaseHandler) {
-      const handler = new Handler();
-      console.log(`[*] Initializing handler: ${name}`);
-      await handler.init();
-      console.log(`[*] Registering new handler: ${name}`);
-      processor.registerHandler(handler);
-    }
+  const factoryManager = new FactoryManager(config.factoryProgramId);
+  await factoryManager.init(api);
+
+  const pairs = factoryManager.getPairs();
+  console.log(`[*] Found ${pairs.length} pairs to monitor`);
+
+  const pairHandlers = pairs.map((address) => new PairHandler(address));
+
+  for (const handler of pairHandlers) {
+    console.log(`[*] Initializing pair handler`);
+    await handler.init(api);
+    console.log(`[*] Registering pair handler`);
+    gearProcessor.registerHandler(handler);
   }
 
-  await processor.run();
+  await gearProcessor.run();
 }
 
 main().catch((error) => {

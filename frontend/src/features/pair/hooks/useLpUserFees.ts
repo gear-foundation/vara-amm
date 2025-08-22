@@ -1,7 +1,7 @@
 import { useAccount } from '@gear-js/react-hooks';
 import { useQuery } from '@tanstack/react-query';
 
-import { Program as PairProgram } from '@/lib/sails/pair';
+import { SailsProgram as PairProgram } from '@/lib/sails/pair';
 
 type UseLpUserFeesProps = {
   pairPrograms?: PairProgram[];

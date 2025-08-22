@@ -6,11 +6,12 @@ import {
   Event as _Event,
   Call as _Call,
   Extrinsic as _Extrinsic,
-} from '@subsquid/substrate-processor';
-import { Store } from '@subsquid/typeorm-store';
-import { hostname } from 'node:os';
+} from "@subsquid/substrate-processor";
+import { Store } from "@subsquid/typeorm-store";
+import { hostname } from "node:os";
 
-import { config } from './config';
+import { config } from "./config";
+import { GearApi } from "@gear-js/api";
 
 export const processor = new SubstrateBatchProcessor()
   .setGateway(config.archiveUrl)
@@ -18,7 +19,7 @@ export const processor = new SubstrateBatchProcessor()
     url: config.rpcUrl,
     rateLimit: config.rateLimit,
     headers: {
-      'User-Agent': hostname(),
+      "User-Agent": hostname(),
     },
   })
   .setBlockRange({ from: config.fromBlock })

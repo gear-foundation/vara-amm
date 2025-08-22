@@ -1,5 +1,6 @@
-import { Logger } from '@subsquid/logger';
-import { ProcessorContext } from '../processor';
+import { Logger } from "@subsquid/logger";
+import { ProcessorContext } from "../processor";
+import { GearApi } from "@gear-js/api";
 
 export abstract class BaseHandler {
   protected events: string[];
@@ -22,7 +23,7 @@ export abstract class BaseHandler {
     return this.messageQueuedProgramIds;
   }
 
-  public init(): Promise<void> {
+  public init(_api: GearApi): Promise<void> {
     // Override this method to perform any necessary initialization
     return Promise.resolve();
   }

@@ -1,6 +1,23 @@
 import { DataSource } from "typeorm";
+import { DefaultNamingStrategy } from "typeorm";
 import dotenv from "dotenv";
-import { VftTransfer } from "./entities";
+import { Pair, Transaction } from "./generated";
+
+class SnakeNamingStrategy extends DefaultNamingStrategy {
+  columnName(
+    propertyName: string,
+    customName?: string,
+    embeddedPrefixes: string[] = []
+  ): string {
+    const defaultName = super.columnName(
+      propertyName,
+      customName,
+      embeddedPrefixes
+    );
+    const snakeCasedName = defaultName.replace(/([A-Z])/g, "_$1").toLowerCase();
+    return snakeCasedName;
+  }
+}
 
 dotenv.config();
 
@@ -14,8 +31,9 @@ const AppDataSource = new DataSource({
   synchronize: true,
   migrationsRun: true,
   logging: process.env.NODE_ENV === "development",
-  entities: [VftTransfer], // TODO: Specify all other entities here
+  entities: [Pair, Transaction],
   migrations: ["db/migrations/*.js"],
+  namingStrategy: new SnakeNamingStrategy(),
 });
 
 export default AppDataSource;

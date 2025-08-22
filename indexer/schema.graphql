@@ -1,17 +1,35 @@
-type Account @entity {
-  "Account address"
-  id: ID!
-  transfersTo: [Transfer!] @derivedFrom(field: "to")
-  transfersFrom: [Transfer!] @derivedFrom(field: "from")
+type Pair @entity {
+  id: ID! # pair address
+  token0: String! @index
+  token1: String! @index
+  token0Symbol: String
+  token1Symbol: String
+  reserve0: BigInt!
+  reserve1: BigInt!
+  totalSupply: BigInt!
+  createdAt: DateTime! @index
+  transactions: [Transaction!] @derivedFrom(field: "pair")
 }
 
-type Transfer @entity {
+type Transaction @entity {
   id: ID!
-  blockNumber: Int! @index
+  type: TransactionType! @index
+  pair: Pair!
+  user: String! @index
+  blockNumber: BigInt! @index
   timestamp: DateTime! @index
-  extrinsicHash: String @index
-  from: Account!
-  to: Account!
-  amount: BigInt! @index
-  fee: BigInt! # fee is calculated at the best effort and may be zero for some old extrinsics
+
+  amountA: BigInt
+  amountB: BigInt
+  liquidity: BigInt
+  amountIn: BigInt
+  amountOut: BigInt
+  tokenIn: String
+  tokenOut: String
+}
+
+enum TransactionType {
+  ADD_LIQUIDITY
+  REMOVE_LIQUIDITY
+  SWAP
 }

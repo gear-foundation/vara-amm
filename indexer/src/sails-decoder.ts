@@ -96,6 +96,16 @@ export class SailsDecoder {
   }: UserMessageSentEvent): EventMessage<T> {
     const service = this.service(payload);
     const method = this.method(payload);
+
+    // TODO: remove this after updating idl
+    if (method === "Minted" || method === "Burned") {
+      return {
+        service,
+        method,
+        payload: null,
+      };
+    }
+
     const _payload =
       this._program.services[service].events[method].decode(payload);
 

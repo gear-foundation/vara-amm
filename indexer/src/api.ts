@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import ConnectionFilterPlugin from "postgraphile-plugin-connection-filter";
 import { createServer } from "node:http";
 import { Pool } from "pg";
+import cors from "cors";
 
 dotenv.config();
 
@@ -15,6 +16,7 @@ async function main() {
   });
 
   const database = process.env.DATABASE_URL || "indexer";
+  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
 
   const options: PostGraphileOptions = {
     watchPg: isDev,
@@ -38,6 +40,7 @@ async function main() {
 
   const app = express();
 
+  app.use(cors({ origin: frontendUrl }));
   app.use(middleware);
 
   const server = createServer(app);

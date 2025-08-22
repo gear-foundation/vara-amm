@@ -43,9 +43,9 @@ export function Navigation() {
               <NavLink to={ROUTES.TRADE} className={navLinkClassName}>
                 TRADE
               </NavLink>
-              {/* <NavLink href={ROUTES.EXPLORE} className={navLinkClassName}>
+              <NavLink to={ROUTES.EXPLORE} className={navLinkClassName}>
                 EXPLORE
-              </NavLink> */}
+              </NavLink>
               <NavLink to={ROUTES.POOL} className={navLinkClassName}>
                 POOL
               </NavLink>
@@ -98,9 +98,9 @@ export function Navigation() {
                 <NavLink to={ROUTES.TRADE} className={navLinkClassName}>
                   TRADE
                 </NavLink>
-                {/* <NavLink href={ROUTES.EXPLORE} className={navLinkClassName}>
+                <NavLink to={ROUTES.EXPLORE} className={navLinkClassName}>
                   EXPLORE
-                </NavLink> */}
+                </NavLink>
                 <NavLink to={ROUTES.POOL} className={navLinkClassName}>
                   POOL
                 </NavLink>
