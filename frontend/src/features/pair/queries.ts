@@ -15,6 +15,18 @@ export type Transaction = {
   pairId: string;
 };
 
+export type PairData = {
+  id: string;
+  token0: string;
+  token1: string;
+  token0Symbol: string | null;
+  token1Symbol: string | null;
+  reserve0: string;
+  reserve1: string;
+  totalSupply: string;
+  createdAt: string;
+};
+
 export const TransactionsOrderBy = {
   ID_ASC: 'ID_ASC',
   ID_DESC: 'ID_DESC',
@@ -48,6 +60,24 @@ export const GetTransactionsQuery = gql`
         pairId
       }
       totalCount
+    }
+  }
+`;
+
+export const GetPairsQuery = gql`
+  query GetPairs {
+    allPairs {
+      nodes {
+        id
+        token0
+        token1
+        token0Symbol
+        token1Symbol
+        reserve0
+        reserve1
+        totalSupply
+        createdAt
+      }
     }
   }
 `;

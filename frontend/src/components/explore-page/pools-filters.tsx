@@ -1,7 +1,9 @@
 import { Plus } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ROUTES } from '@/consts';
 
 type ExplorePagePoolsFiltersProps = {
   poolNetworkFilter: string;
@@ -20,6 +22,8 @@ export function ExplorePagePoolsFilters({
   showMyPools,
   setShowMyPools,
 }: ExplorePagePoolsFiltersProps) {
+  const navigate = useNavigate();
+
   return (
     <div className="flex flex-wrap items-center gap-4">
       <Select value={poolNetworkFilter} onValueChange={setPoolNetworkFilter}>
@@ -63,7 +67,7 @@ export function ExplorePagePoolsFilters({
         </button>
       </div>
 
-      <Button className="btn-primary">
+      <Button className="btn-primary" onClick={() => navigate(ROUTES.POOL, { state: { tab: 'new-position' } })}>
         <Plus className="w-4 h-4 mr-2" />
         ADD LIQUIDITY
       </Button>

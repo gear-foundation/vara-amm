@@ -1,6 +1,7 @@
 import { useAccount } from '@gear-js/react-hooks';
 import { Plus } from 'lucide-react';
 import { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,14 +24,19 @@ type PoolPageProps = {
   refetchBalances: () => void;
 };
 
+type Tab = 'positions' | 'new-position';
+
 export function PoolPage({ pairsTokens, refetchBalances: refetchVftBalances }: PoolPageProps) {
   const [isOpenConnectWallet, setIsOpenConnectWallet] = useState(false);
   const openConnectWallet = () => setIsOpenConnectWallet(true);
   const closeConnectWallet = () => setIsOpenConnectWallet(false);
   const { account } = useAccount();
+  const location = useLocation();
+  const routerState = location.state as { tab?: Tab } | null;
 
   const { pairs } = usePairsQuery();
-  const [activeTab, setActiveTab] = useState<'positions' | 'new'>('positions');
+  const [activeTab, setActiveTab] = useState<Tab>(routerState?.tab || 'positions');
+
   const { pairBalances, refetchPairBalances, pairPrograms } = usePairsBalances({ pairs });
   const { lpDecimals } = useLpDecimals({ pairPrograms });
   const { lpUserFees, refetchLpUserFees } = useLpUserFees({ pairPrograms });
@@ -71,7 +77,7 @@ export function PoolPage({ pairsTokens, refetchBalances: refetchVftBalances }: P
 
   return (
     <div className="max-w-4xl mx-auto">
-      <Tabs value={activeTab} className="w-full" onValueChange={(value) => setActiveTab(value as 'positions' | 'new')}>
+      <Tabs value={activeTab} className="w-full" onValueChange={(value) => setActiveTab(value as Tab)}>
         <TabsList className="card p-1 mb-8">
           <TabsTrigger
             value="positions"
@@ -83,7 +89,7 @@ export function PoolPage({ pairsTokens, refetchBalances: refetchVftBalances }: P
             YOUR POSITIONS
           </TabsTrigger>
           <TabsTrigger
-            value="new"
+            value="new-position"
             className="data-[state=active]:bg-[#00FF85] data-[state=active]:text-black font-bold uppercase">
             NEW POSITION
           </TabsTrigger>
@@ -121,7 +127,7 @@ export function PoolPage({ pairsTokens, refetchBalances: refetchVftBalances }: P
                       <Button
                         className="btn-primary"
                         onClick={() => {
-                          setActiveTab('new');
+                          setActiveTab('new-position');
                           setDefaultToken0(position.token0);
                           setDefaultToken1(position.token1);
                         }}>
@@ -157,7 +163,7 @@ export function PoolPage({ pairsTokens, refetchBalances: refetchVftBalances }: P
               <CardContent className="text-center py-12">
                 <div className="text-gray-400 mb-4">No liquidity positions found</div>
                 {account ? (
-                  <Button className="btn-primary" onClick={() => setActiveTab('new')}>
+                  <Button className="btn-primary" onClick={() => setActiveTab('new-position')}>
                     <Plus className="w-4 h-4 mr-2" />
                     CREATE FIRST POSITION
                   </Button>
@@ -171,7 +177,7 @@ export function PoolPage({ pairsTokens, refetchBalances: refetchVftBalances }: P
           )}
         </TabsContent>
 
-        <TabsContent value="new">
+        <TabsContent value="new-position">
           <AddLiquidity
             pairsTokens={pairsTokens}
             onSuccess={() => {
