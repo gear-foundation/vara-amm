@@ -24,6 +24,10 @@ export type PairData = {
   reserve0: string;
   reserve1: string;
   totalSupply: string;
+  volumeUsd: number | null;
+  volume24h: number | null;
+  volume7d: number | null;
+  tvlUsd: number | null;
   createdAt: string;
 };
 
@@ -76,6 +80,10 @@ export const GetPairsQuery = gql`
         reserve0
         reserve1
         totalSupply
+        volumeUsd
+        volume24h
+        volume7d
+        tvlUsd
         createdAt
       }
     }

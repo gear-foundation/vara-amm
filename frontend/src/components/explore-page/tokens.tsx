@@ -1,6 +1,9 @@
 import { TrendingUp, TrendingDown, ChevronUp, ChevronDown } from 'lucide-react';
-import type React from 'react';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
+
+import { formatCurrency, getVolumeByTimeframe } from '@/utils';
+
+import { useTokensWithPrices, transformTokenDataForTable } from '../../features/token-price';
 
 type TokenData = {
   name: string;
@@ -18,69 +21,6 @@ type TokenData = {
   network: string;
 };
 
-const tokensData: TokenData[] = [
-  {
-    name: 'Ethereum',
-    symbol: 'ETH',
-    logoURI: '/tokens/eth.png',
-    price: 2345.67,
-    change1h: 2.34,
-    change1d: 5.67,
-    fdv: 282100000000,
-    volume1h: 1200000000,
-    volume1d: 15200000000,
-    volume1w: 98400000000,
-    volume1m: 412800000000,
-    volume1y: 5200000000000,
-    network: 'Ethereum',
-  },
-  {
-    name: 'Vara Token',
-    symbol: 'VARA',
-    logoURI: '/tokens/vara.png',
-    price: 1.89,
-    change1h: -1.23,
-    change1d: 12.45,
-    fdv: 1200000000,
-    volume1h: 3800000,
-    volume1d: 45600000,
-    volume1w: 298200000,
-    volume1m: 1100000000,
-    volume1y: 12800000000,
-    network: 'Vara Network',
-  },
-  {
-    name: 'USD Coin',
-    symbol: 'USDC',
-    logoURI: '/tokens/usdc.png',
-    price: 1.0,
-    change1h: 0.01,
-    change1d: 0.02,
-    fdv: 32100000000,
-    volume1h: 742000000,
-    volume1d: 8900000000,
-    volume1w: 62300000000,
-    volume1m: 267800000000,
-    volume1y: 3200000000000,
-    network: 'Ethereum',
-  },
-  {
-    name: 'Tether USD',
-    symbol: 'USDT',
-    logoURI: '/tokens/usdt.png',
-    price: 1.0,
-    change1h: 0.0,
-    change1d: 0.01,
-    fdv: 118500000000,
-    volume1h: 2000000000,
-    volume1d: 24100000000,
-    volume1w: 168700000000,
-    volume1m: 724300000000,
-    volume1y: 8700000000000,
-    network: 'Ethereum',
-  },
-];
-
 type SortField = string;
 type SortDirection = 'asc' | 'desc';
 
@@ -95,6 +35,19 @@ export function ExplorePageTokens({ tokenNetworkFilter, tokenFilter, tokenVolume
     field: '',
     direction: 'desc',
   });
+
+  // Fetch tokens data from indexer
+  const {
+    data: tokensResponse,
+    isLoading,
+    error,
+  } = useTokensWithPrices({
+    first: 100,
+    orderBy: tokenSort.field || 'volume24h',
+  });
+
+  const tokensData = tokensResponse?.allTokens?.nodes ? transformTokenDataForTable(tokensResponse.allTokens.nodes) : [];
+  console.log('🚀 ~ ExplorePageTokens ~ tokensData:', tokensData);
 
   const handleSort = (
     field: SortField,
@@ -139,38 +92,13 @@ export function ExplorePageTokens({ tokenNetworkFilter, tokenFilter, tokenVolume
     });
   };
 
-  const filteredTokens = tokensData.filter((token) => {
+  const filteredTokens = tokensData?.filter((token) => {
     if (tokenNetworkFilter !== 'all' && token.network !== tokenNetworkFilter) return false;
     if (tokenFilter !== 'all' && !token.symbol.toLowerCase().includes(tokenFilter.toLowerCase())) return false;
     return true;
   });
 
   const sortedTokens = sortData(filteredTokens, tokenSort);
-
-  const formatCurrency = (value: number) => {
-    if (value >= 1e12) return `$${(value / 1e12).toFixed(2)}T`;
-    if (value >= 1e9) return `$${(value / 1e9).toFixed(2)}B`;
-    if (value >= 1e6) return `$${(value / 1e6).toFixed(2)}M`;
-    if (value >= 1e3) return `$${(value / 1e3).toFixed(2)}K`;
-    return `$${value.toFixed(2)}`;
-  };
-
-  const getTokenVolume = (token: TokenData) => {
-    switch (tokenVolumeFilter) {
-      case '1h':
-        return formatCurrency(token.volume1h);
-      case '1d':
-        return formatCurrency(token.volume1d);
-      case '1w':
-        return formatCurrency(token.volume1w);
-      case '1m':
-        return formatCurrency(token.volume1m);
-      case '1y':
-        return formatCurrency(token.volume1y);
-      default:
-        return formatCurrency(token.volume1d);
-    }
-  };
 
   const formatPriceChange = (change: number) => {
     const isPositive = change >= 0;
@@ -192,7 +120,7 @@ export function ExplorePageTokens({ tokenNetworkFilter, tokenFilter, tokenVolume
     onSort,
   }: {
     field: string;
-    children: React.ReactNode;
+    children: ReactNode;
     sort: { field: SortField; direction: SortDirection };
     onSort: (field: string) => void;
   }) => (
@@ -213,7 +141,7 @@ export function ExplorePageTokens({ tokenNetworkFilter, tokenFilter, tokenVolume
     onSort,
   }: {
     field: string;
-    children: React.ReactNode;
+    children: ReactNode;
     sort: { field: SortField; direction: SortDirection };
     onSort: (field: string) => void;
   }) => (
@@ -226,6 +154,29 @@ export function ExplorePageTokens({ tokenNetworkFilter, tokenFilter, tokenVolume
       </div>
     </th>
   );
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="card overflow-hidden">
+        <div className="flex items-center justify-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00FF85]"></div>
+          <span className="ml-3 text-gray-400">Loading tokens...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="card overflow-hidden">
+        <div className="flex items-center justify-center py-8">
+          <span className="text-red-400">Error loading tokens. Using fallback data.</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="card overflow-hidden">
@@ -287,7 +238,9 @@ export function ExplorePageTokens({ tokenNetworkFilter, tokenFilter, tokenVolume
                 <td className="py-4 px-6 text-right">{formatPriceChange(token.change1h)}</td>
                 <td className="py-4 px-6 text-right">{formatPriceChange(token.change1d)}</td>
                 <td className="py-4 px-6 text-right mono theme-text">{formatCurrency(token.fdv)}</td>
-                <td className="py-4 px-6 text-right mono theme-text">{getTokenVolume(token)}</td>
+                <td className="py-4 px-6 text-right mono theme-text">
+                  {getVolumeByTimeframe(token, tokenVolumeFilter)}
+                </td>
               </tr>
             ))}
           </tbody>

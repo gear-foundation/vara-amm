@@ -1,4 +1,4 @@
-import {Entity as Entity_, Column as Column_, PrimaryColumn as PrimaryColumn_, StringColumn as StringColumn_, Index as Index_, BigIntColumn as BigIntColumn_, DateTimeColumn as DateTimeColumn_, OneToMany as OneToMany_} from "@subsquid/typeorm-store"
+import {Entity as Entity_, Column as Column_, PrimaryColumn as PrimaryColumn_, StringColumn as StringColumn_, Index as Index_, BigIntColumn as BigIntColumn_, FloatColumn as FloatColumn_, DateTimeColumn as DateTimeColumn_, OneToMany as OneToMany_} from "@subsquid/typeorm-store"
 import {Transaction} from "./transaction.model"
 
 @Entity_()
@@ -33,9 +33,25 @@ export class Pair {
     @BigIntColumn_({nullable: false})
     totalSupply!: bigint
 
+    @FloatColumn_({nullable: true})
+    volumeUsd!: number | undefined | null
+
+    @FloatColumn_({nullable: true})
+    volume24h!: number | undefined | null
+
+    @FloatColumn_({nullable: true})
+    volume7d!: number | undefined | null
+
+    @FloatColumn_({nullable: true})
+    tvlUsd!: number | undefined | null
+
     @Index_()
     @DateTimeColumn_({nullable: false})
     createdAt!: Date
+
+    @Index_()
+    @DateTimeColumn_({nullable: false})
+    updatedAt!: Date
 
     @OneToMany_(() => Transaction, e => e.pair)
     transactions!: Transaction[]

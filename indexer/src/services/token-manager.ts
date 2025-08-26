@@ -1,0 +1,84 @@
+import { Token } from "../model";
+import { ProcessorContext } from "../processor";
+import { SailsProgram as VftProgram } from "./extended-vft-program";
+import { GearApi } from "@gear-js/api";
+
+export class TokenManager {
+  private ctx: ProcessorContext;
+  private api: GearApi;
+
+  constructor(ctx: ProcessorContext, api: GearApi) {
+    this.ctx = ctx;
+    this.api = api;
+  }
+
+  /**
+   * Get or create a token entity
+   * Returns the token and whether it was newly created
+   */
+  async getOrCreateToken(
+    tokenAddress: string
+  ): Promise<{ token: Token; isNew: boolean }> {
+    let token = await this.ctx.store.get(Token, tokenAddress);
+
+    if (!token) {
+      // Create new token by querying the contract
+      token = await this.createTokenFromContract(tokenAddress);
+      return { token, isNew: true };
+    }
+
+    return { token, isNew: false };
+  }
+
+  /**
+   * Create a new token entity by querying the contract
+   */
+  private async createTokenFromContract(tokenAddress: string): Promise<Token> {
+    const vftProgram = new VftProgram(this.api, tokenAddress as `0x${string}`);
+
+    try {
+      const [symbol, name, decimals, totalSupply] = await Promise.all([
+        vftProgram.vft.symbol(),
+        vftProgram.vft.name().catch(() => null), // name might not be implemented
+        vftProgram.vft.decimals(),
+        vftProgram.vft.totalSupply(),
+      ]);
+
+      return new Token({
+        id: tokenAddress,
+        symbol,
+        name,
+        decimals: Number(decimals),
+        totalSupply: BigInt(totalSupply),
+        priceUsd: null,
+        volume24h: null,
+        volume7d: null,
+        volume30d: null,
+        fdv: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+    } catch (error) {
+      this.ctx.log.error(
+        { error, tokenAddress },
+        "Failed to create token from contract"
+      );
+
+      // Create a minimal token if contract queries fail
+      return new Token({
+        id: tokenAddress,
+        symbol: "UNKNOWN",
+        name: null,
+        decimals: 18, // default to 18 decimals
+        totalSupply: null,
+        priceUsd: null,
+        volume24h: null,
+        volume7d: null,
+        volume30d: null,
+        fdv: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+    }
+  }
+}

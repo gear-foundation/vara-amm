@@ -1,3 +1,5 @@
+export * from "./token.model"
+export * from "./tokenPriceSnapshot.model"
 export * from "./pair.model"
 export * from "./transaction.model"
 export * from "./_transactionType"

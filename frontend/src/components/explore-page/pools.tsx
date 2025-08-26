@@ -4,11 +4,12 @@ import type React from 'react';
 import { useState, useMemo } from 'react';
 
 import { LOGO_URI_BY_SYMBOL } from '@/consts';
-import { usePairsTokens } from '@/features/pair/hooks/usePairsTokens';
+import { usePairsTokens } from '@/features/pair/hooks';
 import { GetPairsQuery, type PairData } from '@/features/pair/queries';
 import { getTokenId } from '@/features/token-price';
 import { useTokenPrices } from '@/features/token-price/api';
 import { useGraphQLQuery } from '@/hooks/useGraphQLQuery';
+import { formatCurrency, getVolumeByTimeframe } from '@/utils';
 
 type PoolData = {
   id: string;
@@ -53,7 +54,7 @@ const usePoolsData = () => {
       const token0Symbol = pair.token0Symbol || matchingPair?.token0?.symbol || 'Unknown';
       const token1Symbol = pair.token1Symbol || matchingPair?.token1?.symbol || 'Unknown';
 
-      // Calculate TVL using reserves and mock prices
+      // Calculate TVL using reserves and token prices
       const reserve0 = BigInt(pair.reserve0);
       const reserve1 = BigInt(pair.reserve1);
 
@@ -66,7 +67,7 @@ const usePoolsData = () => {
       const reserve0USD = (Number(reserve0) / Math.pow(10, token0Decimals)) * token0price;
       const reserve1USD = (Number(reserve1) / Math.pow(10, token1Decimals)) * token1price;
 
-      const tvl = reserve0USD + reserve1USD;
+      const tvl = pair.tvlUsd || reserve0USD + reserve1USD;
 
       // Check if it's user's pool (simplified - checking if user has any balance)
       const isMyPool = Boolean(
@@ -177,30 +178,7 @@ export function ExplorePagePools({ poolNetworkFilter, poolVolumeFilter, showMyPo
 
   const sortedPools = sortData(filteredPools, poolSort);
 
-  const formatCurrency = (value: number) => {
-    if (value >= 1e12) return `$${(value / 1e12).toFixed(2)}T`;
-    if (value >= 1e9) return `$${(value / 1e9).toFixed(2)}B`;
-    if (value >= 1e6) return `$${(value / 1e6).toFixed(2)}M`;
-    if (value >= 1e3) return `$${(value / 1e3).toFixed(2)}K`;
-    return `$${value.toFixed(2)}`;
-  };
-
-  const getPoolVolume = (pool: PoolData) => {
-    switch (poolVolumeFilter) {
-      case '1h':
-        return formatCurrency(pool.volume1h);
-      case '1d':
-        return formatCurrency(pool.volume1d);
-      case '1w':
-        return formatCurrency(pool.volume1w);
-      case '1m':
-        return formatCurrency(pool.volume1m);
-      case '1y':
-        return formatCurrency(pool.volume1y);
-      default:
-        return formatCurrency(pool.volume1d);
-    }
-  };
+  const getPoolVolume = (pool: PoolData) => getVolumeByTimeframe(pool, poolVolumeFilter);
 
   const SortableHeader = ({
     field,

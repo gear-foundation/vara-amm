@@ -1,7 +1,7 @@
 import { DataSource } from "typeorm";
 import { DefaultNamingStrategy } from "typeorm";
 import dotenv from "dotenv";
-import { Pair, Transaction } from "./generated";
+import { Pair, Token, TokenPriceSnapshot, Transaction } from "./generated";
 
 class SnakeNamingStrategy extends DefaultNamingStrategy {
   columnName(
@@ -28,10 +28,10 @@ const AppDataSource = new DataSource({
   username: process.env.DB_USER || "postgres",
   password: process.env.DB_PASS || "postgres",
   database: process.env.DB_NAME || "gear_monitoring",
-  synchronize: true,
-  migrationsRun: true,
+  synchronize: false,
+  migrationsRun: false,
   logging: process.env.NODE_ENV === "development",
-  entities: [Pair, Transaction],
+  entities: [Pair, Transaction, Token, TokenPriceSnapshot],
   migrations: ["db/migrations/*.js"],
   namingStrategy: new SnakeNamingStrategy(),
 });

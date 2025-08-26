@@ -1,4 +1,4 @@
-import {Entity as Entity_, Column as Column_, PrimaryColumn as PrimaryColumn_, Index as Index_, ManyToOne as ManyToOne_, StringColumn as StringColumn_, BigIntColumn as BigIntColumn_, DateTimeColumn as DateTimeColumn_} from "@subsquid/typeorm-store"
+import {Entity as Entity_, Column as Column_, PrimaryColumn as PrimaryColumn_, Index as Index_, ManyToOne as ManyToOne_, StringColumn as StringColumn_, BigIntColumn as BigIntColumn_, DateTimeColumn as DateTimeColumn_, FloatColumn as FloatColumn_} from "@subsquid/typeorm-store"
 import {TransactionType} from "./_transactionType"
 import {Pair} from "./pair.model"
 
@@ -51,4 +51,19 @@ export class Transaction {
 
     @StringColumn_({nullable: true})
     tokenOut!: string | undefined | null
+
+    @FloatColumn_({nullable: true})
+    amountAUsd!: number | undefined | null
+
+    @FloatColumn_({nullable: true})
+    amountBUsd!: number | undefined | null
+
+    @FloatColumn_({nullable: true})
+    amountInUsd!: number | undefined | null
+
+    @FloatColumn_({nullable: true})
+    amountOutUsd!: number | undefined | null
+
+    @FloatColumn_({nullable: true})
+    valueUsd!: number | undefined | null
 }
