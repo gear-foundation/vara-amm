@@ -18,6 +18,7 @@ import {
   VftProgram,
   PriceCalculator,
   TokenManager,
+  VolumeCalculator,
 } from "../services";
 import { SailsDecoder } from "../sails-decoder";
 import { BlockCommonData, UserMessageSentEvent, PairInfo } from "../types";
@@ -33,6 +34,7 @@ export class PairHandler extends BaseHandler {
   private _isPairUpdated: boolean;
   private _priceCalculator: PriceCalculator;
   private _tokenManager: TokenManager;
+  private _volumeCalculator: VolumeCalculator;
   private _api: GearApi;
 
   constructor(pairInfo: PairInfo) {
@@ -74,6 +76,8 @@ export class PairHandler extends BaseHandler {
       volumeUsd: 0,
       volume24h: 0,
       volume7d: 0,
+      volume30d: 0,
+      volume1y: 0,
       tvlUsd: 0,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -84,9 +88,20 @@ export class PairHandler extends BaseHandler {
     this._transactions.clear();
     this._tokensToSave.clear();
     this._snapshotsToSave.clear();
+
+    // Clear volume calculator buffers
+    if (this._volumeCalculator) {
+      this._volumeCalculator.clearBuffers();
+    }
   }
 
   public async save(): Promise<void> {
+    // Flush volume buffers before saving
+    if (this._volumeCalculator) {
+      await this._volumeCalculator.flushAllBuffers();
+      await this._volumeCalculator.saveSnapshots();
+    }
+
     // Save pair if updated
     if (this._isPairUpdated) {
       await this._ctx.store.save(this._pair);
@@ -122,6 +137,7 @@ export class PairHandler extends BaseHandler {
     // Initialize services
     this._priceCalculator = new PriceCalculator(ctx);
     this._tokenManager = new TokenManager(ctx, this._api);
+    this._volumeCalculator = new VolumeCalculator(ctx);
 
     // Ensure tokens exist and prepare them for saving
     const { token: token0, isNew: isToken0New } =
@@ -143,15 +159,7 @@ export class PairHandler extends BaseHandler {
       const common = getBlockCommonData(block);
 
       for (const event of block.events) {
-        this._ctx.log.info(
-          {
-            event,
-            pairAddress: this._pairInfo.address,
-            sorce: event.args.message.source,
-            isUserMessageSentEvent: isUserMessageSentEvent(event),
-          },
-          "Event"
-        );
+
 
         if (
           isUserMessageSentEvent(event) &&
@@ -167,14 +175,12 @@ export class PairHandler extends BaseHandler {
     event: UserMessageSentEvent,
     common: BlockCommonData
   ) {
-    this._ctx.log.info({ event }, "Just Evemt!!!");
     if (isSailsEvent(event)) {
-      this._ctx.log.info({ event }, "SailsEvent!!!");
       const { service, method, payload } = this._pairDecoder.decodeEvent(event);
 
       this._ctx.log.info(
         { service, method, payload },
-        ` UserMessageSentEvent from ${this._pairInfo.address}`
+        `UserMessageSentEvent from ${this._pairInfo.address}`
       );
 
       if (service === "Pair") {
@@ -207,7 +213,7 @@ export class PairHandler extends BaseHandler {
         // Calculate USD values
         await this._calculateTransactionUSDValues(transaction);
 
-        // Update pair reserves (this would come from actual reserve update events)
+        // Update pair reserves
         this._pair.reserve0 = BigInt(
           payload.new_reserve_0 || this._pair.reserve0
         );
@@ -307,8 +313,8 @@ export class PairHandler extends BaseHandler {
         // Update pair metrics
         await this._updatePairTVL();
 
-        // TODO: update on time interval (once per 15 minutes or so)
-        await this._updatePairVolumeMetrics();
+        // Update volume metrics efficiently
+        await this._updatePairVolumeMetricsOptimized();
 
         this._transactions.set(event.args.message.id, transaction);
         this._ctx.log.info({ transaction }, "Processed Swap event");
@@ -434,67 +440,45 @@ export class PairHandler extends BaseHandler {
   }
 
   /**
-   * Update pair volume metrics based on recent transactions
+   * Optimized method for updating pair volume metrics
+   * Only queries DB on hour change or first run
    */
-  private async _updatePairVolumeMetrics(): Promise<void> {
-    const now = new Date();
-    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  private async _updatePairVolumeMetricsOptimized(): Promise<void> {
+    // Get volume ONLY from swaps (trading volume)
+    const newTradingVolume = Array.from(this._transactions.values())
+      .filter((tx) => tx.type === TransactionType.SWAP)
+      .reduce((sum, tx) => sum + (tx.valueUsd || 0), 0);
 
-    // Get transactions for 24h volume
-    const transactions24h = await this._ctx.store.find(Transaction, {
-      where: {
-        pair: { id: this._pair.id },
-        timestamp: MoreThanOrEqual(oneDayAgo),
-      },
-    });
+    if (newTradingVolume > 0) {
+      const volumes = await this._volumeCalculator.updatePairVolumes(
+        this._pair.id,
+        newTradingVolume,
+        new Date()
+      );
 
-    // Get transactions for 7d volume
-    const transactions7d = await this._ctx.store.find(Transaction, {
-      where: {
-        pair: { id: this._pair.id },
-        timestamp: MoreThanOrEqual(sevenDaysAgo),
-      },
-    });
+      // Update pair fields
+      this._pair.volume1h = volumes.volume1h;
+      this._pair.volume24h = volumes.volume24h;
+      this._pair.volume7d = volumes.volume7d;
+      this._pair.volume30d = volumes.volume30d;
+      this._pair.volume1y = volumes.volume1y;
 
-    // Calculate 24h volume
-    this._pair.volume24h = transactions24h.reduce((total, tx) => {
-      return total + (tx.valueUsd || 0);
-    }, 0);
+      // Update total volume incrementally
+      this._pair.volumeUsd = (this._pair.volumeUsd || 0) + newTradingVolume;
 
-    // Calculate 7d volume
-    this._pair.volume7d = transactions7d.reduce((total, tx) => {
-      return total + (tx.valueUsd || 0);
-    }, 0);
-
-    // Update total volume (cumulative)
-    if (this._pair.volumeUsd === undefined || this._pair.volumeUsd === null) {
-      // If volumeUsd is not set, calculate it from all transactions
-      const allTransactions = await this._ctx.store.find(Transaction, {
-        where: {
-          pair: { id: this._pair.id },
+      this._ctx.log.info(
+        {
+          pairId: this._pair.id,
+          newTradingVolume,
+          volume1h: this._pair.volume1h,
+          volume24h: this._pair.volume24h,
+          volume7d: this._pair.volume7d,
+          volume30d: this._pair.volume30d,
+          volume1y: this._pair.volume1y,
+          totalVolumeUsd: this._pair.volumeUsd,
         },
-      });
-
-      this._pair.volumeUsd = allTransactions.reduce((total, tx) => {
-        return total + (tx.valueUsd || 0);
-      }, 0);
-    } else {
-      // Just add the current transaction's value to the total
-      const currentTransactionValue = Array.from(
-        this._transactions.values()
-      ).reduce((total, tx) => total + (tx.valueUsd || 0), 0);
-      this._pair.volumeUsd += currentTransactionValue;
+        "Updated pair trading volume efficiently"
+      );
     }
-
-    this._ctx.log.info(
-      {
-        pairId: this._pair.id,
-        volume24h: this._pair.volume24h,
-        volume7d: this._pair.volume7d,
-        volumeUsd: this._pair.volumeUsd,
-      },
-      "Updated pair volume metrics"
-    );
   }
 }

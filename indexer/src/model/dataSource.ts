@@ -1,7 +1,7 @@
 import { DataSource } from "typeorm";
 import { DefaultNamingStrategy } from "typeorm";
 import dotenv from "dotenv";
-import { Pair, Token, TokenPriceSnapshot, Transaction } from "./generated";
+import { Pair, Token, TokenPriceSnapshot, Transaction, PairVolumeSnapshot } from "./generated";
 
 class SnakeNamingStrategy extends DefaultNamingStrategy {
   columnName(
@@ -31,7 +31,7 @@ const AppDataSource = new DataSource({
   synchronize: false,
   migrationsRun: false,
   logging: process.env.NODE_ENV === "development",
-  entities: [Pair, Transaction, Token, TokenPriceSnapshot],
+  entities: [Pair, Transaction, Token, TokenPriceSnapshot, PairVolumeSnapshot],
   migrations: ["db/migrations/*.js"],
   namingStrategy: new SnakeNamingStrategy(),
 });

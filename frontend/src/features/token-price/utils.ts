@@ -1,5 +1,7 @@
 import { LOGO_URI_BY_SYMBOL } from '@/consts';
-import { formatCurrency } from '@/utils';
+import { formatCurrency, toNumber } from '@/utils';
+
+import type { PairData } from '../pair';
 
 import { TOKEN_ID } from './api';
 import type { TokenData } from './queries';
@@ -49,7 +51,10 @@ export function formatPriceChange(change?: number | null): {
 }
 
 // Transform indexed data to frontend format
-export function transformTokenDataForTable(tokens: TokenData[]): Array<{
+export function transformTokenDataForTable(
+  tokens: TokenData[],
+  pairs?: PairData[],
+): Array<{
   name: string;
   symbol: string;
   logoURI: string;
@@ -64,13 +69,28 @@ export function transformTokenDataForTable(tokens: TokenData[]): Array<{
   volume1y: number;
   network: string;
 }> {
-  const toNumber = (value: string | number | null | undefined): number => {
-    if (value === null || value === undefined) return 0;
-    return typeof value === 'string' ? parseFloat(value) || 0 : Number(value) || 0;
-  };
-
   return tokens.map((token) => {
     const latestSnapshot = token.tokenPriceSnapshotsByTokenId?.nodes[0];
+
+    // Calculate volumes from pairs if available, otherwise use snapshot data
+    let volumes = {
+      volume1h: toNumber(latestSnapshot?.volume1H),
+      volume1d: toNumber(latestSnapshot?.volume24H),
+      volume1w: toNumber(latestSnapshot?.volume7D),
+      volume1m: toNumber(latestSnapshot?.volume30D),
+      volume1y: toNumber(latestSnapshot?.volume1Y),
+    };
+
+    if (pairs && pairs.length > 0) {
+      const calculatedVolumes = calculateTokenTradingVolumeBySymbol(token.symbol, pairs);
+      volumes = {
+        volume1h: calculatedVolumes.volume1h,
+        volume1d: calculatedVolumes.volume24h,
+        volume1w: calculatedVolumes.volume7d,
+        volume1m: calculatedVolumes.volume30d,
+        volume1y: calculatedVolumes.volume1y,
+      };
+    }
 
     return {
       name: token.name || token.symbol,
@@ -80,14 +100,34 @@ export function transformTokenDataForTable(tokens: TokenData[]): Array<{
       change1h: toNumber(latestSnapshot?.change1H),
       change1d: toNumber(latestSnapshot?.change24H),
       fdv: toNumber(token.fdv),
-      volume1h: toNumber(latestSnapshot?.volume1H),
-      volume1d: toNumber(latestSnapshot?.volume24H),
-      volume1w: toNumber(latestSnapshot?.volume7D),
-      volume1m: toNumber(latestSnapshot?.volume30D),
-      volume1y: toNumber(latestSnapshot?.volume1Y),
+      ...volumes,
       network: 'Vara Network', // Default network
     };
   });
+}
+
+/**
+ * Calculate token trading volume by symbol from pairs data
+ */
+export function calculateTokenTradingVolumeBySymbol(
+  tokenSymbol: string,
+  pairs: PairData[],
+): {
+  volume1h: number;
+  volume24h: number;
+  volume7d: number;
+  volume30d: number;
+  volume1y: number;
+} {
+  const relevantPairs = pairs.filter((pair) => pair.token0Symbol === tokenSymbol || pair.token1Symbol === tokenSymbol);
+
+  return {
+    volume1h: relevantPairs.reduce((sum, pair) => sum + toNumber(pair.volume1H), 0),
+    volume24h: relevantPairs.reduce((sum, pair) => sum + toNumber(pair.volume24H), 0),
+    volume7d: relevantPairs.reduce((sum, pair) => sum + toNumber(pair.volume7D), 0),
+    volume30d: relevantPairs.reduce((sum, pair) => sum + toNumber(pair.volume30D), 0),
+    volume1y: relevantPairs.reduce((sum, pair) => sum + toNumber(pair.volume1Y), 0),
+  };
 }
 
 export { getTokenId };

@@ -1,5 +1,6 @@
 import {Entity as Entity_, Column as Column_, PrimaryColumn as PrimaryColumn_, StringColumn as StringColumn_, Index as Index_, BigIntColumn as BigIntColumn_, FloatColumn as FloatColumn_, DateTimeColumn as DateTimeColumn_, OneToMany as OneToMany_} from "@subsquid/typeorm-store"
 import {Transaction} from "./transaction.model"
+import {PairVolumeSnapshot} from "./pairVolumeSnapshot.model"
 
 @Entity_()
 export class Pair {
@@ -37,10 +38,19 @@ export class Pair {
     volumeUsd!: number | undefined | null
 
     @FloatColumn_({nullable: true})
+    volume1h!: number | undefined | null
+
+    @FloatColumn_({nullable: true})
     volume24h!: number | undefined | null
 
     @FloatColumn_({nullable: true})
     volume7d!: number | undefined | null
+
+    @FloatColumn_({nullable: true})
+    volume30d!: number | undefined | null
+
+    @FloatColumn_({nullable: true})
+    volume1y!: number | undefined | null
 
     @FloatColumn_({nullable: true})
     tvlUsd!: number | undefined | null
@@ -55,4 +65,7 @@ export class Pair {
 
     @OneToMany_(() => Transaction, e => e.pair)
     transactions!: Transaction[]
+
+    @OneToMany_(() => PairVolumeSnapshot, e => e.pair)
+    volumeSnapshots!: PairVolumeSnapshot[]
 }

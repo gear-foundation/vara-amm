@@ -41,12 +41,26 @@ type Pair @entity {
   reserve1: BigInt!
   totalSupply: BigInt!
   volumeUsd: Float # total volume in USD
+  volume1h: Float # 1h volume in USD
   volume24h: Float # 24h volume in USD
   volume7d: Float # 7d volume in USD
+  volume30d: Float # 30d volume in USD
+  volume1y: Float # 1y volume in USD
   tvlUsd: Float # total value locked in USD
   createdAt: DateTime! @index
   updatedAt: DateTime! @index
   transactions: [Transaction!] @derivedFrom(field: "pair")
+  volumeSnapshots: [PairVolumeSnapshot!] @derivedFrom(field: "pair")
+}
+
+type PairVolumeSnapshot @entity {
+  id: ID! # format: {pairId}:{interval}:{roundedTimestamp}
+  pair: Pair!
+  interval: VolumeInterval! @index
+  volumeUsd: Float!
+  transactionCount: Int!
+  timestamp: DateTime! @index # rounded to interval start
+  createdAt: DateTime! @index
 }
 
 type Transaction @entity {
@@ -77,4 +91,11 @@ enum TransactionType {
   ADD_LIQUIDITY
   REMOVE_LIQUIDITY
   SWAP
+}
+
+enum VolumeInterval {
+  HOURLY
+  DAILY
+  WEEKLY
+  MONTHLY
 }

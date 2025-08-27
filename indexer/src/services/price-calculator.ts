@@ -194,18 +194,6 @@ export class PriceCalculator {
             // Use the transaction's total value (which is now only input side)
             volumeToAdd = tx.valueUsd || 0;
           }
-        } else if (
-          tx.type === TransactionType.ADD_LIQUIDITY ||
-          tx.type === TransactionType.REMOVE_LIQUIDITY
-        ) {
-          // For liquidity operations, count if this token is in the pair
-          if (
-            tx.pair &&
-            (tx.pair.token0 === tokenAddress || tx.pair.token1 === tokenAddress)
-          ) {
-            shouldCount = true;
-            volumeToAdd = tx.valueUsd || 0;
-          }
         }
 
         if (shouldCount) {

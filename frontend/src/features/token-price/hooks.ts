@@ -1,6 +1,7 @@
 import { useQuery, type UseQueryOptions } from '@tanstack/react-query';
 
 import { graphqlClient } from '../../lib/graphql-client';
+import { GetPairsQuery, type PairData } from '../pair/queries';
 
 import {
   GET_TOKENS_WITH_PRICES,
@@ -88,8 +89,6 @@ export function useTokenPriceHistory(
       });
     },
     enabled: !!tokenId,
-    staleTime: 30000,
-    refetchInterval: 60000,
     ...queryOptions,
   });
 }
@@ -101,8 +100,6 @@ export function useTokenByAddress(address: string, queryOptions?: Partial<UseQue
       return graphqlClient.request<GetTokenByAddressResponse>(GET_TOKEN_BY_ADDRESS, { id: address });
     },
     enabled: !!address,
-    staleTime: 30000,
-    refetchInterval: 60000,
     ...queryOptions,
   });
 }
@@ -121,8 +118,19 @@ export function useTokensByVolume(
     queryFn: async () => {
       return graphqlClient.request<GetTokensWithPricesResponse>(GET_TOKENS_BY_VOLUME, options);
     },
-    staleTime: 30000,
-    refetchInterval: 60000,
+    ...queryOptions,
+  });
+}
+
+/**
+ * Hook to get pairs data for volume calculations
+ */
+export function usePairsData(queryOptions?: Partial<UseQueryOptions<{ allPairs: { nodes: PairData[] } }>>) {
+  return useQuery({
+    queryKey: ['pairs-data'],
+    queryFn: async () => {
+      return graphqlClient.request<{ allPairs: { nodes: PairData[] } }>(GetPairsQuery);
+    },
     ...queryOptions,
   });
 }

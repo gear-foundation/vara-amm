@@ -1,8 +1,8 @@
-import { TrendingUp, TrendingDown } from 'lucide-react';
 import { useState } from 'react';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { usePairsTokens } from '@/features/pair';
+import { usePairsTokens, usePoolsData } from '@/features/pair';
+import { formatCurrency } from '@/utils';
 
 import { ExplorePagePools } from './pools';
 import { ExplorePagePoolsFilters } from './pools-filters';
@@ -13,6 +13,7 @@ import { ExplorePageTransactionsFilters } from './transactions-filters';
 
 export function ExplorePage() {
   const { pairsTokens } = usePairsTokens();
+  const { poolsData, metrics, isFetching: isPoolsLoading, error: poolsError } = usePoolsData();
   const [tokenNetworkFilter, setTokenNetworkFilter] = useState('all');
   const [tokenFilter, setTokenFilter] = useState('all');
   const [tokenVolumeFilter, setTokenVolumeFilter] = useState('1d');
@@ -29,22 +30,47 @@ export function ExplorePage() {
         <div className="card p-6">
           <div className="text-sm text-gray-400 uppercase mb-2">24H VOLUME</div>
           <div className="flex items-center space-x-3">
-            <div className="text-2xl font-bold mono theme-text">$4.33B</div>
-            <div className="flex items-center space-x-1 text-[#00FF85] mono">
-              <TrendingUp className="w-4 h-4" />
-              <span className="text-sm font-medium">5.7%</span>
-            </div>
+            {isPoolsLoading ? (
+              <div className="h-8 bg-gray-600 rounded animate-pulse w-24"></div>
+            ) : (
+              <div className="text-2xl font-bold mono theme-text">{formatCurrency(metrics?.total24hVolume || 0)}</div>
+            )}
+            {/* ! TODO: Add volume change */}
+            {/* <div
+              className={`flex items-center space-x-1 mono ${
+                (metrics?.volumeChange24h || 0) >= 0 ? 'text-[#00FF85]' : 'text-red-400'
+              }`}>
+              {(metrics?.volumeChange24h || 0) >= 0 ? (
+                <TrendingUp className="w-4 h-4" />
+              ) : (
+                <TrendingDown className="w-4 h-4" />
+              )}
+              <span className="text-sm font-medium">{Math.abs(metrics?.volumeChange24h || 0).toFixed(1)}%</span>
+            </div> */}
           </div>
         </div>
 
         <div className="card p-6">
           <div className="text-sm text-gray-400 uppercase mb-2">Total VARAΞDEX TVL</div>
           <div className="flex items-center space-x-3">
-            <div className="text-2xl font-bold mono theme-text">$4.40B</div>
-            <div className="flex items-center space-x-1 text-red-400 mono">
-              <TrendingDown className="w-4 h-4" />
-              <span className="text-sm font-medium">3.96%</span>
-            </div>
+            {isPoolsLoading ? (
+              <div className="h-8 bg-gray-600 rounded animate-pulse w-24"></div>
+            ) : (
+              <div className="text-2xl font-bold mono theme-text">{formatCurrency(metrics?.totalTVL || 0)}</div>
+            )}
+            {/* ! TODO: Add volume change */}
+            {/* <div
+            <div
+              className={`flex items-center space-x-1 mono ${
+                (metrics?.tvlChange24h || 0) >= 0 ? 'text-[#00FF85]' : 'text-red-400'
+              }`}>
+              {(metrics?.tvlChange24h || 0) >= 0 ? (
+                <TrendingUp className="w-4 h-4" />
+              ) : (
+                <TrendingDown className="w-4 h-4" />
+              )}
+              <span className="text-sm font-medium">{Math.abs(metrics?.tvlChange24h || 0).toFixed(2)}%</span>
+            </div> */}
           </div>
         </div>
       </div>
@@ -118,6 +144,9 @@ export function ExplorePage() {
             poolNetworkFilter={poolNetworkFilter}
             poolVolumeFilter={poolVolumeFilter}
             showMyPools={showMyPools}
+            poolsData={poolsData}
+            isLoading={isPoolsLoading}
+            error={poolsError}
           />
         </TabsContent>
 

@@ -1,114 +1,9 @@
-import { useAccount } from '@gear-js/react-hooks';
 import { ChevronUp, ChevronDown } from 'lucide-react';
 import type React from 'react';
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 
-import { LOGO_URI_BY_SYMBOL } from '@/consts';
-import { usePairsTokens } from '@/features/pair/hooks';
-import { GetPairsQuery, type PairData } from '@/features/pair/queries';
-import { getTokenId } from '@/features/token-price';
-import { useTokenPrices } from '@/features/token-price/api';
-import { useGraphQLQuery } from '@/hooks/useGraphQLQuery';
+import { type PoolData } from '@/features/pair';
 import { formatCurrency, getVolumeByTimeframe } from '@/utils';
-
-type PoolData = {
-  id: string;
-  name: string;
-  token0: { symbol: string; logoURI: string };
-  token1: { symbol: string; logoURI: string };
-  feeTier: number;
-  tvl: number;
-  volume1h: number;
-  volume1d: number;
-  volume1w: number;
-  volume1m: number;
-  volume1y: number;
-  network: string;
-  isMyPool: boolean;
-};
-
-const usePoolsData = () => {
-  const { account } = useAccount();
-  const { pairsTokens } = usePairsTokens();
-  const { data: tokenPrices } = useTokenPrices();
-  console.log('🚀 ~ usePoolsData ~ tokenPrices:', tokenPrices);
-
-  const {
-    data: pairsResult,
-    isFetching: isPairsFetching,
-    error: pairsError,
-  } = useGraphQLQuery<{
-    allPairs: {
-      nodes: PairData[];
-    };
-  }>(['pairs'], GetPairsQuery);
-
-  const poolsData = useMemo(() => {
-    const pairs = pairsResult?.allPairs?.nodes || [];
-    if (!pairs.length || !pairsTokens) return [];
-
-    return pairs.map((pair) => {
-      // Find matching tokens from pairsTokens
-      const matchingPair = pairsTokens.find((p) => p.pairAddress === pair.id);
-
-      const token0Symbol = pair.token0Symbol || matchingPair?.token0?.symbol || 'Unknown';
-      const token1Symbol = pair.token1Symbol || matchingPair?.token1?.symbol || 'Unknown';
-
-      // Calculate TVL using reserves and token prices
-      const reserve0 = BigInt(pair.reserve0);
-      const reserve1 = BigInt(pair.reserve1);
-
-      const token0Decimals = matchingPair?.token0?.decimals || 18;
-      const token1Decimals = matchingPair?.token1?.decimals || 18;
-
-      const token0price = tokenPrices?.[getTokenId(token0Symbol)]?.usd || 0;
-      const token1price = tokenPrices?.[getTokenId(token1Symbol)]?.usd || 0;
-
-      const reserve0USD = (Number(reserve0) / Math.pow(10, token0Decimals)) * token0price;
-      const reserve1USD = (Number(reserve1) / Math.pow(10, token1Decimals)) * token1price;
-
-      const tvl = pair.tvlUsd || reserve0USD + reserve1USD;
-
-      // Check if it's user's pool (simplified - checking if user has any balance)
-      const isMyPool = Boolean(
-        account?.decodedAddress &&
-          ((matchingPair?.token0?.balance && matchingPair.token0.balance > 0n) ||
-            (matchingPair?.token1?.balance && matchingPair.token1.balance > 0n)),
-      );
-
-      const poolData: PoolData = {
-        id: pair.id,
-        name: `${token0Symbol}/${token1Symbol}`,
-        token0: {
-          symbol: token0Symbol,
-          logoURI: LOGO_URI_BY_SYMBOL[token0Symbol] || '/placeholder.svg',
-        },
-        token1: {
-          symbol: token1Symbol,
-          logoURI: LOGO_URI_BY_SYMBOL[token1Symbol] || '/placeholder.svg',
-        },
-        feeTier: 0.3, // Default fee tier
-        tvl,
-        // Mock volume data for now
-        volume1h: Math.random() * tvl * 0.1,
-        volume1d: Math.random() * tvl * 0.5,
-        volume1w: Math.random() * tvl * 2,
-        volume1m: Math.random() * tvl * 8,
-        volume1y: Math.random() * tvl * 50,
-        network: 'Vara Network',
-        isMyPool,
-      };
-
-      return poolData;
-    });
-  }, [pairsResult?.allPairs?.nodes, pairsTokens, account?.decodedAddress, tokenPrices]);
-
-  return {
-    poolsData,
-    isFetching: isPairsFetching,
-    error: pairsError,
-  };
-};
 
 type SortField = string;
 type SortDirection = 'asc' | 'desc';
@@ -117,15 +12,23 @@ type ExplorePagePoolsProps = {
   poolNetworkFilter: string;
   poolVolumeFilter: string;
   showMyPools: boolean;
+  poolsData: PoolData[];
+  isLoading: boolean;
+  error?: Error | null;
 };
 
-export function ExplorePagePools({ poolNetworkFilter, poolVolumeFilter, showMyPools }: ExplorePagePoolsProps) {
+export function ExplorePagePools({
+  poolNetworkFilter,
+  poolVolumeFilter,
+  showMyPools,
+  poolsData,
+  isLoading,
+  error,
+}: ExplorePagePoolsProps) {
   const [poolSort, setPoolSort] = useState<{ field: SortField; direction: SortDirection }>({
     field: '',
     direction: 'desc',
   });
-
-  const { poolsData, isFetching, error } = usePoolsData();
 
   const handleSort = (
     field: SortField,
@@ -145,7 +48,7 @@ export function ExplorePagePools({ poolNetworkFilter, poolVolumeFilter, showMyPo
     );
   };
 
-  const sortData = (data: PoolData[], sortConfig: { field: SortField; direction: SortDirection }) => {
+  const sortData = (data: PoolData[], sortConfig: { field: SortField; direction: SortDirection }): PoolData[] => {
     if (!sortConfig.field) return data;
 
     return [...data].sort((a, b) => {
@@ -170,7 +73,7 @@ export function ExplorePagePools({ poolNetworkFilter, poolVolumeFilter, showMyPo
     });
   };
 
-  const filteredPools = poolsData.filter((pool) => {
+  const filteredPools = (poolsData || []).filter((pool: PoolData) => {
     if (poolNetworkFilter !== 'all' && pool.network !== poolNetworkFilter) return false;
     if (showMyPools && !pool.isMyPool) return false;
     return true;
@@ -226,13 +129,13 @@ export function ExplorePagePools({ poolNetworkFilter, poolVolumeFilter, showMyPo
     return (
       <div className="card overflow-hidden">
         <div className="p-6 text-center">
-          <p className="text-red-400">Error loading pools: {error.message}</p>
+          <p className="text-red-400">Error loading pools: {error?.message || 'Unknown error'}</p>
         </div>
       </div>
     );
   }
 
-  if (isFetching) {
+  if (isLoading) {
     return (
       <div className="card overflow-hidden">
         <div className="overflow-x-auto">
