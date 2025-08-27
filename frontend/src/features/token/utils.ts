@@ -1,5 +1,5 @@
 import { LOGO_URI_BY_SYMBOL } from '@/consts';
-import { formatCurrency, toNumber } from '@/utils';
+import { toNumber } from '@/utils';
 
 import type { PairData } from '../pair';
 
@@ -18,40 +18,7 @@ const getTokenId = (symbol: string) => {
   throw new Error(`Token not found: ${symbol}`);
 };
 
-// Helper functions for formatting data
-export function formatTokenPrice(price?: number | null): string {
-  if (!price) return '$0.00';
-
-  if (price < 0.01) {
-    return `$${price.toFixed(6)}`;
-  } else if (price < 1) {
-    return `$${price.toFixed(4)}`;
-  } else {
-    return `$${price.toFixed(2)}`;
-  }
-}
-
-export function formatMarketCap(fdv?: number | null): string {
-  if (!fdv) return 'N/A';
-  return formatCurrency(fdv);
-}
-
-export function formatPriceChange(change?: number | null): {
-  value: string;
-  isPositive: boolean;
-} {
-  if (change === undefined || change === null) {
-    return { value: '0.00%', isPositive: true };
-  }
-
-  return {
-    value: `${Math.abs(change).toFixed(2)}%`,
-    isPositive: change >= 0,
-  };
-}
-
-// Transform indexed data to frontend format
-export function transformTokenDataForTable(
+function transformTokenDataForTable(
   tokens: TokenData[],
   pairs?: PairData[],
 ): Array<{
@@ -106,10 +73,7 @@ export function transformTokenDataForTable(
   });
 }
 
-/**
- * Calculate token trading volume by symbol from pairs data
- */
-export function calculateTokenTradingVolumeBySymbol(
+function calculateTokenTradingVolumeBySymbol(
   tokenSymbol: string,
   pairs: PairData[],
 ): {
@@ -130,4 +94,4 @@ export function calculateTokenTradingVolumeBySymbol(
   };
 }
 
-export { getTokenId };
+export { getTokenId, transformTokenDataForTable };

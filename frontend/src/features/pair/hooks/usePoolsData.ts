@@ -4,8 +4,8 @@ import { useMemo } from 'react';
 import { LOGO_URI_BY_SYMBOL } from '@/consts';
 import { usePairsTokens } from '@/features/pair/hooks';
 import { GetPairsQuery, type PairData } from '@/features/pair/queries';
-import { getTokenId } from '@/features/token-price';
-import { useTokenPrices } from '@/features/token-price/api';
+import { getTokenId } from '@/features/token';
+import { useTokenPrices } from '@/features/token/api';
 import { useGraphQLQuery } from '@/hooks/useGraphQLQuery';
 import { toNumber } from '@/utils';
 
@@ -84,6 +84,7 @@ export const usePoolsData = () => {
       const reserve0USD = (Number(reserve0) / Math.pow(10, token0Decimals)) * token0price;
       const reserve1USD = (Number(reserve1) / Math.pow(10, token1Decimals)) * token1price;
 
+      // TODO: remove calculation of tvl since indexer returns it
       const tvl = toNumber(pair.tvlUsd) || reserve0USD + reserve1USD;
       const volume24h = toNumber(pair.volume24H);
 

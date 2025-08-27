@@ -3,7 +3,7 @@ import { useState, type ReactNode } from 'react';
 
 import { formatCurrency, getVolumeByTimeframe } from '@/utils';
 
-import { useTokensWithPrices, transformTokenDataForTable, usePairsData } from '../../features/token-price';
+import { useTokensWithPrices, transformTokenDataForTable, usePairsData } from '../../features/token';
 
 type TokenData = {
   name: string;
@@ -36,7 +36,6 @@ export function ExplorePageTokens({ tokenNetworkFilter, tokenFilter, tokenVolume
     direction: 'desc',
   });
 
-  // Fetch tokens data from indexer
   const {
     data: tokensResponse,
     isLoading: tokensLoading,
@@ -50,19 +49,10 @@ export function ExplorePageTokens({ tokenNetworkFilter, tokenFilter, tokenVolume
   const { data: pairsData, isLoading: pairsLoading, error: pairsError } = usePairsData();
 
   // Transform tokens data with calculated volumes from pairs
-  const tokensData =
-    tokensResponse?.allTokens?.nodes && pairsData?.allPairs?.nodes
-      ? transformTokenDataForTable(tokensResponse.allTokens.nodes, pairsData.allPairs.nodes)
-      : tokensResponse?.allTokens?.nodes
-        ? transformTokenDataForTable(tokensResponse.allTokens.nodes)
-        : [];
+  const tokensData = transformTokenDataForTable(tokensResponse?.allTokens.nodes || [], pairsData?.allPairs.nodes);
 
   const isLoading = tokensLoading || pairsLoading;
   const error = tokensError || pairsError;
-
-  console.log('🚀 ~ ExplorePageTokens ~ tokensData:', tokensData);
-  console.log('🚀 ~ ExplorePageTokens ~ pairsData:', pairsData?.allPairs?.nodes?.length, 'pairs');
-  console.log('🚀 ~ ExplorePageTokens ~ tokensResponse:', tokensResponse?.allTokens?.nodes?.length, 'tokens');
 
   const handleSort = (
     field: SortField,
