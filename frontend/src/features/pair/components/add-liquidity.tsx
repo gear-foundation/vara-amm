@@ -7,6 +7,7 @@ import { TokenSelector } from '@/components/token-selector';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { SECONDS_IN_MINUTE } from '@/consts';
 import { useAddLiquidityMessage, useGetReservesQuery, useVftTotalSupplyQuery, useApproveMessage } from '@/lib/sails';
 
@@ -287,7 +288,8 @@ const AddLiquidity = ({
               />
               <Button
                 onClick={() => setShowToken0Selector(true)}
-                className="btn-secondary flex items-center space-x-2 min-w-[120px]">
+                variant="secondary"
+                className="flex items-center space-x-2 min-w-[120px]">
                 <img src={token0.logoURI || '/placeholder.svg'} alt={token0.name} className="w-5 h-5 rounded-full" />
                 <span>{token0.symbol}</span>
                 <ChevronDown className="w-4 h-4" />
@@ -334,7 +336,8 @@ const AddLiquidity = ({
               />
               <Button
                 onClick={() => setShowToken1Selector(true)}
-                className="btn-secondary flex items-center space-x-2 min-w-[120px]">
+                variant="secondary"
+                className="flex items-center space-x-2 min-w-[120px]">
                 <img src={token1.logoURI || '/placeholder.svg'} alt={token1.name} className="w-5 h-5 rounded-full" />
                 <span>{token1.symbol}</span>
                 <ChevronDown className="w-4 h-4" />
@@ -356,7 +359,20 @@ const AddLiquidity = ({
               <span className="text-gray-400">LP Tokens</span>
               <div className="flex items-center space-x-1">
                 <span className="theme-text">{formatUnits(lpTokensToMint, 18)}</span>
-                <Info className="w-3 h-3 text-gray-400" />
+                <TooltipProvider delayDuration={200}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="w-3 h-3 text-gray-400 cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-xs bg-gray-900 text-white border-gray-700">
+                      <p className="text-xs">
+                        LP tokens represent your share in the liquidity pool. They automatically earn trading fees
+                        (0.3%) and can be redeemed for underlying tokens at any time. The amount of LP tokens is
+                        proportional to your contribution to the pool&apos;s total liquidity.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
             </div>
           </div>

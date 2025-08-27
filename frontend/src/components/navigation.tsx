@@ -73,7 +73,7 @@ export function Navigation() {
                       <span className="mono text-sm theme-text">{prettyAddress(account.decodedAddress)}</span>
                     </Button>
                   ) : (
-                    <Button onClick={openConnectWallet} className="btn-primary">
+                    <Button onClick={openConnectWallet} variant="default">
                       <Wallet className="w-4 h-4 mr-2" />
                       CONNECT WALLET
                     </Button>

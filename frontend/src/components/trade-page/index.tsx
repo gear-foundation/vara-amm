@@ -303,8 +303,8 @@ export function TradePage({ pairsTokens, refetchBalances }: TradePageProps) {
                   />
                   <Button
                     onClick={() => setShowFromTokenSelector(true)}
-                    className="btn-secondary flex items-center space-x-2 min-w-[120px]"
-                    variant="secondary">
+                    variant="secondary"
+                    className="flex items-center space-x-2 min-w-[120px]">
                     <img
                       src={fromToken.logoURI || '/placeholder.svg'}
                       alt={fromToken.name}
@@ -376,8 +376,8 @@ export function TradePage({ pairsTokens, refetchBalances }: TradePageProps) {
                   />
                   <Button
                     onClick={() => setShowToTokenSelector(true)}
-                    className="btn-secondary flex items-center space-x-2 min-w-[120px]"
-                    variant="secondary">
+                    variant="secondary"
+                    className="flex items-center space-x-2 min-w-[120px]">
                     <img
                       src={toToken.logoURI || '/placeholder.svg'}
                       alt={toToken.name}
