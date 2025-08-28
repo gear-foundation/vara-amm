@@ -276,9 +276,9 @@ export function TradePage({ pairsTokens, refetchBalances }: TradePageProps) {
             <CardContent className="space-y-4">
               {/* From Token */}
               <div className="space-y-2">
-                <div className="flex justify-between text-sm text-gray-400">
+                <div className="flex justify-between gap-2 text-sm text-gray-400">
                   <span>FROM</span>
-                  <span>
+                  <span className="text-right">
                     Balance:{' '}
                     {fromToken.balance
                       ? getFormattedBalance(fromToken.balance, fromToken.decimals, fromToken.symbol)
@@ -351,9 +351,9 @@ export function TradePage({ pairsTokens, refetchBalances }: TradePageProps) {
 
               {/* To Token */}
               <div className="space-y-2">
-                <div className="flex justify-between text-sm text-gray-400">
+                <div className="flex justify-between gap-2 text-sm text-gray-400">
                   <span>TO</span>
-                  <span>
+                  <span className="text-right">
                     Balance:{' '}
                     {toToken.balance ? getFormattedBalance(toToken.balance, toToken.decimals, toToken.symbol) : '0'}
                   </span>

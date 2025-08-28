@@ -7,7 +7,7 @@ import { TokenSelector } from '@/components/token-selector';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tooltip } from '@/components/ui/tooltip';
 import { SECONDS_IN_MINUTE } from '@/consts';
 import { useAddLiquidityMessage, useGetReservesQuery, useVftTotalSupplyQuery, useApproveMessage } from '@/lib/sails';
 
@@ -255,9 +255,9 @@ const AddLiquidity = ({
         <CardContent className="space-y-4">
           {/* Token 0 */}
           <div className="space-y-2">
-            <div className="flex justify-between text-sm text-gray-400">
+            <div className="flex justify-between gap-2 text-sm text-gray-400">
               <span>TOKEN 1</span>
-              <span>
+              <span className="text-right">
                 Balance: {token0.balance ? getFormattedBalance(token0.balance, token0.decimals, token0.symbol) : '0'}
               </span>
             </div>
@@ -303,9 +303,9 @@ const AddLiquidity = ({
 
           {/* Token 1 */}
           <div className="space-y-2">
-            <div className="flex justify-between text-sm text-gray-400">
+            <div className="flex justify-between gap-2 text-sm text-gray-400">
               <span>TOKEN 2</span>
-              <span>
+              <span className="text-right">
                 Balance: {token1.balance ? getFormattedBalance(token1.balance, token1.decimals, token1.symbol) : '0'}
               </span>
             </div>
@@ -359,20 +359,19 @@ const AddLiquidity = ({
               <span className="text-gray-400">LP Tokens</span>
               <div className="flex items-center space-x-1">
                 <span className="theme-text">{formatUnits(lpTokensToMint, 18)}</span>
-                <TooltipProvider delayDuration={200}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Info className="w-3 h-3 text-gray-400 cursor-help" />
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-xs bg-gray-900 text-white border-gray-700">
-                      <p className="text-xs">
-                        LP tokens represent your share in the liquidity pool. They automatically earn trading fees
-                        (0.3%) and can be redeemed for underlying tokens at any time. The amount of LP tokens is
-                        proportional to your contribution to the pool&apos;s total liquidity.
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                <Tooltip
+                  content={
+                    <p className="text-xs">
+                      LP tokens represent your share in the liquidity pool. They automatically earn trading fees (0.3%)
+                      and can be redeemed for underlying tokens at any time. The amount of LP tokens is proportional to
+                      your contribution to the pool&apos;s total liquidity.
+                    </p>
+                  }
+                  side="top"
+                  contentClassName="max-w-xs bg-gray-900 text-white border-gray-700"
+                  delayDuration={200}>
+                  <Info className="w-3 h-3 text-gray-400 cursor-help" />
+                </Tooltip>
               </div>
             </div>
           </div>

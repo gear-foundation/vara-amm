@@ -221,7 +221,7 @@ export function ExplorePagePools({
                 <tr key={pool.id} className="table-row">
                   <td className="py-4 px-6">
                     <div className="flex items-center space-x-3">
-                      <div className="flex -space-x-2">
+                      <div className="flex -space-x-2 min-w-10">
                         <img
                           src={pool.token0.logoURI || '/placeholder.svg'}
                           alt={pool.token0.symbol}

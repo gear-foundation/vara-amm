@@ -25,4 +25,64 @@ const TooltipContent = React.forwardRef<
 ));
 TooltipContent.displayName = TooltipPrimitive.Content.displayName;
 
-export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider };
+// Mobile-friendly tooltip component that supports both hover and click
+interface MobileTooltipProps {
+  content: React.ReactNode;
+  children: React.ReactNode;
+  side?: 'top' | 'right' | 'bottom' | 'left';
+  className?: string;
+  contentClassName?: string;
+  delayDuration?: number;
+}
+
+const MobileTooltip = React.forwardRef<React.ElementRef<typeof TooltipPrimitive.Trigger>, MobileTooltipProps>(
+  ({ content, children, side = 'top', className, contentClassName, delayDuration = 200 }, ref) => {
+    const [open, setOpen] = React.useState(false);
+    const containerRef = React.useRef<HTMLDivElement>(null);
+
+    // Handle click outside to close tooltip on mobile
+    React.useEffect(() => {
+      const handleClickOutside = (event: MouseEvent | TouchEvent) => {
+        if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+          setOpen(false);
+        }
+      };
+
+      if (open) {
+        document.addEventListener('mousedown', handleClickOutside);
+        document.addEventListener('touchstart', handleClickOutside);
+      }
+
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+        document.removeEventListener('touchstart', handleClickOutside);
+      };
+    }, [open]);
+
+    return (
+      <div ref={containerRef} className="relative">
+        <TooltipProvider delayDuration={delayDuration}>
+          <Tooltip open={open} onOpenChange={setOpen}>
+            <TooltipTrigger
+              ref={ref}
+              asChild
+              className={className}
+              onClick={(e) => {
+                e.preventDefault();
+                setOpen(!open);
+              }}>
+              {children}
+            </TooltipTrigger>
+            <TooltipContent side={side} className={contentClassName}>
+              {content}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
+    );
+  },
+);
+
+MobileTooltip.displayName = 'MobileTooltip';
+
+export { MobileTooltip as Tooltip };

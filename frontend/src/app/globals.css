@@ -33,8 +33,7 @@
 
   .light body {
     background: #ffffff;
-    background-image:
-      radial-gradient(circle at 25% 25%, rgba(0, 255, 133, 0.05) 0%, transparent 50%),
+    background-image: radial-gradient(circle at 25% 25%, rgba(0, 255, 133, 0.05) 0%, transparent 50%),
       radial-gradient(circle at 75% 75%, rgba(0, 255, 133, 0.02) 0%, transparent 50%);
     color: #000000;
   }
@@ -60,8 +59,7 @@
 
   .dark body {
     background: #0e0e0e;
-    background-image:
-      radial-gradient(circle at 25% 25%, rgba(0, 255, 133, 0.1) 0%, transparent 50%),
+    background-image: radial-gradient(circle at 25% 25%, rgba(0, 255, 133, 0.1) 0%, transparent 50%),
       radial-gradient(circle at 75% 75%, rgba(0, 255, 133, 0.05) 0%, transparent 50%);
     color: #ffffff;
   }
@@ -128,9 +126,27 @@
   }
 
   .input-field:focus {
-    border-color: #00ff85 !important;
+    border-color: #00ff85;
     outline: none;
-    box-shadow: 0 10px 15px -3px rgba(0, 255, 133, 0.2);
+    box-shadow: none;
+  }
+
+  /* Remove all browser default input styles */
+  input:focus,
+  textarea:focus,
+  select:focus {
+    outline: none;
+    box-shadow: none;
+    border: none;
+  }
+
+  input,
+  textarea,
+  select {
+    outline: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
   }
 
   input[type='number']::-webkit-inner-spin-button,
