@@ -6,7 +6,9 @@ import {
   TransactionType,
 } from "../model";
 import { ProcessorContext } from "../processor";
-import { LessThanOrEqual, MoreThanOrEqual, In } from "typeorm";
+import { LessThanOrEqual, MoreThanOrEqual } from "typeorm";
+import { PriceUtils, TimeUtils } from "./utils";
+import { VolumePeriods } from "../types";
 
 export class PriceCalculator {
   private ctx: ProcessorContext;
@@ -20,37 +22,41 @@ export class PriceCalculator {
    * Uses the most liquid pair to determine price
    */
   async calculateTokenPrice(
-    tokenAddress: string,
+    token: Token,
     timestamp: Date,
     blockNumber: bigint
   ): Promise<number | null> {
     // Get all pairs containing this token
     const pairs = await this.ctx.store.find(Pair, {
-      where: [{ token0: tokenAddress }, { token1: tokenAddress }],
+      where: [{ token0: token.id }, { token1: token.id }],
     });
 
     if (pairs.length === 0) {
       return null;
     }
 
-    // For now, we'll use a simple approach:
-    // 1. If there's a USDC or USDT pair, use that (assume stablecoin = $1)
-    // 2. Otherwise, try to find a chain of pairs to calculate price
-
-    const stablecoins = ["USDC", "USDT"]; // Add known stablecoin symbols
-
+    // Find a stablecoin pair for direct price calculation
     for (const pair of pairs) {
-      const isToken0 = pair.token0 === tokenAddress;
+      const isToken0 = pair.token0 === token.id;
       const otherTokenSymbol = isToken0 ? pair.token1Symbol : pair.token0Symbol;
 
-      if (otherTokenSymbol && stablecoins.includes(otherTokenSymbol)) {
-        // Calculate price against stablecoin
+      if (otherTokenSymbol && PriceUtils.isStablecoin(otherTokenSymbol)) {
         const tokenReserve = isToken0 ? pair.reserve0 : pair.reserve1;
         const stablecoinReserve = isToken0 ? pair.reserve1 : pair.reserve0;
 
-        if (tokenReserve > 0n && stablecoinReserve > 0n) {
-          // Price = stablecoinReserve / tokenReserve
-          return Number(stablecoinReserve) / Number(tokenReserve);
+        // Get other token for accurate calculation
+        const otherToken = await this.ctx.store.get(
+          Token,
+          isToken0 ? pair.token1 : pair.token0
+        );
+
+        if (otherToken && tokenReserve > 0n && stablecoinReserve > 0n) {
+          return PriceUtils.calculatePriceFromReserves(
+            tokenReserve,
+            stablecoinReserve,
+            token.decimals,
+            otherToken.decimals
+          );
         }
       }
     }
@@ -58,22 +64,6 @@ export class PriceCalculator {
     // If no direct stablecoin pair, return null for now
     // TODO: Implement multi-hop price calculation
     return null;
-  }
-
-  /**
-   * Calculate volume in USD for a given amount and token
-   */
-  async calculateVolumeUSD(
-    tokenAddress: string,
-    amount: bigint,
-    priceUSD: number
-  ): Promise<number> {
-    const token = await this.ctx.store.get(Token, tokenAddress);
-    if (!token) return 0;
-
-    // Convert amount to human readable format using decimals
-    const humanAmount = Number(amount) / Math.pow(10, token.decimals);
-    return humanAmount * priceUSD;
   }
 
   /**
@@ -87,10 +77,16 @@ export class PriceCalculator {
       return 0;
     }
 
-    const reserve0USD =
-      (Number(pair.reserve0) / Math.pow(10, token0.decimals)) * token0.priceUsd;
-    const reserve1USD =
-      (Number(pair.reserve1) / Math.pow(10, token1.decimals)) * token1.priceUsd;
+    const reserve0USD = PriceUtils.calculateUSDValue(
+      pair.reserve0,
+      token0.decimals,
+      token0.priceUsd
+    );
+    const reserve1USD = PriceUtils.calculateUSDValue(
+      pair.reserve1,
+      token1.decimals,
+      token1.priceUsd
+    );
 
     return reserve0USD + reserve1USD;
   }
@@ -108,11 +104,7 @@ export class PriceCalculator {
     change7d: number | null;
     change30d: number | null;
   }> {
-    const now = timestamp;
-    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const periods = TimeUtils.getTimePeriods(timestamp);
 
     const getClosestPrice = async (
       targetTime: Date
@@ -127,21 +119,16 @@ export class PriceCalculator {
       return snapshot?.priceUsd || null;
     };
 
-    const price1h = await getClosestPrice(oneHourAgo);
-    const price24h = await getClosestPrice(oneDayAgo);
-    const price7d = await getClosestPrice(sevenDaysAgo);
-    const price30d = await getClosestPrice(thirtyDaysAgo);
-
-    const calculateChange = (oldPrice: number | null): number | null => {
-      if (!oldPrice || oldPrice === 0) return null;
-      return ((currentPrice - oldPrice) / oldPrice) * 100;
-    };
+    const price1h = await getClosestPrice(periods.oneHourAgo);
+    const price24h = await getClosestPrice(periods.oneDayAgo);
+    const price7d = await getClosestPrice(periods.sevenDaysAgo);
+    const price30d = await getClosestPrice(periods.thirtyDaysAgo);
 
     return {
-      change1h: calculateChange(price1h),
-      change24h: calculateChange(price24h),
-      change7d: calculateChange(price7d),
-      change30d: calculateChange(price30d),
+      change1h: PriceUtils.calculatePercentageChange(currentPrice, price1h),
+      change24h: PriceUtils.calculatePercentageChange(currentPrice, price24h),
+      change7d: PriceUtils.calculatePercentageChange(currentPrice, price7d),
+      change30d: PriceUtils.calculatePercentageChange(currentPrice, price30d),
     };
   }
 
@@ -151,25 +138,19 @@ export class PriceCalculator {
   async calculateVolumeMetrics(
     tokenAddress: string,
     timestamp: Date
-  ): Promise<{
-    volume1h: number;
-    volume24h: number;
-    volume7d: number;
-    volume30d: number;
-    volume1y: number;
-  }> {
-    const now = timestamp;
-    const periods = {
-      volume1h: new Date(now.getTime() - 60 * 60 * 1000),
-      volume24h: new Date(now.getTime() - 24 * 60 * 60 * 1000),
-      volume7d: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000),
-      volume30d: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000),
-      volume1y: new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000),
+  ): Promise<VolumePeriods> {
+    const periods = TimeUtils.getTimePeriods(timestamp);
+    const periodMap = {
+      volume1h: periods.oneHourAgo,
+      volume24h: periods.oneDayAgo,
+      volume7d: periods.sevenDaysAgo,
+      volume30d: periods.thirtyDaysAgo,
+      volume1y: periods.oneYearAgo,
     };
 
     const results: any = {};
 
-    for (const [key, startTime] of Object.entries(periods)) {
+    for (const [key, startTime] of Object.entries(periodMap)) {
       // Get all transactions in this period where this token is involved
       const transactions = await this.ctx.store.find(Transaction, {
         where: {
@@ -212,19 +193,16 @@ export class PriceCalculator {
    * Returns updated token and snapshot to be saved by the handler
    */
   async prepareTokenMetrics(
-    tokenAddress: string,
+    token: Token,
     timestamp: Date,
     blockNumber: bigint
   ): Promise<{
     token: Token | null;
     snapshot: TokenPriceSnapshot | null;
   }> {
-    let token = await this.ctx.store.get(Token, tokenAddress);
-    if (!token) return { token: null, snapshot: null };
-
     // Calculate current price
     const currentPrice = await this.calculateTokenPrice(
-      tokenAddress,
+      token,
       timestamp,
       blockNumber
     );
@@ -239,15 +217,16 @@ export class PriceCalculator {
 
     // Calculate volume metrics
     const volumeMetrics = await this.calculateVolumeMetrics(
-      tokenAddress,
+      token.id,
       timestamp
     );
 
     // Calculate FDV (Fully Diluted Valuation)
-    const fdv = token.totalSupply
-      ? (Number(token.totalSupply) / Math.pow(10, token.decimals)) *
-        currentPrice
-      : null;
+    const fdv = PriceUtils.calculateFDV(
+      token.totalSupply,
+      token.decimals,
+      currentPrice
+    );
 
     // Update token
     token.priceUsd = currentPrice;
@@ -258,7 +237,7 @@ export class PriceCalculator {
     token.updatedAt = timestamp;
 
     // Create price snapshot
-    const snapshotId = `${tokenAddress}:${blockNumber.toString()}`;
+    const snapshotId = `${token.id}:${blockNumber.toString()}`;
     const snapshot = new TokenPriceSnapshot({
       id: snapshotId,
       token,

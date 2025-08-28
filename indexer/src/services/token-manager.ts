@@ -1,15 +1,14 @@
 import { Token } from "../model";
 import { ProcessorContext } from "../processor";
-import { SailsProgram as VftProgram } from "./extended-vft-program";
-import { GearApi } from "@gear-js/api";
+import { VftProgramCache } from "./vft-cache";
 
 export class TokenManager {
   private ctx: ProcessorContext;
-  private api: GearApi;
+  private vftCache: VftProgramCache;
 
-  constructor(ctx: ProcessorContext, api: GearApi) {
+  constructor(ctx: ProcessorContext, vftCache: VftProgramCache) {
     this.ctx = ctx;
-    this.api = api;
+    this.vftCache = vftCache;
   }
 
   /**
@@ -34,7 +33,7 @@ export class TokenManager {
    * Create a new token entity by querying the contract
    */
   private async createTokenFromContract(tokenAddress: string): Promise<Token> {
-    const vftProgram = new VftProgram(this.api, tokenAddress as `0x${string}`);
+    const vftProgram = this.vftCache.getOrCreate(tokenAddress);
 
     try {
       const [symbol, name, decimals, totalSupply] = await Promise.all([
@@ -63,22 +62,6 @@ export class TokenManager {
         { error, tokenAddress },
         "Failed to create token from contract"
       );
-
-      // Create a minimal token if contract queries fail
-      return new Token({
-        id: tokenAddress,
-        symbol: "UNKNOWN",
-        name: null,
-        decimals: 18, // default to 18 decimals
-        totalSupply: null,
-        priceUsd: null,
-        volume24h: null,
-        volume7d: null,
-        volume30d: null,
-        fdv: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
     }
   }
 }

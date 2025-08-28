@@ -1,6 +1,6 @@
 import { GearApi, HexString } from "@gear-js/api";
 
-import { SailsProgram as FactoryProgram } from "./factory-program";
+import { FactoryProgram } from "./sails";
 import { PairInfo } from "../types";
 
 export class FactoryManager {

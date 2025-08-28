@@ -1,5 +1,4 @@
 import { GearApi } from "@gear-js/api";
-import { MoreThanOrEqual } from "typeorm";
 import {
   getBlockCommonData,
   isSailsEvent,
@@ -15,19 +14,24 @@ import {
 import { ProcessorContext } from "../processor";
 import {
   PairProgram,
-  VftProgram,
   PriceCalculator,
   TokenManager,
   VolumeCalculator,
+  VftProgramCache,
+  PriceUtils,
 } from "../services";
 import { SailsDecoder } from "../sails-decoder";
 import { BlockCommonData, UserMessageSentEvent, PairInfo } from "../types";
 import { BaseHandler } from "./base";
+import {
+  PairEventPayload,
+  LiquidityEventPayload,
+  SwapEventPayload,
+} from "../services/sails";
 
 export class PairHandler extends BaseHandler {
   private _pairDecoder: SailsDecoder;
   private _transactions: Map<string, Transaction>;
-  private _tokensToSave: Map<string, Token>;
   private _snapshotsToSave: Map<string, TokenPriceSnapshot>;
   private _pairInfo: PairInfo;
   private _pair: Pair;
@@ -35,6 +39,10 @@ export class PairHandler extends BaseHandler {
   private _priceCalculator: PriceCalculator;
   private _tokenManager: TokenManager;
   private _volumeCalculator: VolumeCalculator;
+  private _vftCache: VftProgramCache;
+  private _pairProgram: PairProgram;
+  private _tokens: Map<string, Token>;
+  private _isTokensUpdated: boolean;
   private _api: GearApi;
 
   constructor(pairInfo: PairInfo) {
@@ -45,49 +53,23 @@ export class PairHandler extends BaseHandler {
     this.messageQueuedProgramIds = [];
     this._isPairUpdated = false;
     this._transactions = new Map();
-    this._tokensToSave = new Map();
+    this._tokens = new Map();
+    this._isTokensUpdated = false;
     this._snapshotsToSave = new Map();
   }
 
   public async init(api: GearApi): Promise<void> {
     this._api = api;
+    this._vftCache = new VftProgramCache(api);
+    this._pairProgram = new PairProgram(api, this._pairInfo.address);
     this._pairDecoder = await SailsDecoder.new("assets/pair.idl");
-
-    const pairProgram = new PairProgram(api, this._pairInfo.address);
-    const token0Program = new VftProgram(api, this._pairInfo.tokens[0]);
-    const token1Program = new VftProgram(api, this._pairInfo.tokens[1]);
-
-    const token0Symbol = await token0Program.vft.symbol();
-    const token1Symbol = await token1Program.vft.symbol();
-    const [reserve0, reserve1] = await pairProgram.pair.getReserves();
-    const totalSupply = await pairProgram.vft.totalSupply();
-
-    this._isPairUpdated = true;
-
-    this._pair = new Pair({
-      id: this._pairInfo.address,
-      token0: this._pairInfo.tokens[0],
-      token1: this._pairInfo.tokens[1],
-      token0Symbol,
-      token1Symbol,
-      reserve0: BigInt(reserve0),
-      reserve1: BigInt(reserve1),
-      totalSupply: BigInt(totalSupply),
-      volumeUsd: 0,
-      volume24h: 0,
-      volume7d: 0,
-      volume30d: 0,
-      volume1y: 0,
-      tvlUsd: 0,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
   }
 
   public async clear(): Promise<void> {
     this._transactions.clear();
-    this._tokensToSave.clear();
     this._snapshotsToSave.clear();
+    this._isPairUpdated = false;
+    this._isTokensUpdated = false;
 
     // Clear volume calculator buffers
     if (this._volumeCalculator) {
@@ -98,19 +80,17 @@ export class PairHandler extends BaseHandler {
   public async save(): Promise<void> {
     // Flush volume buffers before saving
     if (this._volumeCalculator) {
-      await this._volumeCalculator.flushAllBuffers();
       await this._volumeCalculator.saveSnapshots();
     }
 
     // Save pair if updated
     if (this._isPairUpdated) {
       await this._ctx.store.save(this._pair);
-      this._isPairUpdated = false;
     }
 
     // Save tokens
-    const tokens = Array.from(this._tokensToSave.values());
-    if (tokens.length > 0) {
+    if (this._isTokensUpdated) {
+      const tokens = Array.from(this._tokens.values());
       this._ctx.log.info({ count: tokens.length }, "Saving tokens");
       await this._ctx.store.save(tokens);
     }
@@ -134,24 +114,15 @@ export class PairHandler extends BaseHandler {
     // Always call super.process(ctx) first
     await super.process(ctx);
 
+    // Check if pair already exists in database and load existing data
+    await this._checkAndLoadExistingPair(ctx);
+
     // Initialize services
     this._priceCalculator = new PriceCalculator(ctx);
-    this._tokenManager = new TokenManager(ctx, this._api);
+    this._tokenManager = new TokenManager(ctx, this._vftCache);
     this._volumeCalculator = new VolumeCalculator(ctx);
 
-    // Ensure tokens exist and prepare them for saving
-    const { token: token0, isNew: isToken0New } =
-      await this._tokenManager.getOrCreateToken(this._pairInfo.tokens[0]);
-    const { token: token1, isNew: isToken1New } =
-      await this._tokenManager.getOrCreateToken(this._pairInfo.tokens[1]);
-
-    // Add new tokens to save collection
-    if (isToken0New) {
-      this._tokensToSave.set(token0.id, token0);
-    }
-    if (isToken1New) {
-      this._tokensToSave.set(token1.id, token1);
-    }
+    await this._initTokens();
 
     ctx.log.info(`Processing ${ctx.blocks.length} blocks`);
 
@@ -159,14 +130,99 @@ export class PairHandler extends BaseHandler {
       const common = getBlockCommonData(block);
 
       for (const event of block.events) {
-
-
         if (
           isUserMessageSentEvent(event) &&
           event.args.message.source === this._pairInfo.address
         ) {
           await this._handleUserMessageSentEvent(event, common);
         }
+      }
+    }
+  }
+
+  private async _checkAndLoadExistingPair(
+    ctx: ProcessorContext
+  ): Promise<void> {
+    // If pair is already loaded/cached, no need to query database
+    if (this._pair) {
+      return;
+    }
+
+    // Query database only during initialization when pair is not yet cached
+    const existingPair = await ctx.store.get(Pair, this._pairInfo.address);
+
+    if (existingPair) {
+      ctx.log.info(
+        {
+          pairId: this._pairInfo.address,
+          symbols: `${existingPair.token0Symbol} / ${existingPair.token1Symbol}`,
+          existingVolumeUsd: existingPair.volumeUsd,
+          existingTvlUsd: existingPair.tvlUsd,
+          existingVolume24h: existingPair.volume24h,
+        },
+        "Found existing pair in database, preserving accumulated metrics"
+      );
+
+      this._pair = existingPair;
+
+      this._isPairUpdated = true;
+    } else {
+      ctx.log.info(
+        { pairId: this._pairInfo.address },
+        "Creating new pair entry in database"
+      );
+
+      const token0Program = this._vftCache.getOrCreate(
+        this._pairInfo.tokens[0]
+      );
+      const token1Program = this._vftCache.getOrCreate(
+        this._pairInfo.tokens[1]
+      );
+
+      const token0Symbol = await token0Program.vft.symbol();
+      const token1Symbol = await token1Program.vft.symbol();
+      const [reserve0, reserve1] = await this._pairProgram.pair.getReserves();
+      const totalSupply = await this._pairProgram.vft.totalSupply();
+
+      this._pair = new Pair({
+        id: this._pairInfo.address,
+        token0: this._pairInfo.tokens[0],
+        token1: this._pairInfo.tokens[1],
+        token0Symbol,
+        token1Symbol,
+        reserve0: BigInt(reserve0),
+        reserve1: BigInt(reserve1),
+        totalSupply: BigInt(totalSupply),
+        volumeUsd: 0,
+        volume24h: 0,
+        volume7d: 0,
+        volume30d: 0,
+        volume1y: 0,
+        tvlUsd: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      this._isPairUpdated = true;
+    }
+  }
+
+  private async _initTokens(): Promise<void> {
+    if (this._tokens.size === 0) {
+      // Ensure tokens exist and prepare them for saving
+      const { token: token0, isNew: isToken0New } =
+        await this._tokenManager.getOrCreateToken(this._pairInfo.tokens[0]);
+      const { token: token1, isNew: isToken1New } =
+        await this._tokenManager.getOrCreateToken(this._pairInfo.tokens[1]);
+
+      // Add new tokens to save collection
+      if (isToken0New) {
+        this._tokens.set(token0.id, token0);
+        this._isTokensUpdated = true;
+      }
+      if (isToken1New) {
+        this._tokens.set(token1.id, token1);
+        this._isTokensUpdated = true;
       }
     }
   }
@@ -184,140 +240,111 @@ export class PairHandler extends BaseHandler {
       );
 
       if (service === "Pair") {
-        await this._handlePairService(method, payload, common, event);
+        await this._handlePairService(
+          method,
+          payload as PairEventPayload,
+          common,
+          event
+        );
       }
     }
   }
 
   private async _handlePairService(
     method: string,
-    payload: any,
+    payload: PairEventPayload,
     common: BlockCommonData,
     event: UserMessageSentEvent
   ) {
     switch (method) {
       case "LiquidityAdded": {
-        const transaction = new Transaction({
-          id: event.args.message.id,
-          type: TransactionType.ADD_LIQUIDITY,
-          // TODO: get from event params
-          user: event.args.message.source,
-          blockNumber: BigInt(common.blockNumber),
-          timestamp: common.blockTimestamp,
-          amountA: BigInt(payload.amount_a),
-          amountB: BigInt(payload.amount_b),
-          liquidity: BigInt(payload.liquidity),
-          pair: { id: this._pair.id } as any,
-        });
-
-        // Calculate USD values
-        await this._calculateTransactionUSDValues(transaction);
-
-        // Update pair reserves
-        this._pair.reserve0 = BigInt(
-          payload.new_reserve_0 || this._pair.reserve0
-        );
-        this._pair.reserve1 = BigInt(
-          payload.new_reserve_1 || this._pair.reserve1
-        );
-        this._pair.updatedAt = common.blockTimestamp;
-        this._isPairUpdated = true;
-
-        // Update token prices
-        await this._updateTokenPrices(
-          common.blockTimestamp,
-          BigInt(common.blockNumber)
+        const liquidityPayload = payload as LiquidityEventPayload;
+        const transaction = this._createTransaction(
+          event,
+          common,
+          TransactionType.ADD_LIQUIDITY,
+          {
+            amountA: BigInt(liquidityPayload.amount_a),
+            amountB: BigInt(liquidityPayload.amount_b),
+            liquidity: BigInt(liquidityPayload.liquidity),
+          }
         );
 
-        // Update pair metrics
-        await this._updatePairTVL();
-
-        this._transactions.set(event.args.message.id, transaction);
+        await this._processTransaction(transaction, liquidityPayload, common);
         this._ctx.log.info({ transaction }, "Processed LiquidityAdded event");
         break;
       }
 
       case "LiquidityRemoved": {
-        const transaction = new Transaction({
-          id: event.args.message.id,
-          type: TransactionType.REMOVE_LIQUIDITY,
-          user: event.args.message.source,
-          blockNumber: BigInt(common.blockNumber),
-          timestamp: common.blockTimestamp,
-          amountA: BigInt(payload.amount_a),
-          amountB: BigInt(payload.amount_b),
-          liquidity: BigInt(payload.liquidity),
-          pair: { id: this._pair.id } as any,
-        });
-
-        // Calculate USD values
-        await this._calculateTransactionUSDValues(transaction);
-
-        // Update pair reserves
-        this._pair.reserve0 = BigInt(
-          payload.new_reserve_0 || this._pair.reserve0
-        );
-        this._pair.reserve1 = BigInt(
-          payload.new_reserve_1 || this._pair.reserve1
-        );
-        this._pair.updatedAt = common.blockTimestamp;
-        this._isPairUpdated = true;
-
-        // Update token prices
-        await this._updateTokenPrices(
-          common.blockTimestamp,
-          BigInt(common.blockNumber)
+        const liquidityPayload = payload as LiquidityEventPayload;
+        const transaction = this._createTransaction(
+          event,
+          common,
+          TransactionType.REMOVE_LIQUIDITY,
+          {
+            amountA: BigInt(liquidityPayload.amount_a),
+            amountB: BigInt(liquidityPayload.amount_b),
+            liquidity: BigInt(liquidityPayload.liquidity),
+          }
         );
 
-        // Update pair metrics
-        await this._updatePairTVL();
-
-        this._transactions.set(event.args.message.id, transaction);
+        await this._processTransaction(transaction, liquidityPayload, common);
         this._ctx.log.info({ transaction }, "Processed LiquidityRemoved event");
         break;
       }
 
       case "Swap": {
-        const transaction = new Transaction({
-          id: event.args.message.id,
-          type: TransactionType.SWAP,
-          user: event.args.message.source,
-          blockNumber: BigInt(common.blockNumber),
-          timestamp: common.blockTimestamp,
-          amountIn: BigInt(payload.amount_in),
-          amountOut: BigInt(payload.amount_out),
-          tokenIn: payload.token_in,
-          tokenOut: payload.token_out,
-          pair: { id: this._pair.id } as any,
-        });
+        const swapPayload = payload as SwapEventPayload;
 
-        // Calculate USD values
-        await this._calculateTransactionUSDValues(transaction);
-
-        // Update pair reserves
-        this._pair.reserve0 = BigInt(
-          payload.new_reserve_0 || this._pair.reserve0
-        );
-        this._pair.reserve1 = BigInt(
-          payload.new_reserve_1 || this._pair.reserve1
-        );
-        this._pair.updatedAt = common.blockTimestamp;
-        this._isPairUpdated = true;
-
-        // Update token prices
-        await this._updateTokenPrices(
-          common.blockTimestamp,
-          BigInt(common.blockNumber)
-        );
-
-        // Update pair metrics
-        await this._updatePairTVL();
-
-        // Update volume metrics efficiently
-        await this._updatePairVolumeMetricsOptimized();
-
-        this._transactions.set(event.args.message.id, transaction);
-        this._ctx.log.info({ transaction }, "Processed Swap event");
+        // ! TODO: Update when new Swap event structure is implemented
+        // For now, Swap event doesn't contain data, so we create a minimal transaction
+        if (
+          swapPayload.amount_in &&
+          swapPayload.amount_out &&
+          swapPayload.token_in &&
+          swapPayload.token_out
+        ) {
+          // Future implementation when swap data is available
+          const transaction = this._createTransaction(
+            event,
+            common,
+            TransactionType.SWAP,
+            {
+              amountIn: BigInt(swapPayload.amount_in),
+              amountOut: BigInt(swapPayload.amount_out),
+              tokenIn: swapPayload.token_in,
+              tokenOut: swapPayload.token_out,
+            }
+          );
+          await this._processTransaction(
+            transaction,
+            swapPayload,
+            common,
+            true
+          );
+          this._ctx.log.info({ transaction }, "Processed Swap event with data");
+        } else {
+          // ! TODO: remove this once new Swap event structure is implemented
+          // Current implementation - Swap event without data
+          const transaction = this._createTransaction(
+            event,
+            common,
+            TransactionType.SWAP,
+            {
+              // We'll need to get swap details from transaction input or query reserves
+            }
+          );
+          await this._processTransaction(
+            transaction,
+            swapPayload,
+            common,
+            true
+          );
+          this._ctx.log.info(
+            { transaction },
+            "Processed Swap event (no data in event)"
+          );
+        }
         break;
       }
 
@@ -327,6 +354,94 @@ export class PairHandler extends BaseHandler {
           "Unhandled pair service method"
         );
     }
+  }
+
+  /**
+   * Create a transaction object with common fields
+   */
+  private _createTransaction(
+    event: UserMessageSentEvent,
+    common: BlockCommonData,
+    type: TransactionType,
+    additionalFields: Partial<Transaction> = {}
+  ): Transaction {
+    return new Transaction({
+      id: event.args.message.id,
+      type,
+      user: event.args.message.source,
+      blockNumber: BigInt(common.blockNumber),
+      timestamp: common.blockTimestamp,
+      pair: { id: this._pair.id } as Pair,
+      ...additionalFields,
+    });
+  }
+
+  /**
+   * Process transaction with common operations
+   */
+  private async _processTransaction(
+    transaction: Transaction,
+    payload: PairEventPayload,
+    common: BlockCommonData,
+    isSwap: boolean = false
+  ): Promise<void> {
+    // Calculate USD values
+    await this._calculateTransactionUSDValues(transaction);
+
+    // Update pair reserves
+    await this._updatePairReserves(payload, common);
+
+    // Update token prices and pair metrics
+    await this._updateTokenPrices(
+      common.blockTimestamp,
+      BigInt(common.blockNumber)
+    );
+    await this._updatePairTVL();
+
+    // Update volume metrics for swaps
+    if (isSwap) {
+      await this._updatePairVolumeMetrics();
+    }
+
+    // Store transaction
+    this._transactions.set(transaction.id, transaction);
+  }
+
+  /**
+   * Update pair reserves by querying current on-chain state
+   */
+  private async _updatePairReserves(
+    payload: PairEventPayload,
+    common: BlockCommonData
+  ): Promise<void> {
+    try {
+      // Get current reserves from blockchain state via query
+      const pairProgram = new PairProgram(this._api, this._pairInfo.address);
+
+      const [reserve0, reserve1] = await pairProgram.pair.getReserves();
+
+      // Update reserves with current on-chain values
+      this._pair.reserve0 = BigInt(reserve0);
+      this._pair.reserve1 = BigInt(reserve1);
+
+      this._ctx.log.debug(
+        {
+          pairId: this._pairInfo.address,
+          reserve0: this._pair.reserve0.toString(),
+          reserve1: this._pair.reserve1.toString(),
+        },
+        "Updated pair reserves from on-chain query"
+      );
+    } catch (error) {
+      this._ctx.log.error(
+        { error, pairId: this._pairInfo.address },
+        "Failed to query current reserves, keeping previous values"
+      );
+    }
+
+    // Always update timestamp and mark as updated
+    this._pair.updatedAt = common.blockTimestamp;
+    this._isPairUpdated = true;
   }
 
   /**
@@ -340,17 +455,17 @@ export class PairHandler extends BaseHandler {
       const token1 = await this._ctx.store.get(Token, this._pair.token1);
 
       if (token0?.priceUsd) {
-        transaction.amountAUsd = await this._priceCalculator.calculateVolumeUSD(
-          this._pair.token0,
+        transaction.amountAUsd = PriceUtils.calculateUSDValue(
           transaction.amountA,
+          token0.decimals,
           token0.priceUsd
         );
       }
 
       if (token1?.priceUsd) {
-        transaction.amountBUsd = await this._priceCalculator.calculateVolumeUSD(
-          this._pair.token1,
+        transaction.amountBUsd = PriceUtils.calculateUSDValue(
           transaction.amountB,
+          token1.decimals,
           token1.priceUsd
         );
       }
@@ -362,24 +477,22 @@ export class PairHandler extends BaseHandler {
     if (transaction.amountIn && transaction.tokenIn) {
       const tokenIn = await this._ctx.store.get(Token, transaction.tokenIn);
       if (tokenIn?.priceUsd) {
-        transaction.amountInUsd =
-          await this._priceCalculator.calculateVolumeUSD(
-            transaction.tokenIn,
-            transaction.amountIn,
-            tokenIn.priceUsd
-          );
+        transaction.amountInUsd = PriceUtils.calculateUSDValue(
+          transaction.amountIn,
+          tokenIn.decimals,
+          tokenIn.priceUsd
+        );
       }
     }
 
     if (transaction.amountOut && transaction.tokenOut) {
       const tokenOut = await this._ctx.store.get(Token, transaction.tokenOut);
       if (tokenOut?.priceUsd) {
-        transaction.amountOutUsd =
-          await this._priceCalculator.calculateVolumeUSD(
-            transaction.tokenOut,
-            transaction.amountOut,
-            tokenOut.priceUsd
-          );
+        transaction.amountOutUsd = PriceUtils.calculateUSDValue(
+          transaction.amountOut,
+          tokenOut.decimals,
+          tokenOut.priceUsd
+        );
       }
     }
 
@@ -398,12 +511,12 @@ export class PairHandler extends BaseHandler {
   ): Promise<void> {
     // Update token0 metrics
     const token0Metrics = await this._priceCalculator.prepareTokenMetrics(
-      this._pair.token0,
+      this._tokens.get(this._pair.token0),
       timestamp,
       blockNumber
     );
     if (token0Metrics.token) {
-      this._tokensToSave.set(token0Metrics.token.id, token0Metrics.token);
+      this._tokens.set(token0Metrics.token.id, token0Metrics.token);
     }
     if (token0Metrics.snapshot) {
       this._snapshotsToSave.set(
@@ -414,12 +527,12 @@ export class PairHandler extends BaseHandler {
 
     // Update token1 metrics
     const token1Metrics = await this._priceCalculator.prepareTokenMetrics(
-      this._pair.token1,
+      this._tokens.get(this._pair.token1),
       timestamp,
       blockNumber
     );
     if (token1Metrics.token) {
-      this._tokensToSave.set(token1Metrics.token.id, token1Metrics.token);
+      this._tokens.set(token1Metrics.token.id, token1Metrics.token);
     }
     if (token1Metrics.snapshot) {
       this._snapshotsToSave.set(
@@ -439,11 +552,7 @@ export class PairHandler extends BaseHandler {
     );
   }
 
-  /**
-   * Optimized method for updating pair volume metrics
-   * Only queries DB on hour change or first run
-   */
-  private async _updatePairVolumeMetricsOptimized(): Promise<void> {
+  private async _updatePairVolumeMetrics(): Promise<void> {
     // Get volume ONLY from swaps (trading volume)
     const newTradingVolume = Array.from(this._transactions.values())
       .filter((tx) => tx.type === TransactionType.SWAP)
