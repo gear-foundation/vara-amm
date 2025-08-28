@@ -215,13 +215,10 @@ export class PairHandler extends BaseHandler {
       const { token: token1, isNew: isToken1New } =
         await this._tokenManager.getOrCreateToken(this._pairInfo.tokens[1]);
 
-      // Add new tokens to save collection
-      if (isToken0New) {
-        this._tokens.set(token0.id, token0);
-        this._isTokensUpdated = true;
-      }
-      if (isToken1New) {
-        this._tokens.set(token1.id, token1);
+      this._tokens.set(token0.id, token0);
+      this._tokens.set(token1.id, token1);
+
+      if (isToken0New || isToken1New) {
         this._isTokensUpdated = true;
       }
     }
@@ -264,6 +261,7 @@ export class PairHandler extends BaseHandler {
           common,
           TransactionType.ADD_LIQUIDITY,
           {
+            user: liquidityPayload.user_id,
             amountA: BigInt(liquidityPayload.amount_a),
             amountB: BigInt(liquidityPayload.amount_b),
             liquidity: BigInt(liquidityPayload.liquidity),
@@ -282,6 +280,7 @@ export class PairHandler extends BaseHandler {
           common,
           TransactionType.REMOVE_LIQUIDITY,
           {
+            user: liquidityPayload.user_id,
             amountA: BigInt(liquidityPayload.amount_a),
             amountB: BigInt(liquidityPayload.amount_b),
             liquidity: BigInt(liquidityPayload.liquidity),
@@ -296,55 +295,25 @@ export class PairHandler extends BaseHandler {
       case "Swap": {
         const swapPayload = payload as SwapEventPayload;
 
-        // ! TODO: Update when new Swap event structure is implemented
-        // For now, Swap event doesn't contain data, so we create a minimal transaction
-        if (
-          swapPayload.amount_in &&
-          swapPayload.amount_out &&
-          swapPayload.token_in &&
-          swapPayload.token_out
-        ) {
-          // Future implementation when swap data is available
-          const transaction = this._createTransaction(
-            event,
-            common,
-            TransactionType.SWAP,
-            {
-              amountIn: BigInt(swapPayload.amount_in),
-              amountOut: BigInt(swapPayload.amount_out),
-              tokenIn: swapPayload.token_in,
-              tokenOut: swapPayload.token_out,
-            }
-          );
-          await this._processTransaction(
-            transaction,
-            swapPayload,
-            common,
-            true
-          );
-          this._ctx.log.info({ transaction }, "Processed Swap event with data");
-        } else {
-          // ! TODO: remove this once new Swap event structure is implemented
-          // Current implementation - Swap event without data
-          const transaction = this._createTransaction(
-            event,
-            common,
-            TransactionType.SWAP,
-            {
-              // We'll need to get swap details from transaction input or query reserves
-            }
-          );
-          await this._processTransaction(
-            transaction,
-            swapPayload,
-            common,
-            true
-          );
-          this._ctx.log.info(
-            { transaction },
-            "Processed Swap event (no data in event)"
-          );
-        }
+        const transaction = this._createTransaction(
+          event,
+          common,
+          TransactionType.SWAP,
+          {
+            user: swapPayload.user_id,
+            amountIn: BigInt(swapPayload.amount_in),
+            amountOut: BigInt(swapPayload.amount_out),
+            tokenIn: swapPayload.is_token0_to_token1
+              ? this._pair.token0
+              : this._pair.token1,
+            tokenOut: swapPayload.is_token0_to_token1
+              ? this._pair.token1
+              : this._pair.token0,
+          }
+        );
+        await this._processTransaction(transaction, swapPayload, common, true);
+        this._ctx.log.info({ transaction }, "Processed Swap event with data");
+
         break;
       }
 
@@ -368,7 +337,6 @@ export class PairHandler extends BaseHandler {
     return new Transaction({
       id: event.args.message.id,
       type,
-      user: event.args.message.source,
       blockNumber: BigInt(common.blockNumber),
       timestamp: common.blockTimestamp,
       pair: { id: this._pair.id } as Pair,

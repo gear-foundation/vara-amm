@@ -119,16 +119,25 @@ service Pair {
   /// * `is_token0_to_token1` - Direction of swap (true: token0 to token1, false: token1 to token0)
   query GetAmountOut : (amount_in: u256, is_token0_to_token1: bool) -> u256;
   query GetReserves : () -> struct { u256, u256 };
+  query GetTokens : () -> struct { actor_id, actor_id };
+  query Lock : () -> bool;
   query MsgsInMsgTracker : () -> vec struct { message_id, MessageStatus };
 
   events {
     LiquidityAdded: struct {
+      user_id: actor_id,
       amount_a: u256,
       amount_b: u256,
       liquidity: u256,
     };
-    Swap;
+    Swap: struct {
+      user_id: actor_id,
+      amount_in: u256,
+      amount_out: u256,
+      is_token0_to_token1: bool,
+    };
     LiquidityRemoved: struct {
+      user_id: actor_id,
       amount_a: u256,
       amount_b: u256,
       liquidity: u256,

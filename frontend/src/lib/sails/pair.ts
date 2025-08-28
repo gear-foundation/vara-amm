@@ -398,6 +398,44 @@ export class Pair {
     return result[2].toJSON() as unknown as [number | string | bigint, number | string | bigint];
   }
 
+  public async getTokens(
+    originAddress?: string,
+    value?: number | string | bigint,
+    atBlock?: `0x${string}`,
+  ): Promise<[ActorId, ActorId]> {
+    const payload = this._program.registry.createType('(String, String)', ['Pair', 'GetTokens']).toHex();
+    const reply = await this._program.api.message.calculateReply({
+      destination: this._program.programId,
+      origin: originAddress ? decodeAddress(originAddress) : ZERO_ADDRESS,
+      payload,
+      value: value || 0,
+      gasLimit: this._program.api.blockGasLimit.toBigInt(),
+      at: atBlock,
+    });
+    throwOnErrorReply(reply.code, reply.payload.toU8a(), this._program.api.specVersion, this._program.registry);
+    const result = this._program.registry.createType('(String, String, ([u8;32], [u8;32]))', reply.payload);
+    return result[2].toJSON() as unknown as [ActorId, ActorId];
+  }
+
+  public async lock(
+    originAddress?: string,
+    value?: number | string | bigint,
+    atBlock?: `0x${string}`,
+  ): Promise<boolean> {
+    const payload = this._program.registry.createType('(String, String)', ['Pair', 'Lock']).toHex();
+    const reply = await this._program.api.message.calculateReply({
+      destination: this._program.programId,
+      origin: originAddress ? decodeAddress(originAddress) : ZERO_ADDRESS,
+      payload,
+      value: value || 0,
+      gasLimit: this._program.api.blockGasLimit.toBigInt(),
+      at: atBlock,
+    });
+    throwOnErrorReply(reply.code, reply.payload.toU8a(), this._program.api.specVersion, this._program.registry);
+    const result = this._program.registry.createType('(String, String, bool)', reply.payload);
+    return result[2].toJSON() as unknown as boolean;
+  }
+
   public async msgsInMsgTracker(
     originAddress?: string,
     value?: number | string | bigint,
@@ -419,6 +457,7 @@ export class Pair {
 
   public subscribeToLiquidityAddedEvent(
     callback: (data: {
+      user_id: ActorId;
       amount_a: number | string | bigint;
       amount_b: number | string | bigint;
       liquidity: number | string | bigint;
@@ -434,10 +473,11 @@ export class Pair {
         callback(
           this._program.registry
             .createType(
-              '(String, String, {"amount_a":"U256","amount_b":"U256","liquidity":"U256"})',
+              '(String, String, {"user_id":"[u8;32]","amount_a":"U256","amount_b":"U256","liquidity":"U256"})',
               message.payload,
             )[2]
             .toJSON() as unknown as {
+            user_id: ActorId;
             amount_a: number | string | bigint;
             amount_b: number | string | bigint;
             liquidity: number | string | bigint;
@@ -447,7 +487,14 @@ export class Pair {
     });
   }
 
-  public subscribeToSwapEvent(callback: (data: null) => void | Promise<void>): Promise<() => void> {
+  public subscribeToSwapEvent(
+    callback: (data: {
+      user_id: ActorId;
+      amount_in: number | string | bigint;
+      amount_out: number | string | bigint;
+      is_token0_to_token1: boolean;
+    }) => void | Promise<void>,
+  ): Promise<() => void> {
     return this._program.api.gearEvents.subscribeToGearEvent('UserMessageSent', ({ data: { message } }) => {
       if (!message.source.eq(this._program.programId) || !message.destination.eq(ZERO_ADDRESS)) {
         return;
@@ -455,13 +502,26 @@ export class Pair {
 
       const payload = message.payload.toHex();
       if (getServiceNamePrefix(payload) === 'Pair' && getFnNamePrefix(payload) === 'Swap') {
-        callback(null);
+        callback(
+          this._program.registry
+            .createType(
+              '(String, String, {"user_id":"[u8;32]","amount_in":"U256","amount_out":"U256","is_token0_to_token1":"bool"})',
+              message.payload,
+            )[2]
+            .toJSON() as unknown as {
+            user_id: ActorId;
+            amount_in: number | string | bigint;
+            amount_out: number | string | bigint;
+            is_token0_to_token1: boolean;
+          },
+        );
       }
     });
   }
 
   public subscribeToLiquidityRemovedEvent(
     callback: (data: {
+      user_id: ActorId;
       amount_a: number | string | bigint;
       amount_b: number | string | bigint;
       liquidity: number | string | bigint;
@@ -477,10 +537,11 @@ export class Pair {
         callback(
           this._program.registry
             .createType(
-              '(String, String, {"amount_a":"U256","amount_b":"U256","liquidity":"U256"})',
+              '(String, String, {"user_id":"[u8;32]","amount_a":"U256","amount_b":"U256","liquidity":"U256"})',
               message.payload,
             )[2]
             .toJSON() as unknown as {
+            user_id: ActorId;
             amount_a: number | string | bigint;
             amount_b: number | string | bigint;
             liquidity: number | string | bigint;
