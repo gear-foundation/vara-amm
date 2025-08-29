@@ -19,23 +19,27 @@ export class PriceCalculator {
 
   /**
    * Calculate token price in USD based on pair reserves
-   * Uses the most liquid pair to determine price
+   * Uses liquidity-weighted average price from all stablecoin pairs
    */
-  async calculateTokenPrice(
-    token: Token,
-    timestamp: Date,
-    blockNumber: bigint
-  ): Promise<number | null> {
+  async calculateTokenPrice(token: Token): Promise<number | null> {
+    const MINIMUM_TVL_THRESHOLD = 1000; // $1000 minimum TVL
     // Get all pairs containing this token
     const pairs = await this.ctx.store.find(Pair, {
-      where: [{ token0: token.id }, { token1: token.id }],
+      where: [
+        { token0: token.id },
+        { token1: token.id },
+        { tvlUsd: MoreThanOrEqual(MINIMUM_TVL_THRESHOLD) },
+      ],
     });
 
     if (pairs.length === 0) {
       return null;
     }
 
-    // Find a stablecoin pair for direct price calculation
+    let totalWeightedPrice = 0;
+    let totalWeight = 0;
+
+    // Collect all stablecoin pairs and calculate weighted average
     for (const pair of pairs) {
       const isToken0 = pair.token0 === token.id;
       const otherTokenSymbol = isToken0 ? pair.token1Symbol : pair.token0Symbol;
@@ -44,35 +48,43 @@ export class PriceCalculator {
         const tokenReserve = isToken0 ? pair.reserve0 : pair.reserve1;
         const stablecoinReserve = isToken0 ? pair.reserve1 : pair.reserve0;
 
-        // Get other token for accurate calculation
-        const otherToken = await this.ctx.store.get(
-          Token,
-          isToken0 ? pair.token1 : pair.token0
-        );
+        if (tokenReserve > 0n && stablecoinReserve > 0n) {
+          // Get other token for accurate calculation
+          const otherToken = await this.ctx.store.get(
+            Token,
+            isToken0 ? pair.token1 : pair.token0
+          );
 
-        if (otherToken && tokenReserve > 0n && stablecoinReserve > 0n) {
-          return PriceUtils.calculatePriceFromReserves(
+          if (!otherToken) continue;
+
+          const pairPrice = PriceUtils.calculatePriceFromReserves(
             tokenReserve,
             stablecoinReserve,
             token.decimals,
             otherToken.decimals
           );
+
+          // Use TVL as weight for the price calculation
+          const weight = pair.tvlUsd || 0;
+
+          totalWeightedPrice += pairPrice * weight;
+          totalWeight += weight;
         }
       }
     }
 
-    // If no direct stablecoin pair, return null for now
-    // TODO: Implement multi-hop price calculation
-    return null;
+    // Return weighted average price, or null if no valid pairs found
+    return totalWeight > 0 ? totalWeightedPrice / totalWeight : null;
   }
 
   /**
    * Calculate TVL (Total Value Locked) for a pair in USD
    */
-  async calculatePairTVL(pair: Pair): Promise<number> {
-    const token0 = await this.ctx.store.get(Token, pair.token0);
-    const token1 = await this.ctx.store.get(Token, pair.token1);
-
+  async calculatePairTVL(
+    pair: Pair,
+    token0: Token,
+    token1: Token
+  ): Promise<number> {
     if (!token0 || !token1 || !token0.priceUsd || !token1.priceUsd) {
       return 0;
     }
@@ -201,11 +213,7 @@ export class PriceCalculator {
     snapshot: TokenPriceSnapshot | null;
   }> {
     // Calculate current price
-    const currentPrice = await this.calculateTokenPrice(
-      token,
-      timestamp,
-      blockNumber
-    );
+    const currentPrice = await this.calculateTokenPrice(token);
     if (!currentPrice) return { token: null, snapshot: null };
 
     // Calculate price changes

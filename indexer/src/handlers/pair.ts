@@ -10,6 +10,8 @@ import {
   TransactionType,
   Token,
   TokenPriceSnapshot,
+  PairVolumeSnapshot,
+  VolumeInterval,
 } from "../model";
 import { ProcessorContext } from "../processor";
 import {
@@ -19,9 +21,16 @@ import {
   VolumeCalculator,
   VftProgramCache,
   PriceUtils,
+  TimeUtils,
 } from "../services";
 import { SailsDecoder } from "../sails-decoder";
-import { BlockCommonData, UserMessageSentEvent, PairInfo } from "../types";
+import {
+  BlockCommonData,
+  UserMessageSentEvent,
+  PairInfo,
+  VolumePeriods,
+} from "../types";
+import { MoreThanOrEqual } from "typeorm";
 import { BaseHandler } from "./base";
 import {
   PairEventPayload,
@@ -32,17 +41,18 @@ import {
 export class PairHandler extends BaseHandler {
   private _pairDecoder: SailsDecoder;
   private _transactions: Map<string, Transaction>;
-  private _snapshotsToSave: Map<string, TokenPriceSnapshot>;
+  private _priceSnapshots: Map<string, TokenPriceSnapshot>;
+  private _volumeSnapshots: Map<string, PairVolumeSnapshot>;
   private _pairInfo: PairInfo;
   private _pair: Pair;
   private _isPairUpdated: boolean;
+  private _isTokensUpdated: boolean;
+  private _isVolumeSnapshotsUpdated: boolean;
   private _priceCalculator: PriceCalculator;
   private _tokenManager: TokenManager;
-  private _volumeCalculator: VolumeCalculator;
   private _vftCache: VftProgramCache;
   private _pairProgram: PairProgram;
   private _tokens: Map<string, Token>;
-  private _isTokensUpdated: boolean;
   private _api: GearApi;
 
   constructor(pairInfo: PairInfo) {
@@ -52,10 +62,12 @@ export class PairHandler extends BaseHandler {
     this.events = [];
     this.messageQueuedProgramIds = [];
     this._isPairUpdated = false;
+    this._isTokensUpdated = false;
+    this._isVolumeSnapshotsUpdated = false;
     this._transactions = new Map();
     this._tokens = new Map();
-    this._isTokensUpdated = false;
-    this._snapshotsToSave = new Map();
+    this._priceSnapshots = new Map();
+    this._volumeSnapshots = new Map();
   }
 
   public async init(api: GearApi): Promise<void> {
@@ -67,22 +79,13 @@ export class PairHandler extends BaseHandler {
 
   public async clear(): Promise<void> {
     this._transactions.clear();
-    this._snapshotsToSave.clear();
+    this._priceSnapshots.clear();
     this._isPairUpdated = false;
     this._isTokensUpdated = false;
-
-    // Clear volume calculator buffers
-    if (this._volumeCalculator) {
-      this._volumeCalculator.clearBuffers();
-    }
+    this._isVolumeSnapshotsUpdated = false;
   }
 
   public async save(): Promise<void> {
-    // Flush volume buffers before saving
-    if (this._volumeCalculator) {
-      await this._volumeCalculator.saveSnapshots();
-    }
-
     // Save pair if updated
     if (this._isPairUpdated) {
       await this._ctx.store.save(this._pair);
@@ -96,10 +99,25 @@ export class PairHandler extends BaseHandler {
     }
 
     // Save price snapshots
-    const snapshots = Array.from(this._snapshotsToSave.values());
-    if (snapshots.length > 0) {
-      this._ctx.log.info({ count: snapshots.length }, "Saving price snapshots");
-      await this._ctx.store.save(snapshots);
+    const priceSnapshots = Array.from(this._priceSnapshots.values());
+    if (priceSnapshots.length > 0) {
+      this._ctx.log.info(
+        { count: priceSnapshots.length },
+        "Saving price snapshots"
+      );
+      await this._ctx.store.save(priceSnapshots);
+    }
+
+    // Save volume snapshots
+    if (this._isVolumeSnapshotsUpdated) {
+      const volumeSnapshots = Array.from(this._volumeSnapshots.values());
+      if (volumeSnapshots.length > 0) {
+        this._ctx.log.info(
+          { count: volumeSnapshots.length },
+          "Saving volume snapshots"
+        );
+        await this._ctx.store.save(volumeSnapshots);
+      }
     }
 
     // Save transactions
@@ -120,11 +138,8 @@ export class PairHandler extends BaseHandler {
     // Initialize services
     this._priceCalculator = new PriceCalculator(ctx);
     this._tokenManager = new TokenManager(ctx, this._vftCache);
-    this._volumeCalculator = new VolumeCalculator(ctx);
 
     await this._initTokens();
-
-    ctx.log.info(`Processing ${ctx.blocks.length} blocks`);
 
     for (const block of ctx.blocks) {
       const common = getBlockCommonData(block);
@@ -368,11 +383,13 @@ export class PairHandler extends BaseHandler {
 
     // Update volume metrics for swaps
     if (isSwap) {
-      await this._updatePairVolumeMetrics();
+      await this._updatePairVolumeMetrics(transaction);
+      this._isVolumeSnapshotsUpdated = true;
     }
 
     // Store transaction
     this._transactions.set(transaction.id, transaction);
+    this._isPairUpdated = true;
   }
 
   /**
@@ -409,7 +426,6 @@ export class PairHandler extends BaseHandler {
 
     // Always update timestamp and mark as updated
     this._pair.updatedAt = common.blockTimestamp;
-    this._isPairUpdated = true;
   }
 
   /**
@@ -485,9 +501,10 @@ export class PairHandler extends BaseHandler {
     );
     if (token0Metrics.token) {
       this._tokens.set(token0Metrics.token.id, token0Metrics.token);
+      this._isTokensUpdated = true;
     }
     if (token0Metrics.snapshot) {
-      this._snapshotsToSave.set(
+      this._priceSnapshots.set(
         token0Metrics.snapshot.id,
         token0Metrics.snapshot
       );
@@ -501,9 +518,10 @@ export class PairHandler extends BaseHandler {
     );
     if (token1Metrics.token) {
       this._tokens.set(token1Metrics.token.id, token1Metrics.token);
+      this._isTokensUpdated = true;
     }
     if (token1Metrics.snapshot) {
-      this._snapshotsToSave.set(
+      this._priceSnapshots.set(
         token1Metrics.snapshot.id,
         token1Metrics.snapshot
       );
@@ -516,22 +534,33 @@ export class PairHandler extends BaseHandler {
   private async _updatePairTVL(): Promise<void> {
     // Calculate TVL
     this._pair.tvlUsd = await this._priceCalculator.calculatePairTVL(
-      this._pair
+      this._pair,
+      this._tokens.get(this._pair.token0),
+      this._tokens.get(this._pair.token1)
     );
   }
 
-  private async _updatePairVolumeMetrics(): Promise<void> {
-    // Get volume ONLY from swaps (trading volume)
-    const newTradingVolume = Array.from(this._transactions.values())
-      .filter((tx) => tx.type === TransactionType.SWAP)
-      .reduce((sum, tx) => sum + (tx.valueUsd || 0), 0);
+  private async _updatePairVolumeMetrics(
+    transaction: Transaction
+  ): Promise<void> {
+    const newTradingVolume = transaction.valueUsd;
 
     if (newTradingVolume > 0) {
-      const volumes = await this._volumeCalculator.updatePairVolumes(
+      const timestamp = transaction.timestamp;
+
+      // Create or update hourly snapshot
+      const hourlySnapshot = VolumeCalculator.createOrUpdateHourlySnapshot(
+        this._volumeSnapshots,
         this._pair.id,
         newTradingVolume,
-        new Date()
+        timestamp
       );
+
+      // Store snapshot for later saving
+      this._volumeSnapshots.set(hourlySnapshot.id, hourlySnapshot);
+
+      // Get existing snapshots from database for volume calculations
+      const volumes = await this._calculateCurrentVolumes(timestamp);
 
       // Update pair fields
       this._pair.volume1h = volumes.volume1h;
@@ -554,8 +583,37 @@ export class PairHandler extends BaseHandler {
           volume1y: this._pair.volume1y,
           totalVolumeUsd: this._pair.volumeUsd,
         },
-        "Updated pair trading volume efficiently"
+        "Updated pair trading volume"
       );
     }
+  }
+
+  /**
+   * Calculate current volume periods by combining database snapshots with pending ones
+   */
+  private async _calculateCurrentVolumes(
+    currentTime: Date
+  ): Promise<VolumePeriods> {
+    const { oneYearAgo } = TimeUtils.getTimePeriods(currentTime);
+
+    // Get existing snapshots from database
+    const dbSnapshots = await this._ctx.store.find(PairVolumeSnapshot, {
+      where: {
+        pair: { id: this._pair.id },
+        interval: VolumeInterval.HOURLY,
+        timestamp: MoreThanOrEqual(oneYearAgo),
+      },
+      order: { timestamp: "DESC" },
+    });
+
+    // Include pending snapshots from current processing
+    const pendingSnapshots = Array.from(this._volumeSnapshots.values());
+
+    const allSnapshots = [...dbSnapshots, ...pendingSnapshots];
+
+    return VolumeCalculator.calculateVolumesFromSnapshots(
+      allSnapshots,
+      currentTime
+    );
   }
 }

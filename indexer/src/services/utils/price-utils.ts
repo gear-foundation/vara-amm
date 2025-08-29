@@ -37,15 +37,22 @@ export class PriceUtils {
     }
 
     const tokenAmount = this.toHumanAmount(tokenReserve, tokenDecimals);
-    const otherTokenAmount = this.toHumanAmount(otherTokenReserve, otherTokenDecimals);
-    
+    const otherTokenAmount = this.toHumanAmount(
+      otherTokenReserve,
+      otherTokenDecimals
+    );
+
     return otherTokenAmount / tokenAmount;
   }
 
   /**
    * Calculate FDV (Fully Diluted Valuation)
    */
-  static calculateFDV(totalSupply: bigint | null, decimals: number, priceUSD: number): number | null {
+  static calculateFDV(
+    totalSupply: bigint | null,
+    decimals: number,
+    priceUSD: number
+  ): number | null {
     if (!totalSupply) return null;
     const humanSupply = this.toHumanAmount(totalSupply, decimals);
     return humanSupply * priceUSD;
@@ -55,14 +62,17 @@ export class PriceUtils {
    * Check if a token symbol is a known stablecoin
    */
   static isStablecoin(symbol: string): boolean {
-    const stablecoins = ["USDC", "USDT", "DAI", "BUSD", "USDD"];
+    const stablecoins = ["WUSDC", "WUSDT", "USDC", "USDT"];
     return stablecoins.includes(symbol.toUpperCase());
   }
 
   /**
    * Calculate percentage change
    */
-  static calculatePercentageChange(current: number, previous: number | null): number | null {
+  static calculatePercentageChange(
+    current: number,
+    previous: number | null
+  ): number | null {
     if (!previous || previous === 0) return null;
     return ((current - previous) / previous) * 100;
   }

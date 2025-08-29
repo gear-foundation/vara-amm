@@ -66,6 +66,8 @@ export class GearProcessor {
     });
 
     processor.run(db, async (ctx) => {
+      ctx.log.info(`Processing ${ctx.blocks.length} blocks`);
+
       for (const handler of this._handlers) {
         try {
           await handler.process(ctx);
