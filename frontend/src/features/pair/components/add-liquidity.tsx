@@ -240,6 +240,8 @@ const AddLiquidity = ({
       await batch.signAndSend(address, { signer }, statusCallback);
     } catch (_error) {
       console.error('Error adding liquidity:', _error);
+    } finally {
+      setLoading(false);
     }
   };
 
