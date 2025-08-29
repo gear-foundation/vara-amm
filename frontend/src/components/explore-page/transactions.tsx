@@ -64,7 +64,7 @@ const transformTransactions = (
         ? 'Add'
         : tx.type === 'REMOVE_LIQUIDITY'
           ? 'Remove'
-          : tx.type.charAt(0).toUpperCase() + tx.type.slice(1),
+          : tx.type.charAt(0).toUpperCase() + tx.type.slice(1).toLowerCase(),
     amount: formatAmount(tx, pairsTokens),
     wallet: formatWallet(tx.user),
     time: formatTime(tx.timestamp),

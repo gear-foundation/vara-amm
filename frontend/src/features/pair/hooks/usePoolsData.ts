@@ -4,8 +4,6 @@ import { useMemo } from 'react';
 import { LOGO_URI_BY_SYMBOL } from '@/consts';
 import { usePairsTokens } from '@/features/pair/hooks';
 import { GetPairsQuery, type PairData } from '@/features/pair/queries';
-import { getTokenId } from '@/features/token';
-import { useTokenPrices } from '@/features/token/api';
 import { useGraphQLQuery } from '@/hooks/useGraphQLQuery';
 import { toNumber } from '@/utils';
 
@@ -35,7 +33,6 @@ export type PoolsMetrics = {
 export const usePoolsData = () => {
   const { account } = useAccount();
   const { pairsTokens } = usePairsTokens();
-  const { data: tokenPrices } = useTokenPrices();
 
   const {
     data: pairsResult,
@@ -68,24 +65,10 @@ export const usePoolsData = () => {
       // Find matching tokens from pairsTokens
       const matchingPair = pairsTokens.find((p) => p.pairAddress === pair.id);
 
-      const token0Symbol = pair.token0Symbol || matchingPair?.token0?.symbol || 'Unknown';
-      const token1Symbol = pair.token1Symbol || matchingPair?.token1?.symbol || 'Unknown';
+      const token0Symbol = pair.token0Symbol || 'Unknown';
+      const token1Symbol = pair.token1Symbol || 'Unknown';
 
-      // Calculate TVL using reserves and token prices
-      const reserve0 = BigInt(pair.reserve0);
-      const reserve1 = BigInt(pair.reserve1);
-
-      const token0Decimals = matchingPair?.token0?.decimals || 18;
-      const token1Decimals = matchingPair?.token1?.decimals || 18;
-
-      const token0price = tokenPrices?.[getTokenId(token0Symbol)]?.usd || 0;
-      const token1price = tokenPrices?.[getTokenId(token1Symbol)]?.usd || 0;
-
-      const reserve0USD = (Number(reserve0) / Math.pow(10, token0Decimals)) * token0price;
-      const reserve1USD = (Number(reserve1) / Math.pow(10, token1Decimals)) * token1price;
-
-      // TODO: remove calculation of tvl since indexer returns it
-      const tvl = toNumber(pair.tvlUsd) || reserve0USD + reserve1USD;
+      const tvl = toNumber(pair.tvlUsd);
       const volume24h = toNumber(pair.volume24H);
 
       // Add to totals
@@ -132,7 +115,7 @@ export const usePoolsData = () => {
     };
 
     return { poolsData: _poolsData, metrics: _metrics };
-  }, [pairsResult?.allPairs?.nodes, pairsTokens, account?.decodedAddress, tokenPrices]);
+  }, [pairsResult?.allPairs?.nodes, pairsTokens, account?.decodedAddress]);
 
   return {
     poolsData,
