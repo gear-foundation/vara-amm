@@ -25,7 +25,7 @@ module.exports = class InitMigration1756500000000 {
             "amount_out" numeric, 
             "token_in" text, 
             "token_out" text, 
-            "pair_id" character varying, 
+            "pair_id" character varying NOT NULL, 
             "amount_a_usd" numeric, 
             "amount_b_usd" numeric, 
             "amount_in_usd" numeric, 
@@ -86,18 +86,16 @@ module.exports = class InitMigration1756500000000 {
         await queryRunner.query(`CREATE INDEX "IDX_95d4beb28c1702ce48aa7f55e3" ON "token" ("created_at")`);
         await queryRunner.query(`CREATE INDEX "IDX_a6bb882b22a8299c9861615d14" ON "token" ("updated_at")`);
 
-        // Create token_price_snapshot table (with fdv, without volume fields)
+        // Create token_price_snapshot table (matching GraphQL schema)
         await queryRunner.query(`CREATE TABLE "token_price_snapshot" (
             "id" character varying NOT NULL, 
             "price_usd" numeric NOT NULL, 
+            "fdv" numeric, 
             "change1h" numeric, 
             "change24h" numeric, 
-            "change7d" numeric, 
-            "change30d" numeric, 
-            "fdv" numeric, 
             "timestamp" TIMESTAMP WITH TIME ZONE NOT NULL, 
             "block_number" numeric NOT NULL, 
-            "token_id" character varying, 
+            "token_id" character varying NOT NULL, 
             CONSTRAINT "PK_394b30632e9dd0fafc1404d5413" PRIMARY KEY ("id")
         )`);
 
@@ -114,7 +112,7 @@ module.exports = class InitMigration1756500000000 {
             "transaction_count" integer NOT NULL, 
             "timestamp" TIMESTAMP WITH TIME ZONE NOT NULL, 
             "created_at" TIMESTAMP WITH TIME ZONE NOT NULL, 
-            "pair_id" character varying, 
+            "pair_id" character varying NOT NULL, 
             CONSTRAINT "PK_pair_volume_snapshot" PRIMARY KEY ("id")
         )`);
 
