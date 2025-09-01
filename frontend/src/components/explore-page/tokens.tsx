@@ -32,7 +32,7 @@ type ExplorePageTokensProps = {
 
 export function ExplorePageTokens({ tokenNetworkFilter, tokenFilter, tokenVolumeFilter }: ExplorePageTokensProps) {
   const [tokenSort, setTokenSort] = useState<{ field: SortField; direction: SortDirection }>({
-    field: '',
+    field: 'volume',
     direction: 'desc',
   });
 
@@ -42,14 +42,13 @@ export function ExplorePageTokens({ tokenNetworkFilter, tokenFilter, tokenVolume
     error: tokensError,
   } = useTokensWithPrices({
     first: 100,
-    orderBy: tokenSort.field || 'volume24h',
   });
 
   // Fetch pairs data for volume calculations
   const { data: pairsData, isLoading: pairsLoading, error: pairsError } = usePairsData();
 
   // Transform tokens data with calculated volumes from pairs
-  const tokensData = transformTokenDataForTable(tokensResponse?.allTokens.nodes || [], pairsData?.allPairs.nodes);
+  const tokensData = transformTokenDataForTable(tokensResponse?.allTokens.nodes || [], pairsData?.allPairs.nodes || []);
 
   const isLoading = tokensLoading || pairsLoading;
   const error = tokensError || pairsError;
@@ -73,35 +72,64 @@ export function ExplorePageTokens({ tokenNetworkFilter, tokenFilter, tokenVolume
   };
 
   const sortData = (data: TokenData[], sortConfig: { field: SortField; direction: SortDirection }) => {
-    if (!sortConfig.field) return data;
+    if (!sortConfig.field || !data?.length) return data;
 
     return [...data].sort((a, b) => {
-      let aVal = a[sortConfig.field as keyof TokenData];
-      let bVal = b[sortConfig.field as keyof TokenData];
+      let aVal: string | number;
+      let bVal: string | number;
 
-      // Handle nested properties for volume
-      if (sortConfig.field.startsWith('volume')) {
+      // Handle volume fields with dynamic timeframe
+      if (sortConfig.field === 'volume') {
         const volumeField = `volume${tokenVolumeFilter}` as keyof TokenData;
         aVal = a[volumeField];
         bVal = b[volumeField];
+      } else {
+        // Handle all other fields including price snapshot fields
+        aVal = a[sortConfig.field as keyof TokenData];
+        bVal = b[sortConfig.field as keyof TokenData];
       }
 
-      if (typeof aVal === 'string') {
-        aVal = aVal.toLowerCase();
-        bVal = (bVal as string).toLowerCase();
+      if (aVal == null && bVal == null) return 0;
+      if (aVal == null) return 1; // null values go to the end
+      if (bVal == null) return -1; // null values go to the end
+
+      // Convert to numbers for numeric fields
+      const numericFields = [
+        'price',
+        'change1h',
+        'change1d',
+        'fdv',
+        'volume1h',
+        'volume1d',
+        'volume1w',
+        'volume1m',
+        'volume1y',
+      ];
+      if (numericFields.includes(sortConfig.field) || sortConfig.field === 'volume') {
+        aVal = Number(aVal) || 0;
+        bVal = Number(bVal) || 0;
+        return sortConfig.direction === 'asc' ? aVal - bVal : bVal - aVal;
       }
 
+      // Handle string comparison (case-insensitive)
+      if (typeof aVal === 'string' || typeof bVal === 'string') {
+        aVal = String(aVal).toLowerCase();
+        bVal = String(bVal).toLowerCase();
+      }
+
+      // General comparison
       if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
       if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
       return 0;
     });
   };
 
-  const filteredTokens = tokensData?.filter((token) => {
-    if (tokenNetworkFilter !== 'all' && token.network !== tokenNetworkFilter) return false;
-    if (tokenFilter !== 'all' && !token.symbol.toLowerCase().includes(tokenFilter.toLowerCase())) return false;
-    return true;
-  });
+  const filteredTokens =
+    tokensData?.filter((token) => {
+      if (tokenNetworkFilter !== 'all' && token.network !== tokenNetworkFilter) return false;
+      if (tokenFilter !== 'all' && !token.symbol.toLowerCase().includes(tokenFilter.toLowerCase())) return false;
+      return true;
+    }) || [];
 
   const sortedTokens = sortData(filteredTokens, tokenSort);
 
@@ -228,26 +256,38 @@ export function ExplorePageTokens({ tokenNetworkFilter, tokenFilter, tokenVolume
             </tr>
           </thead>
           <tbody>
-            {sortedTokens.map((token, index) => (
-              <tr key={index} className="table-row">
-                <td className="py-4 px-6">
-                  <div className="flex items-center space-x-3">
-                    <img src={token.logoURI || '/placeholder.svg'} alt={token.name} className="w-8 h-8 rounded-full" />
-                    <div>
-                      <div className="font-medium theme-text">{token.name}</div>
-                      <div className="text-sm text-gray-400 mono">{token.symbol}</div>
-                    </div>
-                  </div>
-                </td>
-                <td className="py-4 px-6 text-right font-medium mono theme-text">${token.price.toFixed(2)}</td>
-                <td className="py-4 px-6 text-right">{formatPriceChange(token.change1h)}</td>
-                <td className="py-4 px-6 text-right">{formatPriceChange(token.change1d)}</td>
-                <td className="py-4 px-6 text-right mono theme-text">{formatCurrency(token.fdv)}</td>
-                <td className="py-4 px-6 text-right mono theme-text">
-                  {getVolumeByTimeframe(token, tokenVolumeFilter)}
+            {sortedTokens.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="py-8 text-center text-gray-400">
+                  No tokens found
                 </td>
               </tr>
-            ))}
+            ) : (
+              sortedTokens.map((token, index) => (
+                <tr key={`${token.symbol}-${index}`} className="table-row">
+                  <td className="py-4 px-6">
+                    <div className="flex items-center space-x-3">
+                      <img
+                        src={token.logoURI || '/placeholder.svg'}
+                        alt={token.name}
+                        className="w-8 h-8 rounded-full"
+                      />
+                      <div>
+                        <div className="font-medium theme-text">{token.name}</div>
+                        <div className="text-sm text-gray-400 mono">{token.symbol}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="py-4 px-6 text-right font-medium mono theme-text">${token.price.toFixed(2)}</td>
+                  <td className="py-4 px-6 text-right">{formatPriceChange(token.change1h)}</td>
+                  <td className="py-4 px-6 text-right">{formatPriceChange(token.change1d)}</td>
+                  <td className="py-4 px-6 text-right mono theme-text">{formatCurrency(token.fdv)}</td>
+                  <td className="py-4 px-6 text-right mono theme-text">
+                    {getVolumeByTimeframe(token, tokenVolumeFilter)}
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>

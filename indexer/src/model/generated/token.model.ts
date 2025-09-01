@@ -22,23 +22,8 @@ export class Token {
     @BigIntColumn_({nullable: true})
     totalSupply!: bigint | undefined | null
 
-    @FloatColumn_({nullable: true})
-    priceUsd!: number | undefined | null
-
     @OneToMany_(() => TokenPriceSnapshot, e => e.token)
     priceHistory!: TokenPriceSnapshot[]
-
-    @FloatColumn_({nullable: true})
-    volume24h!: number | undefined | null
-
-    @FloatColumn_({nullable: true})
-    volume7d!: number | undefined | null
-
-    @FloatColumn_({nullable: true})
-    volume30d!: number | undefined | null
-
-    @FloatColumn_({nullable: true})
-    fdv!: number | undefined | null
 
     @Index_()
     @DateTimeColumn_({nullable: false})

@@ -53,7 +53,10 @@ export class PairHandler extends BaseHandler {
   private _vftCache: VftProgramCache;
   private _pairProgram: PairProgram;
   private _tokens: Map<string, Token>;
+  private _tokenPrices: Map<string, number>; // Store current token prices in memory
   private _api: GearApi;
+  private _lastPriceUpdate: Date | null;
+  private _lastVolumeUpdate: Date | null;
 
   constructor(pairInfo: PairInfo) {
     super();
@@ -66,8 +69,11 @@ export class PairHandler extends BaseHandler {
     this._isVolumeSnapshotsUpdated = false;
     this._transactions = new Map();
     this._tokens = new Map();
+    this._tokenPrices = new Map();
     this._priceSnapshots = new Map();
     this._volumeSnapshots = new Map();
+    this._lastPriceUpdate = null;
+    this._lastVolumeUpdate = null;
   }
 
   public async init(api: GearApi): Promise<void> {
@@ -143,6 +149,33 @@ export class PairHandler extends BaseHandler {
 
     for (const block of ctx.blocks) {
       const common = getBlockCommonData(block);
+
+      // Check if hourly updates are needed
+      const { shouldUpdatePrices, shouldUpdateVolumes } = 
+        this._shouldPerformHourlyUpdates(common.blockTimestamp);
+
+      // Perform hourly price updates if needed
+      if (shouldUpdatePrices) {
+        await this._updateTokenPrices(
+          common.blockTimestamp,
+          BigInt(common.blockNumber)
+        );
+        await this._updatePairTVL();
+        this._isPairUpdated = true;
+        
+        this._ctx.log.info(
+          {
+            pairId: this._pair.id,
+            timestamp: common.blockTimestamp.toISOString(),
+          },
+          "Performed hourly price update"
+        );
+      }
+
+      // Perform hourly volume updates if needed
+      if (shouldUpdateVolumes) {
+        await this._performHourlyVolumeUpdate(common.blockTimestamp);
+      }
 
       for (const event of block.events) {
         if (
@@ -233,9 +266,42 @@ export class PairHandler extends BaseHandler {
       this._tokens.set(token0.id, token0);
       this._tokens.set(token1.id, token1);
 
+      // Load latest price snapshots and initialize token prices
+      await this._initTokenPrices(token0.id);
+      await this._initTokenPrices(token1.id);
+
       if (isToken0New || isToken1New) {
         this._isTokensUpdated = true;
       }
+    }
+  }
+
+  /**
+   * Load the latest price snapshot for a token and initialize its price in memory
+   */
+  private async _initTokenPrices(tokenId: string): Promise<void> {
+    const latestSnapshot = await this._ctx.store.findOne(TokenPriceSnapshot, {
+      where: {
+        token: { id: tokenId },
+      },
+      order: { timestamp: "DESC" },
+    });
+
+    if (latestSnapshot) {
+      this._tokenPrices.set(tokenId, latestSnapshot.priceUsd);
+      this._ctx.log.debug(
+        {
+          tokenId,
+          price: latestSnapshot.priceUsd,
+          timestamp: latestSnapshot.timestamp,
+        },
+        "Initialized token price from latest snapshot"
+      );
+    } else {
+      this._ctx.log.debug(
+        { tokenId },
+        "No price snapshot found for token, price will be calculated on first update"
+      );
     }
   }
 
@@ -438,22 +504,24 @@ export class PairHandler extends BaseHandler {
     transaction: Transaction
   ): Promise<void> {
     if (transaction.amountA && transaction.amountB) {
-      const token0 = await this._ctx.store.get(Token, this._pair.token0);
-      const token1 = await this._ctx.store.get(Token, this._pair.token1);
+      const token0 = this._tokens.get(this._pair.token0);
+      const token1 = this._tokens.get(this._pair.token1);
+      const token0Price = this._tokenPrices.get(this._pair.token0);
+      const token1Price = this._tokenPrices.get(this._pair.token1);
 
-      if (token0?.priceUsd) {
+      if (token0 && token0Price) {
         transaction.amountAUsd = PriceUtils.calculateUSDValue(
           transaction.amountA,
           token0.decimals,
-          token0.priceUsd
+          token0Price
         );
       }
 
-      if (token1?.priceUsd) {
+      if (token1 && token1Price) {
         transaction.amountBUsd = PriceUtils.calculateUSDValue(
           transaction.amountB,
           token1.decimals,
-          token1.priceUsd
+          token1Price
         );
       }
 
@@ -462,23 +530,25 @@ export class PairHandler extends BaseHandler {
     }
 
     if (transaction.amountIn && transaction.tokenIn) {
-      const tokenIn = await this._ctx.store.get(Token, transaction.tokenIn);
-      if (tokenIn?.priceUsd) {
+      const tokenIn = this._tokens.get(transaction.tokenIn);
+      const tokenInPrice = this._tokenPrices.get(transaction.tokenIn);
+      if (tokenIn && tokenInPrice) {
         transaction.amountInUsd = PriceUtils.calculateUSDValue(
           transaction.amountIn,
           tokenIn.decimals,
-          tokenIn.priceUsd
+          tokenInPrice
         );
       }
     }
 
     if (transaction.amountOut && transaction.tokenOut) {
-      const tokenOut = await this._ctx.store.get(Token, transaction.tokenOut);
-      if (tokenOut?.priceUsd) {
+      const tokenOut = this._tokens.get(transaction.tokenOut);
+      const tokenOutPrice = this._tokenPrices.get(transaction.tokenOut);
+      if (tokenOut && tokenOutPrice) {
         transaction.amountOutUsd = PriceUtils.calculateUSDValue(
           transaction.amountOut,
           tokenOut.decimals,
-          tokenOut.priceUsd
+          tokenOutPrice
         );
       }
     }
@@ -496,50 +566,60 @@ export class PairHandler extends BaseHandler {
     timestamp: Date,
     blockNumber: bigint
   ): Promise<void> {
-    // Update token0 metrics
-    const token0Metrics = await this._priceCalculator.prepareTokenMetrics(
-      this._tokens.get(this._pair.token0),
-      timestamp,
-      blockNumber
-    );
-    if (token0Metrics.token) {
-      this._tokens.set(token0Metrics.token.id, token0Metrics.token);
-      this._isTokensUpdated = true;
-    }
-    if (token0Metrics.snapshot) {
+    const token0Snapshot =
+      await this._priceCalculator.prepareTokenPriceSnapshot(
+        this._tokens.get(this._pair.token0),
+        timestamp,
+        blockNumber
+      );
+
+    if (token0Snapshot.snapshot) {
+      this._tokenPrices.set(
+        this._pair.token0,
+        token0Snapshot.snapshot.priceUsd
+      );
       this._priceSnapshots.set(
-        token0Metrics.snapshot.id,
-        token0Metrics.snapshot
+        token0Snapshot.snapshot.id,
+        token0Snapshot.snapshot
       );
     }
 
-    // Update token1 metrics
-    const token1Metrics = await this._priceCalculator.prepareTokenMetrics(
-      this._tokens.get(this._pair.token1),
-      timestamp,
-      blockNumber
-    );
-    if (token1Metrics.token) {
-      this._tokens.set(token1Metrics.token.id, token1Metrics.token);
-      this._isTokensUpdated = true;
-    }
-    if (token1Metrics.snapshot) {
+    const token1Snapshot =
+      await this._priceCalculator.prepareTokenPriceSnapshot(
+        this._tokens.get(this._pair.token1),
+        timestamp,
+        blockNumber
+      );
+
+    if (token1Snapshot.snapshot) {
+      this._tokenPrices.set(
+        this._pair.token1,
+        token1Snapshot.snapshot.priceUsd
+      );
       this._priceSnapshots.set(
-        token1Metrics.snapshot.id,
-        token1Metrics.snapshot
+        token1Snapshot.snapshot.id,
+        token1Snapshot.snapshot
       );
     }
+
+    // Update the last price update timestamp
+    this._lastPriceUpdate = timestamp;
   }
 
   /**
    * Update pair-level metrics like TVL and volume
    */
   private async _updatePairTVL(): Promise<void> {
-    // Calculate TVL
+    // Calculate TVL using in-memory prices
+    const token0Price = this._tokenPrices.get(this._pair.token0);
+    const token1Price = this._tokenPrices.get(this._pair.token1);
+
     this._pair.tvlUsd = await this._priceCalculator.calculatePairTVL(
       this._pair,
       this._tokens.get(this._pair.token0),
-      this._tokens.get(this._pair.token1)
+      this._tokens.get(this._pair.token1),
+      token0Price,
+      token1Price
     );
   }
 
@@ -575,6 +655,9 @@ export class PairHandler extends BaseHandler {
       // Update total volume incrementally
       this._pair.volumeUsd = (this._pair.volumeUsd || 0) + newTradingVolume;
 
+      // Update the last volume update timestamp
+      this._lastVolumeUpdate = timestamp;
+
       this._ctx.log.info(
         {
           pairId: this._pair.id,
@@ -589,6 +672,69 @@ export class PairHandler extends BaseHandler {
         "Updated pair trading volume"
       );
     }
+  }
+
+  /**
+   * Check if hourly updates are needed for prices and volumes
+   */
+  private _shouldPerformHourlyUpdates(currentTime: Date): {
+    shouldUpdatePrices: boolean;
+    shouldUpdateVolumes: boolean;
+  } {
+    const oneHourMs = 60 * 60 * 1000;
+    
+    const shouldUpdatePrices = 
+      !this._lastPriceUpdate || 
+      (currentTime.getTime() - this._lastPriceUpdate.getTime()) >= oneHourMs;
+    
+    const shouldUpdateVolumes = 
+      !this._lastVolumeUpdate || 
+      (currentTime.getTime() - this._lastVolumeUpdate.getTime()) >= oneHourMs;
+    
+    return { shouldUpdatePrices, shouldUpdateVolumes };
+  }
+
+  /**
+   * Perform hourly volume update without requiring a swap transaction
+   */
+  private async _performHourlyVolumeUpdate(timestamp: Date): Promise<void> {
+    // Create an hourly snapshot with 0 volume to maintain timeline consistency
+    const hourlySnapshot = VolumeCalculator.createOrUpdateHourlySnapshot(
+      this._volumeSnapshots,
+      this._pair.id,
+      0, // No new volume, just maintaining the timeline
+      timestamp
+    );
+
+    // Store snapshot for later saving
+    this._volumeSnapshots.set(hourlySnapshot.id, hourlySnapshot);
+
+    // Recalculate all volume periods
+    const volumes = await this._calculateCurrentVolumes(timestamp);
+
+    // Update pair fields
+    this._pair.volume1h = volumes.volume1h;
+    this._pair.volume24h = volumes.volume24h;
+    this._pair.volume7d = volumes.volume7d;
+    this._pair.volume30d = volumes.volume30d;
+    this._pair.volume1y = volumes.volume1y;
+
+    this._isVolumeSnapshotsUpdated = true;
+    this._isPairUpdated = true;
+    this._lastVolumeUpdate = timestamp;
+
+    this._ctx.log.info(
+      {
+        pairId: this._pair.id,
+        timestamp: timestamp.toISOString(),
+        volume1h: this._pair.volume1h,
+        volume24h: this._pair.volume24h,
+        volume7d: this._pair.volume7d,
+        volume30d: this._pair.volume30d,
+        volume1y: this._pair.volume1y,
+      },
+      "Performed hourly volume update"
+    );
   }
 
   /**

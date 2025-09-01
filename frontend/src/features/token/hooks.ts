@@ -7,7 +7,6 @@ import { GET_TOKENS_WITH_PRICES, type GetTokensWithPricesResponse } from './quer
 
 export interface UseTokensWithPricesOptions {
   first?: number;
-  orderBy?: string;
   filter?: string;
 }
 
@@ -16,16 +15,13 @@ export function useTokensWithPrices(
   queryOptions?: Partial<UseQueryOptions<GetTokensWithPricesResponse>>,
 ) {
   return useQuery({
-    queryKey: ['tokens-with-prices', options],
+    queryKey: ['tokens-with-prices', options.first, options.filter],
     queryFn: async () => {
-      const { first = 50, orderBy, filter } = options;
-      const orderByInput = orderBy
-        ? [`${orderBy.replace('24h', '24H').replace('7d', '7D').replace('30d', '30D').toUpperCase()}_DESC`]
-        : ['VOLUME24H_DESC'];
+      const { first = 50, filter } = options;
 
       return graphqlClient.request<GetTokensWithPricesResponse>(GET_TOKENS_WITH_PRICES, {
         first,
-        orderBy: orderByInput,
+        orderBy: ['CREATED_AT_DESC'], // Simple default ordering by creation time
         filter,
       });
     },

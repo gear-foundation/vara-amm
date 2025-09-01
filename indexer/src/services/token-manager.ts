@@ -49,11 +49,6 @@ export class TokenManager {
         name,
         decimals: Number(decimals),
         totalSupply: BigInt(totalSupply),
-        priceUsd: null,
-        volume24h: null,
-        volume7d: null,
-        volume30d: null,
-        fdv: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       });

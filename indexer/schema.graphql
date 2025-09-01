@@ -4,12 +4,7 @@ type Token @entity {
   name: String
   decimals: Int!
   totalSupply: BigInt
-  priceUsd: Float # current price in USD
   priceHistory: [TokenPriceSnapshot!] @derivedFrom(field: "token")
-  volume24h: Float # 24h volume in USD
-  volume7d: Float # 7d volume in USD
-  volume30d: Float # 30d volume in USD
-  fdv: Float # fully diluted valuation
   createdAt: DateTime! @index
   updatedAt: DateTime! @index
 }
@@ -18,15 +13,9 @@ type TokenPriceSnapshot @entity {
   id: ID! # token_address:timestamp
   token: Token!
   priceUsd: Float!
-  volume1h: Float # 1h volume in USD
-  volume24h: Float # 24h volume in USD  
-  volume7d: Float # 7d volume in USD
-  volume30d: Float # 30d volume in USD
-  volume1y: Float # 1y volume in USD
+  fdv: Float # fully diluted valuation
   change1h: Float # 1h price change %
   change24h: Float # 24h price change %
-  change7d: Float # 7d price change %
-  change30d: Float # 30d price change %
   timestamp: DateTime! @index
   blockNumber: BigInt! @index
 }
