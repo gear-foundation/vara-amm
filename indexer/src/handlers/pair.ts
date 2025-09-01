@@ -393,34 +393,37 @@ export class PairHandler extends BaseHandler {
   }
 
   /**
-   * Update pair reserves by querying current on-chain state
+   * Update pair reserves and totalSupply by querying current on-chain state
    */
   private async _updatePairReserves(
     payload: PairEventPayload,
     common: BlockCommonData
   ): Promise<void> {
     try {
-      // Get current reserves from blockchain state via query
+      // Get current reserves and totalSupply from blockchain state via query
       const pairProgram = new PairProgram(this._api, this._pairInfo.address);
 
       const [reserve0, reserve1] = await pairProgram.pair.getReserves();
+      const totalSupply = await pairProgram.vft.totalSupply();
 
-      // Update reserves with current on-chain values
+      // Update reserves and totalSupply with current on-chain values
       this._pair.reserve0 = BigInt(reserve0);
       this._pair.reserve1 = BigInt(reserve1);
+      this._pair.totalSupply = BigInt(totalSupply);
 
       this._ctx.log.debug(
         {
           pairId: this._pairInfo.address,
           reserve0: this._pair.reserve0.toString(),
           reserve1: this._pair.reserve1.toString(),
+          totalSupply: this._pair.totalSupply.toString(),
         },
-        "Updated pair reserves from on-chain query"
+        "Updated pair reserves and totalSupply from on-chain query"
       );
     } catch (error) {
       this._ctx.log.error(
         { error, pairId: this._pairInfo.address },
-        "Failed to query current reserves, keeping previous values"
+        "Failed to query current reserves and totalSupply, keeping previous values"
       );
     }
 
