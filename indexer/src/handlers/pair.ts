@@ -139,7 +139,7 @@ export class PairHandler extends BaseHandler {
     await super.process(ctx);
 
     // Check if pair already exists in database and load existing data
-    await this._checkAndLoadExistingPair(ctx);
+    await this._checkAndLoadExistingPair();
 
     // Initialize services
     this._priceCalculator = new PriceCalculator(ctx);
@@ -151,7 +151,7 @@ export class PairHandler extends BaseHandler {
       const common = getBlockCommonData(block);
 
       // Check if hourly updates are needed
-      const { shouldUpdatePrices, shouldUpdateVolumes } = 
+      const { shouldUpdatePrices, shouldUpdateVolumes } =
         this._shouldPerformHourlyUpdates(common.blockTimestamp);
 
       // Perform hourly price updates if needed
@@ -162,7 +162,7 @@ export class PairHandler extends BaseHandler {
         );
         await this._updatePairTVL();
         this._isPairUpdated = true;
-        
+
         this._ctx.log.info(
           {
             pairId: this._pair.id,
@@ -188,19 +188,20 @@ export class PairHandler extends BaseHandler {
     }
   }
 
-  private async _checkAndLoadExistingPair(
-    ctx: ProcessorContext
-  ): Promise<void> {
+  private async _checkAndLoadExistingPair(): Promise<void> {
     // If pair is already loaded/cached, no need to query database
     if (this._pair) {
       return;
     }
 
     // Query database only during initialization when pair is not yet cached
-    const existingPair = await ctx.store.get(Pair, this._pairInfo.address);
+    const existingPair = await this._ctx.store.get(
+      Pair,
+      this._pairInfo.address
+    );
 
     if (existingPair) {
-      ctx.log.info(
+      this._ctx.log.info(
         {
           pairId: this._pairInfo.address,
           symbols: `${existingPair.token0Symbol} / ${existingPair.token1Symbol}`,
@@ -215,7 +216,7 @@ export class PairHandler extends BaseHandler {
 
       this._isPairUpdated = true;
     } else {
-      ctx.log.info(
+      this._ctx.log.info(
         { pairId: this._pairInfo.address },
         "Creating new pair entry in database"
       );
@@ -682,15 +683,15 @@ export class PairHandler extends BaseHandler {
     shouldUpdateVolumes: boolean;
   } {
     const oneHourMs = 60 * 60 * 1000;
-    
-    const shouldUpdatePrices = 
-      !this._lastPriceUpdate || 
-      (currentTime.getTime() - this._lastPriceUpdate.getTime()) >= oneHourMs;
-    
-    const shouldUpdateVolumes = 
-      !this._lastVolumeUpdate || 
-      (currentTime.getTime() - this._lastVolumeUpdate.getTime()) >= oneHourMs;
-    
+
+    const shouldUpdatePrices =
+      !this._lastPriceUpdate ||
+      currentTime.getTime() - this._lastPriceUpdate.getTime() >= oneHourMs;
+
+    const shouldUpdateVolumes =
+      !this._lastVolumeUpdate ||
+      currentTime.getTime() - this._lastVolumeUpdate.getTime() >= oneHourMs;
+
     return { shouldUpdatePrices, shouldUpdateVolumes };
   }
 
