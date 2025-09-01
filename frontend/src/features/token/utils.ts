@@ -23,7 +23,7 @@ function transformTokenDataForTable(
   volume1y: number;
   network: string;
 }> {
-  if (pairs && pairs.length > 0) {
+  if (pairs && pairs.length === 0) {
     return [];
   }
 

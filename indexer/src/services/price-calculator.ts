@@ -1,12 +1,6 @@
-import {
-  Token,
-  TokenPriceSnapshot,
-  Pair,
-  Transaction,
-  TransactionType,
-} from "../model";
+import { Token, TokenPriceSnapshot, Pair } from "../model";
 import { ProcessorContext } from "../processor";
-import { LessThanOrEqual, MoreThanOrEqual } from "typeorm";
+import { LessThanOrEqual } from "typeorm";
 import { PriceUtils, TimeUtils } from "./utils";
 
 export class PriceCalculator {
@@ -21,14 +15,9 @@ export class PriceCalculator {
    * Uses liquidity-weighted average price from all stablecoin pairs
    */
   async calculateTokenPrice(token: Token): Promise<number | null> {
-    const MINIMUM_TVL_THRESHOLD = 1000; // $1000 minimum TVL
     // Get all pairs containing this token
     const pairs = await this.ctx.store.find(Pair, {
-      where: [
-        { token0: token.id },
-        { token1: token.id },
-        { tvlUsd: MoreThanOrEqual(MINIMUM_TVL_THRESHOLD) },
-      ],
+      where: [{ token0: token.id }, { token1: token.id }],
     });
 
     if (pairs.length === 0) {
@@ -64,7 +53,7 @@ export class PriceCalculator {
           );
 
           // Use TVL as weight for the price calculation
-          const weight = pair.tvlUsd || 0;
+          const weight = pair.tvlUsd || 1;
 
           totalWeightedPrice += pairPrice * weight;
           totalWeight += weight;
@@ -72,8 +61,7 @@ export class PriceCalculator {
       }
     }
 
-    // Return weighted average price, or null if no valid pairs found
-    return totalWeight > 0 ? totalWeightedPrice / totalWeight : null;
+    return totalWeightedPrice / totalWeight;
   }
 
   /**
