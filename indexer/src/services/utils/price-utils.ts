@@ -1,5 +1,3 @@
-import { Token } from "../../model";
-
 /**
  * Utility functions for price calculations
  */
@@ -25,6 +23,9 @@ export class PriceUtils {
 
   /**
    * Calculate price from reserves (for AMM pairs)
+   * Uses the same formula as GetAmountOut with 0.3% fee (997/1000 multiplier)
+   * Formula: amount_out = (amount_in * 997 * reserve_out) / (reserve_in * 1000 + amount_in * 997)
+   * For price calculation, we use 1 unit of input token to get the price
    */
   static calculatePriceFromReserves(
     tokenReserve: bigint,
@@ -36,13 +37,18 @@ export class PriceUtils {
       return 0;
     }
 
-    const tokenAmount = this.toHumanAmount(tokenReserve, tokenDecimals);
-    const otherTokenAmount = this.toHumanAmount(
-      otherTokenReserve,
-      otherTokenDecimals
-    );
+    const amountIn = BigInt(Math.pow(10, tokenDecimals));
+    const numerator = amountIn * 997n * otherTokenReserve;
+    const denominator = tokenReserve * 1000n + amountIn * 997n;
 
-    return otherTokenAmount / tokenAmount;
+    if (denominator === 0n) {
+      return 0;
+    }
+
+    const amountOut = numerator / denominator;
+    const priceInOtherToken = this.toHumanAmount(amountOut, otherTokenDecimals);
+
+    return priceInOtherToken;
   }
 
   /**
