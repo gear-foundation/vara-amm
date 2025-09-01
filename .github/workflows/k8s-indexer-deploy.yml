@@ -74,8 +74,8 @@ jobs:
           context: indexer
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-indexer-starship:${{ env.DEPLOY_ENV }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-indexer-starship:${{ env.DEPLOY_ENV }}-${{ env.COMMIT_SHA }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-indexer-vara-amm:${{ env.DEPLOY_ENV }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-indexer-vara-amm:${{ env.DEPLOY_ENV }}-${{ env.COMMIT_SHA }}
 
   deploy-to-k8s:
     needs: 
