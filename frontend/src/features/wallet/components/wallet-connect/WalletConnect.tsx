@@ -1,5 +1,5 @@
 import { useAlert, useAccount } from '@gear-js/react-hooks';
-import Identicon from '@polkadot/react-identicon';
+import { Identicon } from '@polkadot/react-identicon';
 import { Suspense, useEffect } from 'react';
 
 import { Button } from '@/components/ui/button';
