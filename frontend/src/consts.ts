@@ -2,6 +2,7 @@ import type { HexString } from '@gear-js/api';
 
 export const ENV = {
   NODE_ADDRESS: import.meta.env.VITE_NODE_ADDRESS as string,
+  EXPLORER_URL: import.meta.env.VITE_EXPLORER_URL as string,
   FACTORY_PROGRAM_ID: import.meta.env.VITE_FACTORY_PROGRAM_ID as HexString,
 };
 
@@ -15,6 +16,7 @@ export const ROUTES = {
 export const LOGO_URI_BY_SYMBOL: Record<string, string> = {
   // Vara Network
   VARA: '/tokens/vara.png',
+  WTVARA: '/tokens/vara.png',
   WETH: '/tokens/eth.png',
   WUSDT: '/tokens/usdt.png',
   WUSDC: '/tokens/usdc.png',

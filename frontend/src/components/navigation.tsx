@@ -43,9 +43,9 @@ export function Navigation() {
               <NavLink to={ROUTES.TRADE} className={navLinkClassName}>
                 TRADE
               </NavLink>
-              {/* <NavLink href={ROUTES.EXPLORE} className={navLinkClassName}>
+              <NavLink to={ROUTES.EXPLORE} className={navLinkClassName}>
                 EXPLORE
-              </NavLink> */}
+              </NavLink>
               <NavLink to={ROUTES.POOL} className={navLinkClassName}>
                 POOL
               </NavLink>
@@ -73,7 +73,7 @@ export function Navigation() {
                       <span className="mono text-sm theme-text">{prettyAddress(account.decodedAddress)}</span>
                     </Button>
                   ) : (
-                    <Button onClick={openConnectWallet} className="btn-primary">
+                    <Button onClick={openConnectWallet} variant="default">
                       <Wallet className="w-4 h-4 mr-2" />
                       CONNECT WALLET
                     </Button>
@@ -98,9 +98,9 @@ export function Navigation() {
                 <NavLink to={ROUTES.TRADE} className={navLinkClassName}>
                   TRADE
                 </NavLink>
-                {/* <NavLink href={ROUTES.EXPLORE} className={navLinkClassName}>
+                <NavLink to={ROUTES.EXPLORE} className={navLinkClassName}>
                   EXPLORE
-                </NavLink> */}
+                </NavLink>
                 <NavLink to={ROUTES.POOL} className={navLinkClassName}>
                   POOL
                 </NavLink>

@@ -23,6 +23,8 @@ export const useApproveMessage = (vftAddress: HexString) => {
 
   const tx = async ({ spender, value }: Params) => {
     if (!program || !account) return;
+    console.log('🚀 ~ tx ~ value:', value);
+    console.log('🚀 ~ tx ~ spender:', spender);
 
     const { transaction } = await prepareTransactionAsync({
       args: [spender, value],

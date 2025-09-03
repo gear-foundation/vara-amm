@@ -1,0 +1,90 @@
+type Token @entity {
+  id: ID! # token address
+  symbol: String!
+  name: String
+  decimals: Int!
+  totalSupply: BigInt
+  priceHistory: [TokenPriceSnapshot!] @derivedFrom(field: "token")
+  createdAt: DateTime! @index
+  updatedAt: DateTime! @index
+}
+
+type TokenPriceSnapshot @entity {
+  id: ID! # token_address:timestamp
+  token: Token!
+  priceUsd: Float!
+  fdv: Float # fully diluted valuation
+  change1h: Float # 1h price change %
+  change24h: Float # 24h price change %
+  timestamp: DateTime! @index
+  blockNumber: BigInt! @index
+}
+
+type Pair @entity {
+  id: ID! # pair address
+  token0: String! @index
+  token1: String! @index
+  token0Symbol: String
+  token1Symbol: String
+  reserve0: BigInt!
+  reserve1: BigInt!
+  totalSupply: BigInt!
+  volumeUsd: Float # total volume in USD
+  volume1h: Float # 1h volume in USD
+  volume24h: Float # 24h volume in USD
+  volume7d: Float # 7d volume in USD
+  volume30d: Float # 30d volume in USD
+  volume1y: Float # 1y volume in USD
+  tvlUsd: Float # total value locked in USD
+  createdAt: DateTime! @index
+  updatedAt: DateTime! @index
+  transactions: [Transaction!] @derivedFrom(field: "pair")
+  volumeSnapshots: [PairVolumeSnapshot!] @derivedFrom(field: "pair")
+}
+
+type PairVolumeSnapshot @entity {
+  id: ID! # format: {pairId}:{interval}:{roundedTimestamp}
+  pair: Pair!
+  interval: VolumeInterval! @index
+  volumeUsd: Float!
+  transactionCount: Int!
+  timestamp: DateTime! @index # rounded to interval start
+  createdAt: DateTime! @index
+}
+
+type Transaction @entity {
+  id: ID!
+  type: TransactionType! @index
+  pair: Pair!
+  user: String! @index
+  blockNumber: BigInt! @index
+  timestamp: DateTime! @index
+
+  amountA: BigInt
+  amountB: BigInt
+  liquidity: BigInt
+  amountIn: BigInt
+  amountOut: BigInt
+  tokenIn: String
+  tokenOut: String
+  
+  # USD values for display
+  amountAUsd: Float
+  amountBUsd: Float
+  amountInUsd: Float
+  amountOutUsd: Float
+  valueUsd: Float # total transaction value in USD
+}
+
+enum TransactionType {
+  ADD_LIQUIDITY
+  REMOVE_LIQUIDITY
+  SWAP
+}
+
+enum VolumeInterval {
+  HOURLY
+  DAILY
+  WEEKLY
+  MONTHLY
+}
