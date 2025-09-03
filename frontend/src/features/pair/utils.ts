@@ -22,13 +22,13 @@ const getNetworks = (pairsTokens: PairsTokens): Network[] => {
       }, []),
     },
     // TODO: add other networks
-    {
-      id: 'ethereum',
-      name: 'Ethereum',
-      chainId: 1,
-      logoURI: '/tokens/eth.png',
-      tokens: [],
-    },
+    // {
+    //   id: 'ethereum',
+    //   name: 'Ethereum',
+    //   chainId: 1,
+    //   logoURI: '/tokens/eth.png',
+    //   tokens: [],
+    // },
   ];
 };
 
