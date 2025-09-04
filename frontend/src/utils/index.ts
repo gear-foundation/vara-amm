@@ -1,4 +1,4 @@
-export { formatCurrency, getVolumeByTimeframe } from './currency';
+export { formatCurrency, formatPrice, getVolumeByTimeframe } from './currency';
 
 export const toNumber = (value: string | number | null | undefined): number => {
   if (value === null || value === undefined) return 0;

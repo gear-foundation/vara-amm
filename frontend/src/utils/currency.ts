@@ -9,6 +9,15 @@ export function formatCurrency(value?: number | null): string {
   if (value >= 1e9) return `$${(value / 1e9).toFixed(2)}B`;
   if (value >= 1e6) return `$${(value / 1e6).toFixed(2)}M`;
   if (value >= 1e3) return `$${(value / 1e3).toFixed(2)}K`;
+
+  return `$${value.toFixed(2)}`;
+}
+
+export function formatPrice(value?: number): string {
+  if (!value) return `$${(0).toFixed(2)}`;
+  if (value < 0.001) return `$${value.toFixed(6)}`;
+  if (value < 0.1) return `$${value.toFixed(4)}`;
+
   return `$${value.toFixed(2)}`;
 }
 

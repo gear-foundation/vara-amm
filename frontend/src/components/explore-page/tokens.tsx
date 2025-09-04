@@ -2,7 +2,7 @@ import { TrendingUp, TrendingDown, ChevronUp, ChevronDown } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 
 import type { TokenDataMap } from '@/features/pair';
-import { formatCurrency, getVolumeByTimeframe } from '@/utils';
+import { formatCurrency, formatPrice, getVolumeByTimeframe } from '@/utils';
 
 import { useTokensWithPrices, transformTokenDataForTable, usePairsData } from '../../features/token';
 
@@ -289,7 +289,7 @@ export function ExplorePageTokens({
                       </div>
                     </div>
                   </td>
-                  <td className="py-4 px-6 text-right font-medium mono theme-text">${token.price.toFixed(2)}</td>
+                  <td className="py-4 px-6 text-right font-medium mono theme-text">{formatPrice(token.price)}</td>
                   <td className="py-4 px-6 text-right">{formatPriceChange(token.change1h)}</td>
                   <td className="py-4 px-6 text-right">{formatPriceChange(token.change1d)}</td>
                   <td className="py-4 px-6 text-right mono theme-text">{formatCurrency(token.fdv)}</td>
