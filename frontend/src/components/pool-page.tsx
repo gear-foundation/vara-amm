@@ -37,7 +37,7 @@ export function PoolPage({ pairsTokens, refetchBalances: refetchVftBalances }: P
   const { pairs } = usePairsQuery();
   const [activeTab, setActiveTab] = useState<Tab>(routerState?.tab || 'positions');
 
-  const { pairBalances, refetchPairBalances, pairPrograms } = usePairsBalances({ pairs });
+  const { pairBalances, refetchPairBalances, pairPrograms } = usePairsBalances();
   const { lpDecimals } = useLpDecimals({ pairPrograms });
   const { lpUserFees, refetchLpUserFees } = useLpUserFees({ pairPrograms });
   const { pairTotalSupplies, refetchPairTotalSupplies } = usePairsTotalSupply({ pairPrograms });
@@ -50,11 +50,11 @@ export function PoolPage({ pairsTokens, refetchBalances: refetchVftBalances }: P
   };
 
   const pairsWithUserLiquidity = pairs?.map((pair, index) => {
-    const { token0, token1 } = pairsTokens.find(({ pairAddress }) => pairAddress === pair[1]) || {};
+    const { token0, token1, pairAddress } = pairsTokens.find((_pair) => _pair.pairAddress === pair[1]) || {};
 
     if (!token0 || !token1) throw new Error('Token not found');
 
-    const userLpBalance = (pairBalances && pairBalances[index]) || 0n;
+    const userLpBalance = (pairAddress && pairBalances?.[pairAddress]) || 0n;
     const totalSupply = (pairTotalSupplies && pairTotalSupplies[index]) || 0n;
     const poolShare = calculateExistingPoolShare(userLpBalance, totalSupply);
 

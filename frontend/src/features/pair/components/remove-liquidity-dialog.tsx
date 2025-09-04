@@ -118,12 +118,12 @@ const RemoveLiquidityDialog = ({
         </div>
 
         <div className="flex justify-between text-sm text-gray-400">
-          <span>{token0.symbol}</span>
+          <span>{token0.displaySymbol}</span>
           <span>Expected amount: {formatUnits(BigInt(removeLiquidityAmounts?.[0] || 0), token0.decimals)}</span>
         </div>
 
         <div className="flex justify-between text-sm text-gray-400">
-          <span>{token1.symbol}</span>
+          <span>{token1.displaySymbol}</span>
           <span>Expected amount: {formatUnits(BigInt(removeLiquidityAmounts?.[1] || 0), token1.decimals)}</span>
         </div>
 

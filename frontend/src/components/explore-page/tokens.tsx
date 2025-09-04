@@ -1,6 +1,7 @@
 import { TrendingUp, TrendingDown, ChevronUp, ChevronDown } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 
+import type { TokenDataMap } from '@/features/pair';
 import { formatCurrency, getVolumeByTimeframe } from '@/utils';
 
 import { useTokensWithPrices, transformTokenDataForTable, usePairsData } from '../../features/token';
@@ -28,9 +29,15 @@ type ExplorePageTokensProps = {
   tokenNetworkFilter: string;
   tokenFilter: string;
   tokenVolumeFilter: string;
+  tokensDataMap?: TokenDataMap;
 };
 
-export function ExplorePageTokens({ tokenNetworkFilter, tokenFilter, tokenVolumeFilter }: ExplorePageTokensProps) {
+export function ExplorePageTokens({
+  tokenNetworkFilter,
+  tokenFilter,
+  tokenVolumeFilter,
+  tokensDataMap,
+}: ExplorePageTokensProps) {
   const [tokenSort, setTokenSort] = useState<{ field: SortField; direction: SortDirection }>({
     field: 'volume',
     direction: 'desc',
@@ -48,7 +55,11 @@ export function ExplorePageTokens({ tokenNetworkFilter, tokenFilter, tokenVolume
   const { data: pairsData, isLoading: pairsLoading, error: pairsError } = usePairsData();
 
   // Transform tokens data with calculated volumes from pairs
-  const tokensData = transformTokenDataForTable(tokensResponse?.allTokens.nodes || [], pairsData?.allPairs.nodes || []);
+  const tokensData = transformTokenDataForTable(
+    tokensResponse?.allTokens.nodes || [],
+    pairsData?.allPairs.nodes || [],
+    tokensDataMap,
+  );
 
   const isLoading = tokensLoading || pairsLoading;
   const error = tokensError || pairsError;

@@ -1,24 +1,16 @@
 import type { HexString } from '@gear-js/api';
-import { useAccount, useApi } from '@gear-js/react-hooks';
+import { useAccount, useApi, useDeriveBalancesAll } from '@gear-js/react-hooks';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useMemo, useRef } from 'react';
 
 import { LOGO_URI_BY_SYMBOL } from '@/consts';
+import { useVaraSymbol } from '@/hooks';
 import { usePairsQuery } from '@/lib/sails';
 import { SailsProgram as VftProgram } from '@/lib/sails/extended-vft';
 
 import type { PairsTokens, Token } from '../types';
 
-const fetchTokenData = async (
-  program: VftProgram,
-  address: HexString,
-  userAddress?: HexString,
-): Promise<{
-  symbol: string;
-  name: string;
-  decimals: number;
-  balance?: bigint;
-} | null> => {
+const fetchTokenData = async (program: VftProgram, address: HexString, userAddress?: HexString): Promise<TokenData> => {
   if (!program) return null;
 
   try {
@@ -31,6 +23,7 @@ const fetchTokenData = async (
 
     return {
       symbol,
+      displaySymbol: symbol,
       name,
       decimals,
       balance,
@@ -43,15 +36,18 @@ const fetchTokenData = async (
 
 type TokenData = {
   symbol: string;
+  displaySymbol: string;
   name: string;
   decimals: number;
   balance?: bigint;
+  isVaraNative?: boolean;
 } | null;
 
-type TokenDataMap = Map<HexString, NonNullable<TokenData>>;
+export type TokenDataMap = Map<HexString, NonNullable<TokenData>>;
 
 type UsePairsTokensResult = {
   pairsTokens: PairsTokens | undefined;
+  tokensData: TokenDataMap | undefined;
   refetchBalances: () => void;
   isFetching: boolean;
   error: Error | null;
@@ -59,7 +55,9 @@ type UsePairsTokensResult = {
 
 const usePairsTokens = (): UsePairsTokensResult => {
   const { pairs } = usePairsQuery();
+  const varaSymbol = useVaraSymbol();
   const { account } = useAccount();
+  const { data: nativeBalance } = useDeriveBalancesAll({ address: account?.address });
   const { api } = useApi();
 
   const vftProgramsRef = useRef<Map<HexString, VftProgram>>(new Map());
@@ -98,28 +96,38 @@ const usePairsTokens = (): UsePairsTokensResult => {
     isFetching,
     error,
   } = useQuery<TokenDataMap, Error>({
-    queryKey: ['pairsTokensData', vftAddresses, account?.decodedAddress],
+    queryKey: ['pairsTokensData', vftAddresses, account?.decodedAddress, nativeBalance],
     queryFn: async ({ client }) => {
       const cachedData: TokenDataMap | undefined = client.getQueryData([
         'pairsTokensData',
         vftAddresses,
         account?.decodedAddress,
+        nativeBalance,
       ]);
+
+      const setTokenData = (tokenDataMap: TokenDataMap, index: number, token: TokenData) => {
+        if (!token) return;
+        const isVaraNative = token.symbol.toLowerCase().includes('vara');
+        tokenDataMap.set(vftAddresses[index], {
+          ...token,
+          balance: isVaraNative ? nativeBalance?.transferable?.toBigInt() : token.balance,
+          isVaraNative,
+          displaySymbol: isVaraNative && varaSymbol ? varaSymbol : token.symbol,
+        });
+      };
 
       // if has cachedData - refetch only balances
       if (cachedData && account) {
-        const tokenDataMap = new Map(cachedData);
+        const tokenDataMap = new Map(cachedData) as TokenDataMap;
         const tokenPrograms = getVftPrograms();
         const tokenBalancesPromises = tokenPrograms.map(({ program }) => program.vft.balanceOf(account.decodedAddress));
 
         const tokenBalances = await Promise.all(tokenBalancesPromises);
         tokenBalances.forEach((balance, index) => {
           const token = tokenDataMap.get(vftAddresses[index]);
-          if (token && balance) {
-            tokenDataMap.set(vftAddresses[index], {
-              ...token,
-              balance,
-            });
+
+          if (token) {
+            setTokenData(tokenDataMap, index, { ...token, balance });
           }
         });
         return tokenDataMap;
@@ -136,13 +144,8 @@ const usePairsTokens = (): UsePairsTokensResult => {
       );
 
       const tokenDataResults = await Promise.all(tokenDataPromises);
-
       const tokenDataMap = new Map<HexString, NonNullable<(typeof tokenDataResults)[0]>>();
-      tokenDataResults.forEach((data, index) => {
-        if (data) {
-          tokenDataMap.set(vftAddresses[index], data);
-        }
-      });
+      tokenDataResults.forEach((data, index) => setTokenData(tokenDataMap, index, data));
 
       return tokenDataMap;
     },
@@ -155,40 +158,34 @@ const usePairsTokens = (): UsePairsTokensResult => {
     const result: PairsTokens = [];
 
     for (const [ftAddresses, pairAddress] of pairs) {
-      const tokenData0 = tokensData.get(ftAddresses[0]);
-      const tokenData1 = tokensData.get(ftAddresses[1]);
+      const tokens: Token[] = [];
+      for (const [, address] of ftAddresses.entries()) {
+        const data = tokensData.get(address);
+        if (!data) continue;
 
-      if (tokenData0 && tokenData1) {
-        const token0: Token = {
-          symbol: tokenData0.symbol,
-          name: tokenData0.name,
-          decimals: tokenData0.decimals,
-          balance: tokenData0.balance,
-          address: ftAddresses[0],
-          logoURI: LOGO_URI_BY_SYMBOL[tokenData0.symbol],
+        const displaySymbol = data.isVaraNative && varaSymbol ? varaSymbol : data.symbol;
+        const token: Token = {
+          symbol: data.symbol,
+          displaySymbol,
+          name: data.name,
+          decimals: data.decimals,
+          balance: data.balance,
+          address,
+          logoURI: LOGO_URI_BY_SYMBOL[data.symbol],
           network: 'Vara Network',
+          isVaraNative: data.isVaraNative,
         };
+        tokens.push(token);
+      }
 
-        const token1: Token = {
-          symbol: tokenData1.symbol,
-          name: tokenData1.name,
-          decimals: tokenData1.decimals,
-          balance: tokenData1.balance,
-          address: ftAddresses[1],
-          logoURI: LOGO_URI_BY_SYMBOL[tokenData1.symbol],
-          network: 'Vara Network',
-        };
-
-        result.push({
-          token0,
-          token1,
-          pairAddress,
-        });
+      if (tokens.length === 2) {
+        const [token0, token1] = tokens;
+        result.push({ token0, token1, pairAddress });
       }
     }
 
     return result.length > 0 ? result : undefined;
-  }, [pairs, tokensData]);
+  }, [pairs, tokensData, varaSymbol]);
 
   const refetchBalances = useCallback(() => {
     void refetchTokensData();
@@ -196,6 +193,7 @@ const usePairsTokens = (): UsePairsTokensResult => {
 
   return {
     pairsTokens,
+    tokensData,
     refetchBalances,
     isFetching,
     error,

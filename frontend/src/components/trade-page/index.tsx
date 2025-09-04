@@ -1,4 +1,5 @@
 import { useAccount, useAlert, useApi } from '@gear-js/react-hooks';
+import type { SubmittableExtrinsic } from '@polkadot/api/types';
 import type { ISubmittableResult } from '@polkadot/types/types';
 import { ArrowDownUp, Info, ChevronDown, ChevronUp } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -22,9 +23,9 @@ import {
 import { WalletConnect } from '@/features/wallet';
 import {
   useApproveMessage,
-  usePairsQuery,
   useSwapExactTokensForTokensMessage,
   useSwapTokensForExactTokensMessage,
+  useMintMessage,
 } from '@/lib/sails';
 import { getErrorMessage } from '@/lib/utils';
 
@@ -47,8 +48,7 @@ export function TradePage({ pairsTokens, refetchBalances }: TradePageProps) {
   const [fromToken, setFromToken] = useState<Token>(pairsTokens[0].token0);
   const [toToken, setToToken] = useState<Token>(pairsTokens[0].token1);
 
-  const { pairs } = usePairsQuery();
-  const { pairPrograms } = usePairsBalances({ pairs });
+  const { pairPrograms } = usePairsBalances();
   const { selectedPair, isPairReverse, pairIndex } = getSelectedPair(pairsTokens, fromToken, toToken) || {};
   const pairAddress = selectedPair?.pairAddress;
 
@@ -65,6 +65,7 @@ export function TradePage({ pairsTokens, refetchBalances }: TradePageProps) {
   }, [pairsTokens]);
 
   const { approveMessage } = useApproveMessage(fromToken.address);
+  const { mintMessage } = useMintMessage();
 
   const { swapTokensForExactTokensMessage, isPending: isSwapTokensForExactTokensPending } =
     useSwapTokensForExactTokensMessage(pairAddress);
@@ -107,12 +108,16 @@ export function TradePage({ pairsTokens, refetchBalances }: TradePageProps) {
     const isToken0ToToken1 = !isPairReverse;
 
     try {
-      let batch: ReturnType<typeof api.tx.utility.batch>;
+      let transactions: SubmittableExtrinsic<'promise', ISubmittableResult>[] = [];
+
+      const shouldMint = fromToken.isVaraNative;
+      let mintValue: bigint;
 
       if (lastInputTouch === 'from') {
         const amountIn = parseUnits(fromAmount, fromToken.decimals);
         const amountOut = await pairPrograms[pairIndex].pair.getAmountOut(amountIn, isToken0ToToken1);
         const amountOutMin = calculatePercentage(amountOut, 1 - SLIPPAGE).toString();
+        mintValue = amountIn;
 
         console.log('swapExactTokensForTokensMessage', {
           amountIn: amountIn.toString(),
@@ -135,11 +140,12 @@ export function TradePage({ pairsTokens, refetchBalances }: TradePageProps) {
           return;
         }
 
-        batch = api.tx.utility.batch([approveTx.extrinsic, swapExactTokensForTokensTx.extrinsic]);
+        transactions = [approveTx.extrinsic, swapExactTokensForTokensTx.extrinsic];
       } else {
         const amountOut = parseUnits(toAmount, toToken.decimals);
         const amountIn = await pairPrograms[pairIndex].pair.getAmountIn(amountOut, isToken0ToToken1);
-        const amountInMax = calculatePercentage(amountIn, 1 + SLIPPAGE).toString();
+        const amountInMax = calculatePercentage(amountIn, 1 + SLIPPAGE);
+        mintValue = amountInMax;
 
         console.log('swapTokensForExactTokensMessage', {
           amountOut: amountOut.toString(),
@@ -150,7 +156,7 @@ export function TradePage({ pairsTokens, refetchBalances }: TradePageProps) {
 
         const swapTokensForExactTokensTx = await swapTokensForExactTokensMessage({
           amountOut: amountOut.toString(),
-          amountInMax,
+          amountInMax: amountInMax.toString(),
           isToken0ToToken1,
           deadline: deadline.toString(),
         });
@@ -161,7 +167,7 @@ export function TradePage({ pairsTokens, refetchBalances }: TradePageProps) {
           return;
         }
 
-        batch = api.tx.utility.batch([approveTx.extrinsic, swapTokensForExactTokensTx.extrinsic]);
+        transactions = [approveTx.extrinsic, swapTokensForExactTokensTx.extrinsic];
       }
 
       setLoading(true);
@@ -180,6 +186,15 @@ export function TradePage({ pairsTokens, refetchBalances }: TradePageProps) {
           onFinally: () => setLoading(false),
         });
       };
+
+      if (shouldMint) {
+        const mintTx = await mintMessage({ value: mintValue });
+        if (mintTx) {
+          transactions.push(mintTx.extrinsic);
+        }
+      }
+
+      const batch = api.tx.utility.batch(transactions);
 
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment
       // @ts-ignore

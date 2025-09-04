@@ -1,13 +1,16 @@
+import type { HexString } from '@gear-js/api';
+
 import { LOGO_URI_BY_SYMBOL } from '@/consts';
 import { toNumber } from '@/utils';
 
-import type { PairData } from '../pair';
+import type { PairData, TokenDataMap } from '../pair';
 
 import type { TokenData } from './queries';
 
 function transformTokenDataForTable(
   tokens: TokenData[],
   pairs: PairData[],
+  tokensDataMap?: TokenDataMap,
 ): Array<{
   name: string;
   symbol: string;
@@ -23,7 +26,7 @@ function transformTokenDataForTable(
   volume1y: number;
   network: string;
 }> {
-  if (pairs && pairs.length === 0) {
+  if ((pairs && pairs.length === 0) || !tokensDataMap) {
     return [];
   }
 
@@ -31,10 +34,11 @@ function transformTokenDataForTable(
     const latestSnapshot = token.tokenPriceSnapshotsByTokenId?.nodes[0];
 
     const calculatedVolumes = calculateTokenTradingVolumeBySymbol(token.symbol, pairs);
+    const displaySymbol = tokensDataMap.get(token.id as HexString)?.displaySymbol || token.symbol;
 
     return {
-      name: token.name || token.symbol,
-      symbol: token.symbol,
+      name: token.name || displaySymbol,
+      symbol: displaySymbol,
       logoURI: LOGO_URI_BY_SYMBOL[token.symbol] || '/placeholder.svg',
       price: toNumber(latestSnapshot?.priceUsd) || 0,
       change1h: toNumber(latestSnapshot?.change1H) || 0,
