@@ -1,4 +1,6 @@
 import type { HexString } from '@gear-js/api';
+import { useAccount, useAlert, useApi } from '@gear-js/react-hooks';
+import type { ISubmittableResult } from '@polkadot/types/types';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -6,14 +8,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input';
 import { INPUT_PERCENTAGES, SECONDS_IN_MINUTE, SLIPPAGE } from '@/consts';
 import {
+  useBurnMessage,
   useCalculateRemoveLiquidityQuery,
   useRemoveLiquidityMessage,
   useVftBalanceOfQuery,
   useVftDecimalsQuery,
 } from '@/lib/sails';
+import { getErrorMessage } from '@/lib/utils';
 
 import type { Token } from '../types';
-import { calculatePercentage, formatUnits, parseUnits } from '../utils';
+import { calculatePercentage, formatUnits, parseUnits, handleStatus } from '../utils';
 
 type RemoveLiquidityDialogProps = {
   isOpen: boolean;
@@ -34,9 +38,15 @@ const RemoveLiquidityDialog = ({
 }: RemoveLiquidityDialogProps) => {
   const [error, setError] = useState<string | null>(null);
   const [userInput, setUserInput] = useState<string>('');
+  const [loading, setLoading] = useState(false);
+  const { api } = useApi();
+  const alert = useAlert();
+  const { account } = useAccount();
+
   const { removeLiquidityMessage, isPending: isRemoveLiquidityPending } = useRemoveLiquidityMessage(pairAddress);
   const { balance: userLpBalance, isFetching: isUserLpBalanceFetching } = useVftBalanceOfQuery(pairAddress);
   const { decimals: lpDecimals, isFetching: isLpDecimalsFetching } = useVftDecimalsQuery(pairAddress);
+  const { burnMessage } = useBurnMessage();
 
   const lpInput = lpDecimals && userInput ? parseUnits(userInput, lpDecimals) : 0n;
 
@@ -46,10 +56,19 @@ const RemoveLiquidityDialog = ({
   ); // or manually: liquidity * reserve_a / total_supply
 
   const isFetching =
-    isUserLpBalanceFetching || isLpDecimalsFetching || isRemoveLiquidityAmountsFetching || isRemoveLiquidityPending;
+    isUserLpBalanceFetching ||
+    isLpDecimalsFetching ||
+    isRemoveLiquidityAmountsFetching ||
+    isRemoveLiquidityPending ||
+    loading;
 
   const removeLiquidity = async () => {
     setError(null);
+    if (!api) {
+      setError('API is not ready');
+      return;
+    }
+
     if (!lpDecimals) {
       setError('Failed to get LP token decimals');
       return;
@@ -62,6 +81,11 @@ const RemoveLiquidityDialog = ({
 
     if (!removeLiquidityAmounts) {
       setError('Failed to calculate expected amounts');
+      return;
+    }
+
+    if (!account?.decodedAddress) {
+      setError('Wallet not connected');
       return;
     }
 
@@ -78,9 +102,51 @@ const RemoveLiquidityDialog = ({
     };
     console.log('🚀 ~ removeLiquidity ~ params:', params);
 
-    await removeLiquidityMessage(params);
-    refetchBalances();
-    onClose();
+    try {
+      const removeLiquidityTx = await removeLiquidityMessage(params);
+      if (!removeLiquidityTx?.extrinsic) {
+        setError('Failed to create remove liquidity transaction');
+        return;
+      }
+
+      const transactions = [removeLiquidityTx.extrinsic];
+
+      setLoading(true);
+
+      if (token0.isVaraNative) {
+        const burnTx0 = await burnMessage({ value: BigInt(removeLiquidityAmounts[0]) });
+        if (burnTx0) {
+          transactions.push(burnTx0.extrinsic);
+        }
+      }
+      if (token1.isVaraNative) {
+        const burnTx1 = await burnMessage({ value: BigInt(removeLiquidityAmounts[1]) });
+        if (burnTx1) {
+          transactions.push(burnTx1.extrinsic);
+        }
+      }
+
+      const batch = api.tx.utility.batch(transactions);
+      const { address, signer } = account;
+
+      const statusCallback = (result: ISubmittableResult) =>
+        handleStatus(api, result, {
+          onSuccess: () => {
+            alert.success('Liquidity removed successfully');
+            void refetchBalances();
+            onClose();
+          },
+          onError: (_error) => alert.error(_error),
+          onFinally: () => setLoading(false),
+        });
+
+      await batch.signAndSend(address, { signer }, statusCallback);
+    } catch (_error) {
+      console.error('Error removing liquidity:', _error);
+      alert.error(getErrorMessage(_error));
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

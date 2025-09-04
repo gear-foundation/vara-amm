@@ -57,7 +57,7 @@ const usePairsTokens = (): UsePairsTokensResult => {
   const { pairs } = usePairsQuery();
   const varaSymbol = useVaraSymbol();
   const { account } = useAccount();
-  const { data: nativeBalance } = useDeriveBalancesAll({ address: account?.address });
+  const { data: nativeBalance, refetch: refetchNativeBalance } = useDeriveBalancesAll({ address: account?.address });
   const { api } = useApi();
 
   const vftProgramsRef = useRef<Map<HexString, VftProgram>>(new Map());
@@ -189,7 +189,8 @@ const usePairsTokens = (): UsePairsTokensResult => {
 
   const refetchBalances = useCallback(() => {
     void refetchTokensData();
-  }, [refetchTokensData]);
+    void refetchNativeBalance();
+  }, [refetchTokensData, refetchNativeBalance]);
 
   return {
     pairsTokens,

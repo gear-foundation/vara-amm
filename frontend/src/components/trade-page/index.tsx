@@ -26,6 +26,7 @@ import {
   useSwapExactTokensForTokensMessage,
   useSwapTokensForExactTokensMessage,
   useMintMessage,
+  useBurnMessage,
 } from '@/lib/sails';
 import { getErrorMessage } from '@/lib/utils';
 
@@ -66,6 +67,7 @@ export function TradePage({ pairsTokens, refetchBalances }: TradePageProps) {
 
   const { approveMessage } = useApproveMessage(fromToken.address);
   const { mintMessage } = useMintMessage();
+  const { burnMessage } = useBurnMessage();
 
   const { swapTokensForExactTokensMessage, isPending: isSwapTokensForExactTokensPending } =
     useSwapTokensForExactTokensMessage(pairAddress);
@@ -111,13 +113,16 @@ export function TradePage({ pairsTokens, refetchBalances }: TradePageProps) {
       let transactions: SubmittableExtrinsic<'promise', ISubmittableResult>[] = [];
 
       const shouldMint = fromToken.isVaraNative;
+      const shouldBurn = toToken.isVaraNative;
       let mintValue: bigint;
+      let burnValue: bigint;
 
       if (lastInputTouch === 'from') {
         const amountIn = parseUnits(fromAmount, fromToken.decimals);
         const amountOut = await pairPrograms[pairIndex].pair.getAmountOut(amountIn, isToken0ToToken1);
-        const amountOutMin = calculatePercentage(amountOut, 1 - SLIPPAGE).toString();
+        const amountOutMin = calculatePercentage(amountOut, 1 - SLIPPAGE);
         mintValue = amountIn;
+        burnValue = amountOutMin;
 
         console.log('swapExactTokensForTokensMessage', {
           amountIn: amountIn.toString(),
@@ -130,7 +135,7 @@ export function TradePage({ pairsTokens, refetchBalances }: TradePageProps) {
 
         const swapExactTokensForTokensTx = await swapExactTokensForTokensMessage({
           amountIn: amountIn.toString(),
-          amountOutMin,
+          amountOutMin: amountOutMin.toString(),
           isToken0ToToken1,
           deadline: deadline.toString(),
         });
@@ -146,6 +151,7 @@ export function TradePage({ pairsTokens, refetchBalances }: TradePageProps) {
         const amountIn = await pairPrograms[pairIndex].pair.getAmountIn(amountOut, isToken0ToToken1);
         const amountInMax = calculatePercentage(amountIn, 1 + SLIPPAGE);
         mintValue = amountInMax;
+        burnValue = amountOut;
 
         console.log('swapTokensForExactTokensMessage', {
           amountOut: amountOut.toString(),
@@ -189,9 +195,12 @@ export function TradePage({ pairsTokens, refetchBalances }: TradePageProps) {
 
       if (shouldMint) {
         const mintTx = await mintMessage({ value: mintValue });
-        if (mintTx) {
-          transactions.push(mintTx.extrinsic);
-        }
+        if (mintTx) transactions.push(mintTx.extrinsic);
+      }
+
+      if (shouldBurn) {
+        const burnTx = await burnMessage({ value: burnValue });
+        if (burnTx) transactions.push(burnTx.extrinsic);
       }
 
       const batch = api.tx.utility.batch(transactions);

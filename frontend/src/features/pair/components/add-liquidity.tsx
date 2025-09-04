@@ -9,7 +9,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Tooltip } from '@/components/ui/tooltip';
 import { SECONDS_IN_MINUTE } from '@/consts';
-import { useAddLiquidityMessage, useGetReservesQuery, useVftTotalSupplyQuery, useApproveMessage } from '@/lib/sails';
+import {
+  useAddLiquidityMessage,
+  useGetReservesQuery,
+  useVftTotalSupplyQuery,
+  useApproveMessage,
+  useMintMessage,
+} from '@/lib/sails';
+import { getErrorMessage } from '@/lib/utils';
 
 import type { Token, Network, PairsTokens } from '../types';
 import {
@@ -108,6 +115,7 @@ const AddLiquidity = ({
   const { approveMessage: token1ApproveMessage, isPending: isToken1ApprovePending } = useApproveMessage(token1.address);
 
   const { addLiquidityMessage, isPending: isAddLiquidityPending } = useAddLiquidityMessage(pairAddress);
+  const { mintMessage } = useMintMessage();
   const isPending =
     isToken0ApprovePending ||
     isToken1ApprovePending ||
@@ -165,16 +173,17 @@ const AddLiquidity = ({
     const amountADesired = parseUnits(amountANum.toString(), token0.decimals);
     const amountBDesired = parseUnits(amountBNum.toString(), token1.decimals);
 
-    if (amountADesired > token0Balance) {
+    // For VARA native tokens, we don't need to check balance as we'll mint them
+    if (!token0.isVaraNative && amountADesired > token0Balance) {
       setError(
-        `Insufficient ${token0.symbol} balance. Available: ${getFormattedBalance(token0Balance, token0.decimals, token0.symbol)}`,
+        `Insufficient ${token0.displaySymbol} balance. Available: ${getFormattedBalance(token0Balance, token0.decimals, token0.displaySymbol)}`,
       );
       return;
     }
 
-    if (amountBDesired > token1Balance) {
+    if (!token1.isVaraNative && amountBDesired > token1Balance) {
       setError(
-        `Insufficient ${token1.symbol} balance. Available: ${getFormattedBalance(token1Balance, token1.decimals, token1.symbol)}`,
+        `Insufficient ${token1.displaySymbol} balance. Available: ${getFormattedBalance(token1Balance, token1.decimals, token1.displaySymbol)}`,
       );
       return;
     }
@@ -186,8 +195,8 @@ const AddLiquidity = ({
     const deadline = (Math.floor(Date.now() / 1000) + 20 * SECONDS_IN_MINUTE) * 1000;
 
     console.log('Adding liquidity with params:', {
-      tokenA: `${token0.symbol} (${token0.address})`,
-      tokenB: `${token1.symbol} (${token1.address})`,
+      tokenA: `${token0.displaySymbol} (${token0.address})`,
+      tokenB: `${token1.displaySymbol} (${token1.address})`,
       amountADesired,
       amountBDesired,
       amountAMin,
@@ -216,12 +225,25 @@ const AddLiquidity = ({
         setError('Failed to create batch');
         return;
       }
+
+      const transactions = [token0ApproveTx.extrinsic, token1ApproveTx.extrinsic, addLiquidityTx.extrinsic];
+
       setLoading(true);
-      const batch = api.tx.utility.batch([
-        token0ApproveTx.extrinsic,
-        token1ApproveTx.extrinsic,
-        addLiquidityTx.extrinsic,
-      ]);
+
+      if (token0.isVaraNative) {
+        const mintTx0 = await mintMessage({ value: amountADesired });
+        if (mintTx0) {
+          transactions.unshift(mintTx0.extrinsic);
+        }
+      }
+      if (token1.isVaraNative) {
+        const mintTx1 = await mintMessage({ value: amountBDesired });
+        if (mintTx1) {
+          transactions.unshift(mintTx1.extrinsic);
+        }
+      }
+
+      const batch = api.tx.utility.batch(transactions);
       const { address, signer } = account;
       const statusCallback = (result: ISubmittableResult) =>
         handleStatus(api, result, {
@@ -240,6 +262,7 @@ const AddLiquidity = ({
       await batch.signAndSend(address, { signer }, statusCallback);
     } catch (_error) {
       console.error('Error adding liquidity:', _error);
+      alert.error(getErrorMessage(_error));
     } finally {
       setLoading(false);
     }
@@ -260,7 +283,8 @@ const AddLiquidity = ({
             <div className="flex justify-between gap-2 text-sm text-gray-400">
               <span>TOKEN 1</span>
               <span className="text-right">
-                Balance: {token0.balance ? getFormattedBalance(token0.balance, token0.decimals, token0.symbol) : '0'}
+                Balance:{' '}
+                {token0.balance ? getFormattedBalance(token0.balance, token0.decimals, token0.displaySymbol) : '0'}
               </span>
             </div>
             <div className="flex items-center space-x-2">
@@ -293,7 +317,7 @@ const AddLiquidity = ({
                 variant="secondary"
                 className="flex items-center space-x-2 min-w-[120px]">
                 <img src={token0.logoURI || '/placeholder.svg'} alt={token0.name} className="w-5 h-5 rounded-full" />
-                <span>{token0.symbol}</span>
+                <span>{token0.displaySymbol}</span>
                 <ChevronDown className="w-4 h-4" />
               </Button>
             </div>
@@ -308,7 +332,8 @@ const AddLiquidity = ({
             <div className="flex justify-between gap-2 text-sm text-gray-400">
               <span>TOKEN 2</span>
               <span className="text-right">
-                Balance: {token1.balance ? getFormattedBalance(token1.balance, token1.decimals, token1.symbol) : '0'}
+                Balance:{' '}
+                {token1.balance ? getFormattedBalance(token1.balance, token1.decimals, token1.displaySymbol) : '0'}
               </span>
             </div>
             <div className="flex items-center space-x-2">
@@ -341,7 +366,7 @@ const AddLiquidity = ({
                 variant="secondary"
                 className="flex items-center space-x-2 min-w-[120px]">
                 <img src={token1.logoURI || '/placeholder.svg'} alt={token1.name} className="w-5 h-5 rounded-full" />
-                <span>{token1.symbol}</span>
+                <span>{token1.displaySymbol}</span>
                 <ChevronDown className="w-4 h-4" />
               </Button>
             </div>
