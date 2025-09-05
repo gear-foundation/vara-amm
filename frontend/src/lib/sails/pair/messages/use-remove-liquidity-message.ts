@@ -31,7 +31,7 @@ export const useRemoveLiquidityMessage = (pairAddress: HexString) => {
       gasLimit: 105_000_000_000n,
     });
 
-    await transaction.signAndSend();
+    return transaction;
   };
 
   const { mutateAsync: removeLiquidityMessage, isPending } = useMutation({

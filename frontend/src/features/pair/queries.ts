@@ -1,3 +1,4 @@
+import type { HexString } from '@gear-js/api';
 import { gql } from 'graphql-request';
 
 export type Transaction = {
@@ -17,8 +18,8 @@ export type Transaction = {
 
 export type PairData = {
   id: string;
-  token0: string;
-  token1: string;
+  token0: HexString;
+  token1: HexString;
   token0Symbol: string | null;
   token1Symbol: string | null;
   reserve0: string;

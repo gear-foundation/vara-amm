@@ -2,12 +2,14 @@ import type { HexString } from '@gear-js/api';
 
 interface Token {
   symbol: string;
+  displaySymbol: string;
   name: string;
   address: HexString;
   decimals: number;
   logoURI: string;
   balance?: bigint;
   network?: string;
+  isVaraNative?: boolean;
 }
 
 interface Network {

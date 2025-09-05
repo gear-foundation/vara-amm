@@ -16,6 +16,7 @@ export const ROUTES = {
 export const LOGO_URI_BY_SYMBOL: Record<string, string> = {
   // Vara Network
   VARA: '/tokens/vara.png',
+  TVARA: '/tokens/vara.png',
   WTVARA: '/tokens/vara.png',
   WETH: '/tokens/eth.png',
   WUSDT: '/tokens/usdt.png',

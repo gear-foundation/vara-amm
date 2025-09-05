@@ -42,12 +42,16 @@ const formatAmount = (tx: Transaction, pairsTokens: PairsTokens) => {
   const { token0, token1 } = pairInfo;
 
   switch (tx.type) {
-    case 'SWAP':
-      return `${formatUnits(BigInt(tx.amountIn), token0.decimals)} ${token0.symbol} → ${formatUnits(BigInt(tx.amountOut), token1.decimals)} ${token1.symbol}`;
+    case 'SWAP': {
+      const isToken0ToToken1 = tx.tokenIn === token0.address;
+      const tokenIn = isToken0ToToken1 ? token0 : token1;
+      const tokenOut = isToken0ToToken1 ? token1 : token0;
+      return `${formatUnits(BigInt(tx.amountIn), tokenIn.decimals)} ${tokenIn.displaySymbol} → ${formatUnits(BigInt(tx.amountOut), tokenOut.decimals)} ${tokenOut.displaySymbol}`;
+    }
     case 'ADD_LIQUIDITY':
-      return `${formatUnits(BigInt(tx.amountA), token0.decimals)} ${token0.symbol} + ${formatUnits(BigInt(tx.amountB), token1.decimals)} ${token1.symbol}`;
+      return `${formatUnits(BigInt(tx.amountA), token0.decimals)} ${token0.displaySymbol} + ${formatUnits(BigInt(tx.amountB), token1.decimals)} ${token1.displaySymbol}`;
     case 'REMOVE_LIQUIDITY':
-      return `${formatUnits(BigInt(tx.amountA), token0.decimals)} ${token0.symbol} + ${formatUnits(BigInt(tx.amountB), token1.decimals)} ${token1.symbol}`;
+      return `${formatUnits(BigInt(tx.amountA), token0.decimals)} ${token0.displaySymbol} + ${formatUnits(BigInt(tx.amountB), token1.decimals)} ${token1.displaySymbol}`;
     default:
       return `unknown type: ${tx.type}`;
   }

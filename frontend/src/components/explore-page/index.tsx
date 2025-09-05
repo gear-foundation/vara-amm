@@ -12,8 +12,9 @@ import { ExplorePageTransactions } from './transactions';
 import { ExplorePageTransactionsFilters } from './transactions-filters';
 
 export function ExplorePage() {
-  const { pairsTokens } = usePairsTokens();
-  const { poolsData, metrics, isFetching: isPoolsLoading, error: poolsError } = usePoolsData();
+  const { pairsTokens, tokensData } = usePairsTokens();
+
+  const { poolsData, metrics, isFetching: isPoolsLoading, error: poolsError } = usePoolsData(tokensData);
   const [tokenNetworkFilter, setTokenNetworkFilter] = useState('all');
   const [tokenFilter, setTokenFilter] = useState('all');
   const [tokenVolumeFilter, setTokenVolumeFilter] = useState('1d');
@@ -136,6 +137,7 @@ export function ExplorePage() {
             tokenNetworkFilter={tokenNetworkFilter}
             tokenFilter={tokenFilter}
             tokenVolumeFilter={tokenVolumeFilter}
+            tokensDataMap={tokensData}
           />
         </TabsContent>
 

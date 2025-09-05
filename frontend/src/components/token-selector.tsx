@@ -27,7 +27,7 @@ export function TokenSelector({
   const filteredTokens = selectedNetwork.tokens.filter(
     (token) =>
       token.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      token.symbol.toLowerCase().includes(searchQuery.toLowerCase()),
+      token.displaySymbol.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   const handleTokenSelect = (token: Token) => {
@@ -71,7 +71,7 @@ export function TokenSelector({
                     className="w-full flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-500/10 transition-colors text-left">
                     <img src={token.logoURI || '/placeholder.svg'} alt={token.name} className="w-8 h-8 rounded-full" />
                     <div className="flex-1">
-                      <div className="font-medium theme-text">{token.symbol}</div>
+                      <div className="font-medium theme-text">{token.displaySymbol}</div>
                       <div className="text-sm text-gray-400 mono">
                         {token.balance ? getFormattedBalance(token.balance, token.decimals) : '0'}
                       </div>
