@@ -585,6 +585,25 @@
     react-transition-group "4.4.5"
     sails-js-parser "0.4.2"
 
+"@gear-js/ui@0.7.0":
+  version "0.7.0"
+  resolved "https://registry.yarnpkg.com/@gear-js/ui/-/ui-0.7.0.tgz#86ad8bcbc6d8f4321f010dfec7c15319b2c79615"
+  integrity sha512-E9hsEr9j7aL0n+M2gX6rku8QVOSlKltYLNg2Fxk/mhE9udgTLbPrz9fHJbFUklUPocsVC7hySRRhWMkfoYj7fQ==
+
+"@gear-js/vara-ui@0.3.1":
+  version "0.3.1"
+  resolved "https://registry.yarnpkg.com/@gear-js/vara-ui/-/vara-ui-0.3.1.tgz#9c58d76c8eb1d4b88ccbb3c92ec4716d3dcc1333"
+  integrity sha512-4dWChBDNS3q9mnrrzgC7B4VpiwCztv3GFWRYds8OWKfebfCCr15o6VBRn4DVZCxU9hygDZtcpjlB0AdjAei8hg==
+  dependencies:
+    non.geist "1.0.4"
+
+"@gear-js/wallet-connect@0.4.1":
+  version "0.4.1"
+  resolved "https://registry.yarnpkg.com/@gear-js/wallet-connect/-/wallet-connect-0.4.1.tgz#ea24e248312907e5322bbf6d3ea7ef4d00ca988a"
+  integrity sha512-OshpbdGImaY3iM8sw20MNRsNhxEnra06keQWqwzjA6LiOBUzhJ0OglMFOxzvTp7xrYjT9QqSYx0DSztMj/a9ZQ==
+  dependencies:
+    clsx "2.1.1"
+
 "@hookform/resolvers@3.9.1":
   version "3.9.1"
   resolved "https://registry.yarnpkg.com/@hookform/resolvers/-/resolvers-3.9.1.tgz#a23883c40bfd449cb6c6ab5a0fa0729184c950ff"
@@ -5697,6 +5716,11 @@ node-stdlib-browser@^1.2.0:
     util "^0.12.4"
     vm-browserify "^1.0.1"
 
+non.geist@1.0.4:
+  version "1.0.4"
+  resolved "https://registry.yarnpkg.com/non.geist/-/non.geist-1.0.4.tgz#967b89cf433687778af90163292873e7263a5be2"
+  integrity sha512-2spmLTgz5ipZrFGLiI1YkiHb8Yit0yFySPvWzal3wCwCFilMFQQ/Jwwz4lcEatwIKUpOeMYwyFwP8MJ8EVKqGA==
+
 normalize-path@^3.0.0, normalize-path@~3.0.0:
   version "3.0.0"
   resolved "https://registry.yarnpkg.com/normalize-path/-/normalize-path-3.0.0.tgz#0dcd69ff23a1c9b11fd0978316644a0388216a65"
@@ -6653,10 +6677,10 @@ sails-js@0.4.3:
   optionalDependencies:
     sails-js-types "^0.4.2"
 
-sass@1.89.2:
-  version "1.89.2"
-  resolved "https://registry.yarnpkg.com/sass/-/sass-1.89.2.tgz#a771716aeae774e2b529f72c0ff2dfd46c9de10e"
-  integrity sha512-xCmtksBKd/jdJ9Bt9p7nPKiuqrlBMBuuGkQlkhZjjQk3Ty48lv93k5Dq6OPkKt4XwxDJ7tvlfrTa1MPA9bf+QA==
+sass@^1.92.0:
+  version "1.92.0"
+  resolved "https://registry.yarnpkg.com/sass/-/sass-1.92.0.tgz#02d9ae21ce1763def2cd461449aac2eb56364796"
+  integrity sha512-KDNI0BxgIRDAfJgzNm5wuy+4yOCIZyrUbjSpiU/JItfih+KGXAVefKL53MTml054MmBA3DDKIBMSI/7XLxZJ3A==
   dependencies:
     chokidar "^4.0.0"
     immutable "^5.0.2"

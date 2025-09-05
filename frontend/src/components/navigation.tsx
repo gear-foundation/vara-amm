@@ -1,26 +1,17 @@
 import { useAccount } from '@gear-js/react-hooks';
-import { Wallet, Menu, X } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
+import { Wallet } from '@/components/wallet';
 import { ROUTES } from '@/consts';
-import { WalletChange } from '@/features/wallet';
-import { WalletConnect } from '@/features/wallet/components/wallet-connect/WalletConnect';
-import { prettyAddress } from '@/lib/utils';
 
 import { ThemeSwitcher } from './theme-switcher';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 
 export function Navigation() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isOpenConnectWallet, setIsOpenConnectWallet] = useState(false);
-  const openConnectWallet = () => setIsOpenConnectWallet(true);
-  const closeConnectWallet = () => setIsOpenConnectWallet(false);
-  const [isOpenChange, setIsOpenChange] = useState(false);
-  const openAndCloseChange = () => setIsOpenChange(!isOpenChange);
-
-  const { account, isAccountReady } = useAccount();
+  const { isAccountReady } = useAccount();
 
   const navLinkClass = 'theme-text font-medium uppercase tracking-wide transition-colors';
   const navLinkActiveClass = 'accent-text font-medium uppercase tracking-wide transition-colors';
@@ -62,24 +53,7 @@ export function Navigation() {
             {/* Theme Switcher & Wallet Connection */}
             <div className="hidden md:flex items-center space-x-4">
               <ThemeSwitcher />
-              {isAccountReady && (
-                <>
-                  {account ? (
-                    <Button
-                      onClick={openAndCloseChange}
-                      variant="outline"
-                      className="flex items-center space-x-2 bg-[#00FF85]/10 border border-[#00FF85]/20 rounded-xl px-4 py-2">
-                      <div className="w-6 h-6 bg-[#00FF85] rounded-full"></div>
-                      <span className="mono text-sm theme-text">{prettyAddress(account.decodedAddress)}</span>
-                    </Button>
-                  ) : (
-                    <Button onClick={openConnectWallet} className="btn-primary">
-                      <Wallet className="w-4 h-4 mr-2" />
-                      CONNECT WALLET
-                    </Button>
-                  )}
-                </>
-              )}
+              {isAccountReady && <Wallet />}
             </div>
 
             {/* Mobile menu button */}
@@ -104,37 +78,18 @@ export function Navigation() {
                 <NavLink to={ROUTES.POOL} className={navLinkClassName}>
                   POOL
                 </NavLink>
-
                 {/* // ! TODO: add search input */}
                 {/* <Input
                     placeholder="Search tokens, pools..."
                     className="input-field w-full mb-4"
                   /> */}
-                {account ? (
-                  <WalletChange onClose={() => setIsMenuOpen(false)} openConnectWallet={openConnectWallet} />
-                ) : (
-                  <Button onClick={openConnectWallet} className="btn-primary w-full">
-                    <Wallet className="w-4 h-4 mr-2" />
-                    CONNECT WALLET
-                  </Button>
-                )}
+
+                <Wallet isFullWidth />
               </div>
             </div>
           )}
         </div>
       </nav>
-
-      {isOpenChange && (
-        <Dialog open={isOpenChange} onOpenChange={openAndCloseChange} aria-describedby="change-account-dialog">
-          <DialogContent className="card max-w-md mx-auto max-h-[80vh] overflow-auto flex flex-col">
-            <DialogHeader>
-              <DialogTitle>CONNECTED ACCOUNT</DialogTitle>
-            </DialogHeader>
-            <WalletChange onClose={openAndCloseChange} openConnectWallet={openConnectWallet} />
-          </DialogContent>
-        </Dialog>
-      )}
-      <WalletConnect isOpen={isOpenConnectWallet} onClose={closeConnectWallet} />
     </>
   );
 }

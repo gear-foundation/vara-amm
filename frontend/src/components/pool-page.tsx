@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Wallet } from '@/components/wallet';
 import {
   AddLiquidity,
   RemoveLiquidity,
@@ -15,7 +16,6 @@ import {
 } from '@/features/pair';
 import type { PairsTokens, Token } from '@/features/pair/types';
 import { formatUnits, calculateExistingPoolShare } from '@/features/pair/utils';
-import { WalletConnect } from '@/features/wallet';
 import { usePairsQuery } from '@/lib/sails';
 
 type PoolPageProps = {
@@ -24,9 +24,6 @@ type PoolPageProps = {
 };
 
 export function PoolPage({ pairsTokens, refetchBalances: refetchVftBalances }: PoolPageProps) {
-  const [isOpenConnectWallet, setIsOpenConnectWallet] = useState(false);
-  const openConnectWallet = () => setIsOpenConnectWallet(true);
-  const closeConnectWallet = () => setIsOpenConnectWallet(false);
   const { account } = useAccount();
 
   const { pairs } = usePairsQuery();
@@ -162,9 +159,7 @@ export function PoolPage({ pairsTokens, refetchBalances: refetchVftBalances }: P
                     CREATE FIRST POSITION
                   </Button>
                 ) : (
-                  <Button onClick={openConnectWallet} className="btn-primary py-4">
-                    CONNECT WALLET
-                  </Button>
+                  <Wallet />
                 )}
               </CardContent>
             </Card>
@@ -180,12 +175,9 @@ export function PoolPage({ pairsTokens, refetchBalances: refetchVftBalances }: P
             }}
             defaultToken0={defaultToken0}
             defaultToken1={defaultToken1}
-            openConnectWallet={openConnectWallet}
           />
         </TabsContent>
       </Tabs>
-
-      <WalletConnect isOpen={isOpenConnectWallet} onClose={closeConnectWallet} />
     </div>
   );
 }

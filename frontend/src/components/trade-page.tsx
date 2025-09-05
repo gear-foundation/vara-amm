@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Wallet } from '@/components/wallet';
 import { INPUT_PERCENTAGES, SECONDS_IN_MINUTE, SLIPPAGE } from '@/consts';
 import { usePairsBalances } from '@/features/pair';
 import type { Token, Network, PairsTokens } from '@/features/pair/types';
@@ -19,7 +20,6 @@ import {
   handleStatus,
   parseUnits,
 } from '@/features/pair/utils';
-import { WalletConnect } from '@/features/wallet';
 import {
   useApproveMessage,
   usePairsQuery,
@@ -77,9 +77,6 @@ export function TradePage({ pairsTokens, refetchBalances }: TradePageProps) {
   const { account } = useAccount();
 
   const isWalletConnected = !!account;
-  const [isOpenConnectWallet, setIsOpenConnectWallet] = useState(false);
-  const openConnectWallet = () => setIsOpenConnectWallet(true);
-  const closeConnectWallet = () => setIsOpenConnectWallet(false);
 
   const swapTokens = () => {
     const tempToken = fromToken;
@@ -435,9 +432,7 @@ export function TradePage({ pairsTokens, refetchBalances }: TradePageProps) {
                   SWAP TOKENS
                 </Button>
               ) : (
-                <Button onClick={openConnectWallet} className="btn-primary w-full py-4 text-lg">
-                  CONNECT WALLET
-                </Button>
+                <Wallet />
               )}
             </CardContent>
           </Card>
@@ -467,8 +462,6 @@ export function TradePage({ pairsTokens, refetchBalances }: TradePageProps) {
         title="Select token to swap to"
         networks={networks}
       />
-
-      <WalletConnect isOpen={isOpenConnectWallet} onClose={closeConnectWallet} />
     </div>
   );
 }

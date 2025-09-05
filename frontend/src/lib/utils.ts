@@ -6,10 +6,6 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-const prettyAddress = (address: string) => {
-  return address.slice(0, 6) + '...' + address.slice(-4);
-};
-
 const copyToClipboard = ({
   alert,
   value,
@@ -83,4 +79,4 @@ const getErrorMessage = (error: unknown): string => {
   return String(error) || 'Unknown error';
 };
 
-export { cn, copyToClipboard, prettyAddress, getErrorMessage };
+export { cn, copyToClipboard, getErrorMessage };
