@@ -59,7 +59,7 @@ export function PoolPage({ pairsTokens, refetchBalances: refetchVftBalances }: P
     const poolShare = calculateExistingPoolShare(userLpBalance, totalSupply);
 
     return {
-      pool: `${token0.symbol}/${token1.symbol}`,
+      pool: `${token0.displaySymbol}/${token1.displaySymbol}`,
       token0,
       token1,
       liquidity: userLpBalance,
@@ -105,12 +105,12 @@ export function PoolPage({ pairsTokens, refetchBalances: refetchVftBalances }: P
                       <div className="flex -space-x-2">
                         <img
                           src={position?.token0.logoURI || '/placeholder.svg'}
-                          alt={position?.token0.symbol}
+                          alt={position?.token0.displaySymbol}
                           className="w-8 h-8 rounded-full border-2 border-gray-500/20"
                         />
                         <img
                           src={position?.token1.logoURI || '/placeholder.svg'}
-                          alt={position?.token1.symbol}
+                          alt={position?.token1.displaySymbol}
                           className="w-8 h-8 rounded-full border-2 border-gray-500/20"
                         />
                       </div>

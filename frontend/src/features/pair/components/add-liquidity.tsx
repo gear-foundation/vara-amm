@@ -173,15 +173,14 @@ const AddLiquidity = ({
     const amountADesired = parseUnits(amountANum.toString(), token0.decimals);
     const amountBDesired = parseUnits(amountBNum.toString(), token1.decimals);
 
-    // For VARA native tokens, we don't need to check balance as we'll mint them
-    if (!token0.isVaraNative && amountADesired > token0Balance) {
+    if (amountADesired > token0Balance) {
       setError(
         `Insufficient ${token0.displaySymbol} balance. Available: ${getFormattedBalance(token0Balance, token0.decimals, token0.displaySymbol)}`,
       );
       return;
     }
 
-    if (!token1.isVaraNative && amountBDesired > token1Balance) {
+    if (amountBDesired > token1Balance) {
       setError(
         `Insufficient ${token1.displaySymbol} balance. Available: ${getFormattedBalance(token1Balance, token1.decimals, token1.displaySymbol)}`,
       );

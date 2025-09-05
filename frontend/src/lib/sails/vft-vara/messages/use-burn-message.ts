@@ -31,6 +31,7 @@ export const useBurnMessage = () => {
     if (!program || !account) return;
     const { transaction } = await prepareTransactionAsync({
       args: [value],
+      gasLimit: 105_000_000_000n,
     });
 
     return transaction;
