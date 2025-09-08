@@ -25,6 +25,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('varaswap-theme', theme);
     document.documentElement.classList.remove('light', 'dark');
     document.documentElement.classList.add(theme);
+
+    // Add/remove dark-theme class to body for vara-ui theme (wallet-connect)
+    if (theme === 'dark') {
+      document.body.classList.add('dark-theme');
+    } else {
+      document.body.classList.remove('dark-theme');
+    }
   }, [theme]);
 
   const toggleTheme = () => {
@@ -36,6 +43,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useTheme = () => {
   const context = useContext(ThemeProviderContext);
   if (context === undefined) {

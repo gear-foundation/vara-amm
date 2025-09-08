@@ -63,4 +63,5 @@ const Alert = ({ alert, close }: Props) => {
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export { Alert, alertStyles };

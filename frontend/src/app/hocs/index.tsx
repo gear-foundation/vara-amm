@@ -14,14 +14,17 @@ import { ENV } from '../../consts';
 
 import { QueryProvider } from './query-provider';
 
+// eslint-disable-next-line react-refresh/only-export-components
 function ApiProvider({ children }: ProviderProps) {
   return <GearApiProvider initialArgs={{ endpoint: ENV.NODE_ADDRESS }}>{children}</GearApiProvider>;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 function AccountProvider({ children }: ProviderProps) {
   return <GearAccountProvider appName="Vara DEX">{children}</GearAccountProvider>;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 function AlertProvider({ children }: ProviderProps) {
   return (
     <GearAlertProvider template={Alert} containerClassName={alertStyles.root}>

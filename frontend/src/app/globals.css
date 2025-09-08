@@ -205,7 +205,7 @@
 
   .nav-bg {
     backdrop-filter: blur(12px);
-    @apply sticky top-0 z-50;
+    @apply sticky top-0 z-10;
   }
 
   .dark .nav-bg {

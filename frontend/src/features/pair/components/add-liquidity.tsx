@@ -3,11 +3,7 @@ import type { ISubmittableResult } from '@polkadot/types/types';
 import { Plus, ChevronDown, Info } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
-import { TokenSelector } from '@/components/token-selector';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Tooltip } from '@/components/ui/tooltip';
+import { Wallet, Button, Card, CardContent, CardHeader, CardTitle, TokenSelector, Input, Tooltip } from '@/components';
 import { SECONDS_IN_MINUTE } from '@/consts';
 import {
   useAddLiquidityMessage,
@@ -37,16 +33,9 @@ type AddLiquidityProps = {
   onSuccess: () => void;
   defaultToken0: Token | null;
   defaultToken1: Token | null;
-  openConnectWallet: () => void;
 };
 
-const AddLiquidity = ({
-  pairsTokens,
-  onSuccess,
-  defaultToken0,
-  defaultToken1,
-  openConnectWallet,
-}: AddLiquidityProps) => {
+const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: AddLiquidityProps) => {
   const [token0, setToken0] = useState<Token>(defaultToken0 || pairsTokens[0].token0);
   const [token1, setToken1] = useState<Token>(defaultToken1 || pairsTokens[0].token1);
 
@@ -410,9 +399,7 @@ const AddLiquidity = ({
               ADD LIQUIDITY
             </Button>
           ) : (
-            <Button onClick={openConnectWallet} className="btn-primary w-full py-4 text-lg">
-              CONNECT WALLET
-            </Button>
+            <Wallet />
           )}
 
           {!pairAddress && <div className="text-red-500"> Pair not found</div>}
