@@ -85,6 +85,7 @@ export function Swap({ pairsTokens, refetchBalances }: TradePageProps) {
     setToToken(tempToken);
     setFromAmount(toAmount);
     setToAmount(tempAmount);
+    setLastInputTouch((prev) => (prev === 'from' ? 'to' : 'from'));
   };
 
   const handleFromTokenSelect = (token: Token, network: Network) => {
@@ -249,6 +250,16 @@ export function Swap({ pairsTokens, refetchBalances }: TradePageProps) {
       const amount = await getAmount('1');
       setOneOutAmount(amount);
     };
+    const recalculateAmounts = async () => {
+      if (lastInputTouch === 'from') {
+        const amountOut = await getAmount(fromAmount);
+        setToAmount(amountOut);
+      } else {
+        const amountIn = await getAmount(toAmount, true);
+        setFromAmount(amountIn);
+      }
+    };
+    void recalculateAmounts();
     void fetchOneOutAmount();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fromToken, toToken, pairPrograms, pairIndex]);
