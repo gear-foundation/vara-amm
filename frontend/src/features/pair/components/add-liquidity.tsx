@@ -115,6 +115,33 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
 
   const { account } = useAccount();
 
+  useEffect(() => {
+    if (!reserves || isPairReverse === undefined || isPoolEmpty) return;
+
+    if (amount0) {
+      const newAmount1 = calculateProportionalAmount(
+        amount0,
+        token0.decimals,
+        reserves[0],
+        reserves[1],
+        token1.decimals,
+        isPairReverse,
+      );
+      setAmount1(newAmount1);
+    } else if (amount1) {
+      const newAmount0 = calculateProportionalAmount(
+        amount1,
+        token1.decimals,
+        reserves[1],
+        reserves[0],
+        token0.decimals,
+        isPairReverse,
+      );
+      setAmount0(newAmount0);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token0.address, token1.address, reserves]);
+
   const addLiquidity = async () => {
     setError(null);
 
