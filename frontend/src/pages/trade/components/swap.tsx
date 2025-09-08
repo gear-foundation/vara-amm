@@ -28,6 +28,7 @@ import {
   useMintMessage,
   useBurnMessage,
 } from '@/lib/sails';
+import { useGetReservesQuery } from '@/lib/sails/pair/queries/use-get-reserves-query';
 import { getErrorMessage } from '@/lib/utils';
 
 type TradePageProps = {
@@ -47,6 +48,7 @@ export function Swap({ pairsTokens, refetchBalances }: TradePageProps) {
   const { pairPrograms } = usePairsBalances();
   const { selectedPair, isPairReverse, pairIndex } = getSelectedPair(pairsTokens, fromToken, toToken) || {};
   const pairAddress = selectedPair?.pairAddress;
+  const { reserves } = useGetReservesQuery(pairAddress);
 
   useEffect(() => {
     setFromToken((prev) => ({
@@ -77,6 +79,8 @@ export function Swap({ pairsTokens, refetchBalances }: TradePageProps) {
   const { account } = useAccount();
 
   const isWalletConnected = !!account;
+
+  const LIQUIDITY_ERROR = 'This trade cannot be executed due to insufficient liquidity or too much price impact.';
 
   const swapTokens = () => {
     const tempToken = fromToken;
@@ -234,16 +238,51 @@ export function Swap({ pairsTokens, refetchBalances }: TradePageProps) {
     const amountIn = parseUnits(amount, decimalsIn);
 
     let amountOut = 0n;
-    if (lastInputTouch === 'from') {
-      amountOut = await pairProgram.pair.getAmountOut(amountIn, isToken0ToToken1);
-    } else {
-      amountOut = await pairProgram.pair.getAmountIn(amountIn, !isToken0ToToken1);
+    try {
+      if (lastInputTouch === 'from') {
+        amountOut = await pairProgram.pair.getAmountOut(amountIn, isToken0ToToken1);
+      } else {
+        amountOut = await pairProgram.pair.getAmountIn(amountIn, !isToken0ToToken1);
+      }
+    } catch {
+      setError(LIQUIDITY_ERROR);
+      return '';
     }
 
     return formatUnits(amountOut, decimalsOut);
   };
 
   const [oneOutAmount, setOneOutAmount] = useState('');
+
+  const validateLiquidity = (currentFromAmount: string, currentToAmount: string) => {
+    if (!reserves || isPairReverse === undefined) return;
+    const isToken0ToToken1 = !isPairReverse;
+    const reserveOut = isToken0ToToken1 ? reserves[1] : reserves[0];
+
+    try {
+      if (lastInputTouch === 'from') {
+        const desiredOutWei = parseUnits(currentToAmount || '0', toToken.decimals);
+        if (desiredOutWei >= reserveOut && Number(currentFromAmount)) {
+          setError(LIQUIDITY_ERROR);
+          return;
+        }
+      } else {
+        const desiredOutWei = parseUnits(currentToAmount || '0', toToken.decimals);
+        if (desiredOutWei >= reserveOut && Number(currentToAmount)) {
+          setError(LIQUIDITY_ERROR);
+          return;
+        }
+      }
+
+      // If previous error was liquidity error, clear it when conditions no longer hold
+      if (error === LIQUIDITY_ERROR) {
+        setError('');
+      }
+    } catch {
+      // Parsing issues: conservatively set error
+      setError(LIQUIDITY_ERROR);
+    }
+  };
 
   useEffect(() => {
     const fetchOneOutAmount = async () => {
@@ -254,9 +293,11 @@ export function Swap({ pairsTokens, refetchBalances }: TradePageProps) {
       if (lastInputTouch === 'from') {
         const amountOut = await getAmount(fromAmount);
         setToAmount(amountOut);
+        validateLiquidity(fromAmount, amountOut);
       } else {
         const amountIn = await getAmount(toAmount, true);
         setFromAmount(amountIn);
+        validateLiquidity(amountIn, toAmount);
       }
     };
     void recalculateAmounts();
@@ -269,7 +310,7 @@ export function Swap({ pairsTokens, refetchBalances }: TradePageProps) {
 
     if (!fromToken.balance || amountIn > fromToken.balance) {
       setError('Insufficient balance');
-    } else {
+    } else if (error === 'Insufficient balance') {
       setError('');
     }
   };
@@ -308,6 +349,7 @@ export function Swap({ pairsTokens, refetchBalances }: TradePageProps) {
                 setFromAmount(value);
                 const amountOut = await getAmount(value);
                 setToAmount(amountOut);
+                validateLiquidity(value, amountOut);
               }}
               placeholder="0.0"
               className="input-field flex-1 text-xl"
@@ -341,6 +383,7 @@ export function Swap({ pairsTokens, refetchBalances }: TradePageProps) {
                   setFromAmount(amountIn);
                   setToAmount(amountOut);
                   setLastInputTouch('from');
+                  validateLiquidity(amountIn, amountOut);
                 }}>
                 {label}
               </Button>
@@ -380,6 +423,7 @@ export function Swap({ pairsTokens, refetchBalances }: TradePageProps) {
                 const amountIn = await getAmount(value, true);
                 setFromAmount(amountIn);
                 checkBalances(amountIn);
+                validateLiquidity(amountIn, value);
               }}
               placeholder="0.0"
               className="input-field flex-1 text-xl"
