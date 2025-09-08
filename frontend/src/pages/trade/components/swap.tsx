@@ -3,10 +3,10 @@ import type { ISubmittableResult } from '@polkadot/types/types';
 import { ArrowDownUp, Info, ChevronDown, ChevronUp } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
+import { TokenSelector } from '@/components/token-selector';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Wallet } from '@/components/wallet';
 import { INPUT_PERCENTAGES, SECONDS_IN_MINUTE, SLIPPAGE } from '@/consts';
 import { usePairsBalances } from '@/features/pair';
@@ -27,16 +27,12 @@ import {
   useSwapTokensForExactTokensMessage,
 } from '@/lib/sails';
 
-import { TokenSelector } from './token-selector';
-import { TradePageBuy } from './trade-page-buy';
-import { TradePageSell } from './trade-page-sell';
-
 type TradePageProps = {
   pairsTokens: PairsTokens;
   refetchBalances: () => void;
 };
 
-export function TradePage({ pairsTokens, refetchBalances }: TradePageProps) {
+export function Swap({ pairsTokens, refetchBalances }: TradePageProps) {
   const { api } = useApi();
   const alert = useAlert();
   const [error, setError] = useState('');
@@ -246,206 +242,167 @@ export function TradePage({ pairsTokens, refetchBalances }: TradePageProps) {
     !Number(toAmount);
 
   return (
-    <div className="max-w-md mx-auto">
-      <Tabs defaultValue="swap" className="w-full">
-        <TabsList className="card p-1 w-full flex">
-          <TabsTrigger
-            value="swap"
-            className="data-[state=active]:bg-[#00FF85] data-[state=active]:text-black font-bold uppercase flex-1">
-            SWAP
-          </TabsTrigger>
-          <TabsTrigger
-            value="buy"
-            className="data-[state=active]:bg-[#00FF85] data-[state=active]:text-black font-bold uppercase flex-1">
-            BUY
-          </TabsTrigger>
-          <TabsTrigger
-            value="sell"
-            className="data-[state=active]:bg-[#00FF85] data-[state=active]:text-black font-bold uppercase flex-1">
-            SELL
-          </TabsTrigger>
-        </TabsList>
+    <Card className="card">
+      <CardHeader className="pb-4">{/* Removed SWAP TOKENS title and settings gear icon */}</CardHeader>
+      <CardContent className="space-y-4">
+        {/* From Token */}
+        <div className="space-y-2">
+          <div className="flex justify-between text-sm text-gray-400">
+            <span>FROM</span>
+            <span>
+              Balance:{' '}
+              {fromToken.balance ? getFormattedBalance(fromToken.balance, fromToken.decimals, fromToken.symbol) : '0'}
+            </span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Input
+              value={fromAmount}
+              onChange={async (e) => {
+                const value = e.target.value;
+                if (Number(value) < 0 || isNaN(Number(value))) return;
 
-        <TabsContent value="swap" className="mt-6">
-          <Card className="card">
-            <CardHeader className="pb-4">{/* Removed SWAP TOKENS title and settings gear icon */}</CardHeader>
-            <CardContent className="space-y-4">
-              {/* From Token */}
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm text-gray-400">
-                  <span>FROM</span>
-                  <span>
-                    Balance:{' '}
-                    {fromToken.balance
-                      ? getFormattedBalance(fromToken.balance, fromToken.decimals, fromToken.symbol)
-                      : '0'}
-                  </span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Input
-                    value={fromAmount}
-                    onChange={async (e) => {
-                      const value = e.target.value;
-                      if (Number(value) < 0 || isNaN(Number(value))) return;
+                checkBalances(value);
+                setLastInputTouch('from');
+                setFromAmount(value);
+                const amountOut = await getAmount(value);
+                setToAmount(amountOut);
+              }}
+              placeholder="0.0"
+              className="input-field flex-1 text-xl"
+            />
+            <Button
+              onClick={() => setShowFromTokenSelector(true)}
+              className="btn-secondary flex items-center space-x-2 min-w-[120px]"
+              variant="secondary">
+              <img
+                src={fromToken.logoURI || '/placeholder.svg'}
+                alt={fromToken.name}
+                className="w-5 h-5 rounded-full"
+              />
+              <span>{fromToken.symbol}</span>
+              <ChevronDown className="w-4 h-4" />
+            </Button>
+          </div>
+          <div className="flex space-x-2">
+            {INPUT_PERCENTAGES.map(({ label, value }) => (
+              <Button
+                key={value}
+                variant="ghost"
+                size="sm"
+                className="text-xs bg-gray-500/20 hover:bg-gray-500/30 theme-text"
+                onClick={async () => {
+                  const amountIn = formatUnits(
+                    calculatePercentage(fromToken.balance || 0n, value),
+                    fromToken.decimals || 0,
+                  );
+                  const amountOut = await getAmount(amountIn);
+                  setFromAmount(amountIn);
+                  setToAmount(amountOut);
+                  setLastInputTouch('from');
+                }}>
+                {label}
+              </Button>
+            ))}
+          </div>
+        </div>
 
-                      checkBalances(value);
-                      setLastInputTouch('from');
-                      setFromAmount(value);
-                      const amountOut = await getAmount(value);
-                      setToAmount(amountOut);
-                    }}
-                    placeholder="0.0"
-                    className="input-field flex-1 text-xl"
-                  />
-                  <Button
-                    onClick={() => setShowFromTokenSelector(true)}
-                    className="btn-secondary flex items-center space-x-2 min-w-[120px]"
-                    variant="secondary">
-                    <img
-                      src={fromToken.logoURI || '/placeholder.svg'}
-                      alt={fromToken.name}
-                      className="w-5 h-5 rounded-full"
-                    />
-                    <span>{fromToken.symbol}</span>
-                    <ChevronDown className="w-4 h-4" />
-                  </Button>
-                </div>
-                <div className="flex space-x-2">
-                  {INPUT_PERCENTAGES.map(({ label, value }) => (
-                    <Button
-                      key={value}
-                      variant="ghost"
-                      size="sm"
-                      className="text-xs bg-gray-500/20 hover:bg-gray-500/30 theme-text"
-                      onClick={async () => {
-                        const amountIn = formatUnits(
-                          calculatePercentage(fromToken.balance || 0n, value),
-                          fromToken.decimals || 0,
-                        );
-                        const amountOut = await getAmount(amountIn);
-                        setFromAmount(amountIn);
-                        setToAmount(amountOut);
-                        setLastInputTouch('from');
-                      }}>
-                      {label}
-                    </Button>
-                  ))}
-                </div>
-              </div>
+        {/* Swap Button */}
+        <div className="flex justify-center">
+          <Button
+            onClick={swapTokens}
+            variant="ghost"
+            size="icon"
+            disabled={isSwapTokensForExactTokensPending || isSwapExactTokensForTokensPending || loading}
+            className="rounded-full bg-gray-500/20 border-2 border-gray-500/30 hover:border-[#00FF85] hover:bg-[#00FF85]/10 theme-text hover:text-[#00FF85] transition-all duration-200">
+            <ArrowDownUp className="w-4 h-4" />
+          </Button>
+        </div>
 
-              {/* Swap Button */}
-              <div className="flex justify-center">
-                <Button
-                  onClick={swapTokens}
-                  variant="ghost"
-                  size="icon"
-                  disabled={isSwapTokensForExactTokensPending || isSwapExactTokensForTokensPending || loading}
-                  className="rounded-full bg-gray-500/20 border-2 border-gray-500/30 hover:border-[#00FF85] hover:bg-[#00FF85]/10 theme-text hover:text-[#00FF85] transition-all duration-200">
-                  <ArrowDownUp className="w-4 h-4" />
-                </Button>
-              </div>
+        {/* To Token */}
+        <div className="space-y-2">
+          <div className="flex justify-between text-sm text-gray-400">
+            <span>TO</span>
+            <span>
+              Balance: {toToken.balance ? getFormattedBalance(toToken.balance, toToken.decimals, toToken.symbol) : '0'}
+            </span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Input
+              value={toAmount}
+              onChange={async (e) => {
+                const value = e.target.value;
+                if (Number(value) < 0 || isNaN(Number(value))) return;
 
-              {/* To Token */}
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm text-gray-400">
-                  <span>TO</span>
-                  <span>
-                    Balance:{' '}
-                    {toToken.balance ? getFormattedBalance(toToken.balance, toToken.decimals, toToken.symbol) : '0'}
-                  </span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Input
-                    value={toAmount}
-                    onChange={async (e) => {
-                      const value = e.target.value;
-                      if (Number(value) < 0 || isNaN(Number(value))) return;
+                setLastInputTouch('to');
+                setToAmount(value);
+                const amountIn = await getAmount(value, true);
+                setFromAmount(amountIn);
+                checkBalances(amountIn);
+              }}
+              placeholder="0.0"
+              className="input-field flex-1 text-xl"
+            />
+            <Button
+              onClick={() => setShowToTokenSelector(true)}
+              className="btn-secondary flex items-center space-x-2 min-w-[120px]"
+              variant="secondary">
+              <img src={toToken.logoURI || '/placeholder.svg'} alt={toToken.name} className="w-5 h-5 rounded-full" />
+              <span>{toToken.symbol}</span>
+              <ChevronDown className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
 
-                      setLastInputTouch('to');
-                      setToAmount(value);
-                      const amountIn = await getAmount(value, true);
-                      setFromAmount(amountIn);
-                      checkBalances(amountIn);
-                    }}
-                    placeholder="0.0"
-                    className="input-field flex-1 text-xl"
-                  />
-                  <Button
-                    onClick={() => setShowToTokenSelector(true)}
-                    className="btn-secondary flex items-center space-x-2 min-w-[120px]"
-                    variant="secondary">
-                    <img
-                      src={toToken.logoURI || '/placeholder.svg'}
-                      alt={toToken.name}
-                      className="w-5 h-5 rounded-full"
-                    />
-                    <span>{toToken.symbol}</span>
-                    <ChevronDown className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-
-              {/* Expandable Details Block */}
-              <div className="bg-gray-500/10 border border-gray-500/20 rounded-lg">
-                <button
-                  onClick={() => setShowDetails(!showDetails)}
-                  className="w-full flex items-center justify-between p-3 hover:bg-gray-500/5 transition-colors">
-                  <div className="flex items-center space-x-2">
-                    {pairAddress ? (
-                      <span className="text-sm theme-text">
-                        1 {fromToken.symbol} = {oneOutAmount} {toToken.symbol}
-                      </span>
-                    ) : (
-                      <div className="text-red-500"> Pair not found</div>
-                    )}
-                    <Info className="w-3 h-3 text-gray-400" />
-                  </div>
-                  {showDetails ? (
-                    <ChevronUp className="w-4 h-4 text-gray-400" />
-                  ) : (
-                    <ChevronDown className="w-4 h-4 text-gray-400" />
-                  )}
-                </button>
-
-                {showDetails && (
-                  <div className="px-3 pb-3 space-y-2 border-t border-gray-500/10">
-                    <div className="flex justify-between text-sm pt-2">
-                      <span className="text-gray-400">Fee (0.3%)</span>
-                      <span className="theme-text">{calculateFee()}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-400">Swap direction</span>
-                      <span className="theme-text">{getSwapDirection()}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-400">Max slippage</span>
-                      <span className="theme-text">Auto {SLIPPAGE * 100}%</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {error && <div className="text-red-500">{error}</div>}
-
-              {isWalletConnected ? (
-                <Button onClick={handleSwap} disabled={isSwapDisabled} className="btn-primary w-full py-4 text-lg">
-                  SWAP TOKENS
-                </Button>
+        {/* Expandable Details Block */}
+        <div className="bg-gray-500/10 border border-gray-500/20 rounded-lg">
+          <button
+            onClick={() => setShowDetails(!showDetails)}
+            className="w-full flex items-center justify-between p-3 hover:bg-gray-500/5 transition-colors">
+            <div className="flex items-center space-x-2">
+              {pairAddress ? (
+                <span className="text-sm theme-text">
+                  1 {fromToken.symbol} = {oneOutAmount} {toToken.symbol}
+                </span>
               ) : (
-                <Wallet />
+                <div className="text-red-500"> Pair not found</div>
               )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+              <Info className="w-3 h-3 text-gray-400" />
+            </div>
+            {showDetails ? (
+              <ChevronUp className="w-4 h-4 text-gray-400" />
+            ) : (
+              <ChevronDown className="w-4 h-4 text-gray-400" />
+            )}
+          </button>
 
-        <TabsContent value="buy" className="mt-6">
-          <TradePageBuy />
-        </TabsContent>
+          {showDetails && (
+            <div className="px-3 pb-3 space-y-2 border-t border-gray-500/10">
+              <div className="flex justify-between text-sm pt-2">
+                <span className="text-gray-400">Fee (0.3%)</span>
+                <span className="theme-text">{calculateFee()}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-400">Swap direction</span>
+                <span className="theme-text">{getSwapDirection()}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-400">Max slippage</span>
+                <span className="theme-text">Auto {SLIPPAGE * 100}%</span>
+              </div>
+            </div>
+          )}
+        </div>
 
-        <TabsContent value="sell" className="mt-6">
-          <TradePageSell />
-        </TabsContent>
-      </Tabs>
+        {error && <div className="text-red-500">{error}</div>}
+
+        {isWalletConnected ? (
+          <Button onClick={handleSwap} disabled={isSwapDisabled} className="btn-primary w-full py-4 text-lg">
+            SWAP TOKENS
+          </Button>
+        ) : (
+          <Wallet />
+        )}
+      </CardContent>
 
       <TokenSelector
         isOpen={showFromTokenSelector}
@@ -462,6 +419,6 @@ export function TradePage({ pairsTokens, refetchBalances }: TradePageProps) {
         title="Select token to swap to"
         networks={networks}
       />
-    </div>
+    </Card>
   );
 }
