@@ -1,11 +1,11 @@
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components';
 
-const TradePageSell = () => {
+const Buy = () => {
   return (
     <Card className="card">
       <CardHeader>
-        <CardTitle className="text-lg font-bold uppercase theme-text">SELL CRYPTO</CardTitle>
-        <p className="text-sm text-gray-400">Choose your preferred exchange to sell crypto for fiat</p>
+        <CardTitle className="text-lg font-bold uppercase theme-text">BUY CRYPTO</CardTitle>
+        <p className="text-sm text-gray-400">Choose your preferred provider to buy crypto with fiat</p>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid grid-cols-1 gap-3">
@@ -21,7 +21,7 @@ const TradePageSell = () => {
               </div>
               <div className="text-left">
                 <div className="font-medium theme-text">Coinbase</div>
-                <div className="text-xs text-gray-400">Instant cashout available</div>
+                <div className="text-xs text-gray-400">Popular & trusted</div>
               </div>
             </div>
             <div className="text-xs text-gray-400 group-hover:text-[#00FF85]">→</div>
@@ -39,7 +39,7 @@ const TradePageSell = () => {
               </div>
               <div className="text-left">
                 <div className="font-medium theme-text">BANXA</div>
-                <div className="text-xs text-gray-400">Bank transfer support</div>
+                <div className="text-xs text-gray-400">Fast onboarding</div>
               </div>
             </div>
             <div className="text-xs text-gray-400 group-hover:text-[#00FF85]">→</div>
@@ -57,7 +57,7 @@ const TradePageSell = () => {
               </div>
               <div className="text-left">
                 <div className="font-medium theme-text">Gate.io</div>
-                <div className="text-xs text-gray-400">P2P trading available</div>
+                <div className="text-xs text-gray-400">Global exchange</div>
               </div>
             </div>
             <div className="text-xs text-gray-400 group-hover:text-[#00FF85]">→</div>
@@ -75,7 +75,7 @@ const TradePageSell = () => {
               </div>
               <div className="text-left">
                 <div className="font-medium theme-text">Crypto.com</div>
-                <div className="text-xs text-gray-400">Visa card cashout</div>
+                <div className="text-xs text-gray-400">Card & app integration</div>
               </div>
             </div>
             <div className="text-xs text-gray-400 group-hover:text-[#00FF85]">→</div>
@@ -93,7 +93,7 @@ const TradePageSell = () => {
               </div>
               <div className="text-left">
                 <div className="font-medium theme-text">MEXC</div>
-                <div className="text-xs text-gray-400">Competitive rates</div>
+                <div className="text-xs text-gray-400">Low fees</div>
               </div>
             </div>
             <div className="text-xs text-gray-400 group-hover:text-[#00FF85]">→</div>
@@ -111,7 +111,7 @@ const TradePageSell = () => {
               </div>
               <div className="text-left">
                 <div className="font-medium theme-text">BitMart</div>
-                <div className="text-xs text-gray-400">Multiple withdrawal options</div>
+                <div className="text-xs text-gray-400">Multiple payment methods</div>
               </div>
             </div>
             <div className="text-xs text-gray-400 group-hover:text-[#00FF85]">→</div>
@@ -119,10 +119,9 @@ const TradePageSell = () => {
         </div>
 
         <div className="mt-6 p-4 bg-gray-500/10 border border-gray-500/20 rounded-lg">
-          <div className="text-sm text-gray-400 mb-2">⚠️ Important</div>
+          <div className="text-sm text-gray-400 mb-2">💡 Pro Tip</div>
           <div className="text-sm theme-text">
-            Always verify withdrawal fees and processing times before selling. Some exchanges may require KYC
-            verification.
+            Compare fees and payment methods across providers to find the best option for your region.
           </div>
         </div>
       </CardContent>
@@ -130,4 +129,4 @@ const TradePageSell = () => {
   );
 };
 
-export { TradePageSell };
+export { Buy };
