@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Wallet } from '@/components/wallet';
 import { RemoveLiquidity } from '@/features/pair';
 import type { Token } from '@/features/pair/types';
-import { formatUnits } from '@/features/pair/utils';
+import { formatUnitsTrimmed } from '@/features/pair/utils';
 
 type UserPosition = {
   pool: string;
@@ -77,13 +77,13 @@ export function YourPositions({
                 <div>
                   <div className="text-sm text-gray-400 uppercase">LIQUIDITY</div>
                   <div className="text-sm font-medium mono theme-text">
-                    {formatUnits(position.liquidity, position.decimals)} LP
+                    {formatUnitsTrimmed(position.liquidity, position.decimals)} LP
                   </div>
                 </div>
                 <div>
                   <div className="text-sm text-gray-400 uppercase">REWARDS</div>
                   <div className="text-sm font-medium mono theme-text">
-                    {formatUnits(position.rewards, position.decimals)} LP
+                    {formatUnitsTrimmed(position.rewards, position.decimals)} LP
                   </div>
                 </div>
                 <div>

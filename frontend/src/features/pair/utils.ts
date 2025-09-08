@@ -80,6 +80,41 @@ const formatUnits = (value: bigint, decimals: number): string => {
   return trimmed ? `${quotient}.${trimmed}` : quotient.toString();
 };
 
+// Formats with custom trimming rules:
+// - If integer <= 0: keep fractional up to 3 last non-zero digit
+// - If integer > 0: keep only 2 digits after the dot
+const formatUnitsTrimmed = (value: bigint, decimals: number): string => {
+  const formatted = formatUnits(value, decimals);
+  const DISPLAY_DIGITS = 3;
+
+  if (!formatted || formatted === '0') return '0';
+
+  const parts = formatted.split('.');
+  const integerPart = parts[0] ?? '0';
+  const fractionalPart = parts[1] ?? '';
+
+  try {
+    const integerAsBigInt = BigInt(integerPart);
+
+    if (integerAsBigInt === 0n) {
+      if (!fractionalPart) return '0';
+      const lastNonZeroIndex = [...fractionalPart].findIndex((ch) => ch !== '0');
+
+      if (lastNonZeroIndex === -1) return '0';
+
+      const trimmedFraction = fractionalPart.slice(0, lastNonZeroIndex + DISPLAY_DIGITS);
+      return `0.${trimmedFraction}`;
+    }
+
+    // Integer part is non-zero: keep only 2 digits after the dot
+    const twoDigits = fractionalPart.slice(0, 2);
+    return `${integerPart}.${twoDigits}`;
+  } catch {
+    // Fallback to original formatted on unexpected input
+    return formatted;
+  }
+};
+
 const calculateProportionalAmount = (
   inputAmount: string,
   inputDecimals: number,
@@ -268,6 +303,7 @@ export {
   parseUnits,
   calculatePercentage,
   formatUnits,
+  formatUnitsTrimmed,
   calculateProportionalAmount,
   getSelectedPair,
   handleStatus,
