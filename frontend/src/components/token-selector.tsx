@@ -1,3 +1,4 @@
+import { HexString } from '@gear-js/api';
 import { Search, Check } from 'lucide-react';
 import { useState } from 'react';
 
@@ -12,6 +13,7 @@ interface TokenSelectorProps {
   onSelectToken: (token: Token, network: Network) => void;
   title?: string;
   networks: Network[];
+  disabledTokenAddress?: HexString;
 }
 
 export function TokenSelector({
@@ -20,15 +22,18 @@ export function TokenSelector({
   onSelectToken,
   title = 'Select a token',
   networks,
+  disabledTokenAddress,
 }: TokenSelectorProps) {
   const [selectedNetwork, setSelectedNetwork] = useState<Network>(networks[0]);
   const [searchQuery, setSearchQuery] = useState('');
 
   const filteredTokens = selectedNetwork.tokens.filter(
     (token) =>
-      token.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      token.displaySymbol.toLowerCase().includes(searchQuery.toLowerCase()),
+      (token.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        token.displaySymbol.toLowerCase().includes(searchQuery.toLowerCase())) &&
+      token.address !== disabledTokenAddress,
   );
+  console.log('🚀 ~ TokenSelector ~ filteredTokens:', filteredTokens, disabledTokenAddress);
 
   const handleTokenSelect = (token: Token) => {
     onSelectToken(token, selectedNetwork);

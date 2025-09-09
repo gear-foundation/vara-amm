@@ -499,6 +499,7 @@ export function Swap({ pairsTokens, refetchBalances }: TradePageProps) {
         onSelectToken={handleFromTokenSelect}
         title="Select token to swap from"
         networks={networks}
+        disabledTokenAddress={toToken.address}
       />
 
       <TokenSelector
@@ -507,6 +508,7 @@ export function Swap({ pairsTokens, refetchBalances }: TradePageProps) {
         onSelectToken={handleToTokenSelect}
         title="Select token to swap to"
         networks={networks}
+        disabledTokenAddress={fromToken.address}
       />
     </Card>
   );

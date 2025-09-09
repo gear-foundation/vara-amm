@@ -442,6 +442,7 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
         onSelectToken={handleToken0Select}
         title="Select first token"
         networks={networks}
+        disabledTokenAddress={token1.address}
       />
 
       <TokenSelector
@@ -450,6 +451,7 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
         onSelectToken={handleToken1Select}
         title="Select second token"
         networks={networks}
+        disabledTokenAddress={token0.address}
       />
     </>
   );
