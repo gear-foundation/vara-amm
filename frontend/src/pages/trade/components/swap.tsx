@@ -294,16 +294,19 @@ export function Swap({ pairsTokens, refetchBalances }: TradePageProps) {
         const amountOut = await getAmount(fromAmount);
         setToAmount(amountOut);
         validateLiquidity(fromAmount, amountOut);
+        checkBalances(fromAmount);
       } else {
         const amountIn = await getAmount(toAmount, true);
         setFromAmount(amountIn);
         validateLiquidity(amountIn, toAmount);
+        checkBalances(amountIn);
       }
     };
     void recalculateAmounts();
     void fetchOneOutAmount();
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fromToken, toToken, pairPrograms, pairIndex]);
+  }, [fromToken, toToken, pairPrograms, pairIndex, reserves]);
 
   const checkBalances = (amount: string) => {
     const amountIn = parseUnits(amount, fromToken.decimals);
