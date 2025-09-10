@@ -73,7 +73,7 @@ const MobileTooltip = React.forwardRef<React.ElementRef<typeof TooltipPrimitive.
               }}>
               {children}
             </TooltipTrigger>
-            <TooltipContent side={side} className={contentClassName}>
+            <TooltipContent side={side} className={cn('bg-gray-900 text-white border-gray-700', contentClassName)}>
               {content}
             </TooltipContent>
           </Tooltip>

@@ -434,9 +434,7 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
                       your contribution to the pool&apos;s total liquidity.
                     </p>
                   }
-                  side="top"
-                  contentClassName="max-w-xs bg-gray-900 text-white border-gray-700"
-                  delayDuration={200}>
+                  contentClassName="max-w-xs">
                   <Info className="w-3 h-3 text-gray-400 cursor-help" />
                 </Tooltip>
               </div>

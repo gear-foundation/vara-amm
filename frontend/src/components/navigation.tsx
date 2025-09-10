@@ -1,5 +1,5 @@
 import { useAccount } from '@gear-js/react-hooks';
-import { Menu, X } from 'lucide-react';
+import { ArrowLeftRight, Menu, X } from 'lucide-react';
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 
@@ -8,6 +8,7 @@ import { Wallet } from '@/components/wallet';
 import { ROUTES } from '@/consts';
 
 import { ThemeSwitcher } from './theme-switcher';
+import { Tooltip } from './ui';
 
 export function Navigation() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -16,6 +17,10 @@ export function Navigation() {
   const navLinkClass = 'theme-text font-medium uppercase tracking-wide transition-colors';
   const navLinkActiveClass = 'accent-text font-medium uppercase tracking-wide transition-colors';
   const navLinkClassName = ({ isActive }: { isActive: boolean }) => (isActive ? navLinkActiveClass : navLinkClass);
+
+  const openVaraBridge = () => {
+    window.open('https://bridge.vara.network', '_blank', 'noopener,noreferrer');
+  };
 
   return (
     <>
@@ -41,19 +46,34 @@ export function Navigation() {
                 POOL
               </NavLink>
             </div>
+            <div className="flex-1"></div>
 
-            {/* Search Bar */}
-            {/* <div className="hidden md:flex items-center flex-1 max-w-md mx-8">
+            <div className="hidden md:flex items-center space-x-4">
+              <Tooltip
+                content={<p className="text-xs">Use Vara Bridge to move assets between Ethereum and Vara</p>}
+                contentClassName="w-56"
+                side="bottom">
+                <Button
+                  onClick={openVaraBridge}
+                  className="bridge-btn flex items-center space-x-2 px-4 py-2 rounded-xl font-medium uppercase tracking-wide transition-all duration-200">
+                  <ArrowLeftRight className="w-4 h-4" />
+                  <span>BRIDGE ASSETS</span>
+                </Button>
+              </Tooltip>
+
+              {/* Search Bar */}
+              {/* <div className="hidden md:flex items-center flex-1 max-w-md mx-8">
               <div className="relative w-full">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <Input placeholder="Search tokens, pools..." className="input-field pl-10 w-full" />
               </div>
             </div> */}
 
-            {/* Theme Switcher & Wallet Connection */}
-            <div className="hidden md:flex items-center space-x-4">
-              <ThemeSwitcher />
-              {isAccountReady && <Wallet />}
+              {/* Theme Switcher & Wallet Connection */}
+              <div className="hidden md:flex items-center space-x-4">
+                <ThemeSwitcher />
+                {isAccountReady && <Wallet />}
+              </div>
             </div>
 
             {/* Mobile menu button */}
@@ -83,6 +103,14 @@ export function Navigation() {
                     placeholder="Search tokens, pools..."
                     className="input-field w-full mb-4"
                   /> */}
+
+                {/* Mobile Bridge Button */}
+                <Button
+                  onClick={openVaraBridge}
+                  className="bridge-btn flex items-center justify-center space-x-2 w-full">
+                  <ArrowLeftRight className="w-4 h-4" />
+                  <span>BRIDGE ASSETS</span>
+                </Button>
 
                 <Wallet isFullWidth />
               </div>
