@@ -1,6 +1,6 @@
 import { useAccount, useAlert, useApi } from '@gear-js/react-hooks';
 import type { SubmittableExtrinsic } from '@polkadot/api/types';
-import type { ISubmittableResult } from '@polkadot/types/types';
+import { ISubmittableResult } from '@polkadot/types/types';
 import { ArrowDownUp, Info, ChevronDown, ChevronUp } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -18,9 +18,9 @@ import {
   getFormattedBalance,
   getNetworks,
   getSelectedPair,
-  handleStatus,
   parseUnits,
 } from '@/features/pair/utils';
+import { useSignAndSend } from '@/hooks/use-sign-and-send';
 import {
   useApproveMessage,
   useSwapExactTokensForTokensMessage,
@@ -62,14 +62,22 @@ export function Swap({ pairsTokens, refetchBalances }: TradePageProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pairsTokens]);
 
-  const { approveMessage } = useApproveMessage(fromToken.address);
-  const { mintMessage } = useMintMessage();
-  const { burnMessage } = useBurnMessage();
+  const approve = useApproveMessage(fromToken.address);
+  const mint = useMintMessage();
+  const burn = useBurnMessage();
 
-  const { swapTokensForExactTokensMessage, isPending: isSwapTokensForExactTokensPending } =
-    useSwapTokensForExactTokensMessage(pairAddress);
-  const { swapExactTokensForTokensMessage, isPending: isSwapExactTokensForTokensPending } =
-    useSwapExactTokensForTokensMessage(pairAddress);
+  const swapTokensForExactTokens = useSwapTokensForExactTokensMessage(pairAddress);
+  const swapExactTokensForTokens = useSwapExactTokensForTokensMessage(pairAddress);
+
+  const signAndSend = useSignAndSend({
+    programs: [
+      approve.program,
+      mint.program,
+      burn.program,
+      swapTokensForExactTokens.program,
+      swapExactTokensForTokens.program,
+    ],
+  });
 
   const [fromAmount, setFromAmount] = useState('');
   const [toAmount, setToAmount] = useState('');
@@ -128,9 +136,9 @@ export function Swap({ pairsTokens, refetchBalances }: TradePageProps) {
           deadline: deadline.toString(),
         });
 
-        const approveTx = await approveMessage({ value: amountIn, spender: pairAddress });
+        const approveTx = await approve.mutateAsync({ value: amountIn, spender: pairAddress });
 
-        const swapExactTokensForTokensTx = await swapExactTokensForTokensMessage({
+        const swapExactTokensForTokensTx = await swapExactTokensForTokens.mutateAsync({
           amountIn: amountIn.toString(),
           amountOutMin: amountOutMin.toString(),
           isToken0ToToken1,
@@ -157,14 +165,14 @@ export function Swap({ pairsTokens, refetchBalances }: TradePageProps) {
           deadline: deadline.toString(),
         });
 
-        const swapTokensForExactTokensTx = await swapTokensForExactTokensMessage({
+        const swapTokensForExactTokensTx = await swapTokensForExactTokens.mutateAsync({
           amountOut: amountOut.toString(),
           amountInMax: amountInMax.toString(),
           isToken0ToToken1,
           deadline: deadline.toString(),
         });
 
-        const approveTx = await approveMessage({ value: amountInMax, spender: pairAddress });
+        const approveTx = await approve.mutateAsync({ value: amountInMax, spender: pairAddress });
         if (!approveTx?.extrinsic || !swapTokensForExactTokensTx?.extrinsic) {
           alert.error('Failed to create batch');
           return;
@@ -175,36 +183,23 @@ export function Swap({ pairsTokens, refetchBalances }: TradePageProps) {
 
       setLoading(true);
 
-      const { address, signer } = account;
-      const statusCallback = (result: ISubmittableResult) => {
-        return handleStatus(api, result, {
-          // TODO: SEEMS LIKE BATCH SUCCESS EVERYTIME ON FAILED TX
-          onSuccess: () => {
-            alert.success('Swap successful');
-            void refetchBalances();
-            setToAmount('');
-            setFromAmount('');
-          },
-          onError: (_error) => alert.error(_error),
-          onFinally: () => setLoading(false),
-        });
-      };
-
       if (shouldMint) {
-        const mintTx = await mintMessage({ value: mintValue });
+        const mintTx = await mint.mutateAsync({ value: mintValue });
         if (mintTx) transactions.push(mintTx.extrinsic);
       }
 
       if (shouldBurn) {
-        const burnTx = await burnMessage({ value: burnValue });
+        const burnTx = await burn.mutateAsync({ value: burnValue });
         if (burnTx) transactions.push(burnTx.extrinsic);
       }
 
-      const batch = api.tx.utility.batch(transactions);
+      const extrinsic = api.tx.utility.batchAll(transactions);
+      await signAndSend.mutateAsync({ extrinsic });
 
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-ignore
-      await batch.signAndSend(address, { signer }, statusCallback);
+      alert.success('Swap successful');
+      void refetchBalances();
+      setToAmount('');
+      setFromAmount('');
     } catch (_error) {
       alert.error(getErrorMessage(_error));
     } finally {
@@ -320,8 +315,8 @@ export function Swap({ pairsTokens, refetchBalances }: TradePageProps) {
 
   const isSwapDisabled =
     !pairAddress ||
-    isSwapTokensForExactTokensPending ||
-    isSwapExactTokensForTokensPending ||
+    swapTokensForExactTokens.isPending ||
+    swapExactTokensForTokens.isPending ||
     loading ||
     !!error ||
     !Number(fromAmount) ||
@@ -400,7 +395,7 @@ export function Swap({ pairsTokens, refetchBalances }: TradePageProps) {
             onClick={swapTokens}
             variant="ghost"
             size="icon"
-            disabled={isSwapTokensForExactTokensPending || isSwapExactTokensForTokensPending || loading}
+            disabled={swapTokensForExactTokens.isPending || swapExactTokensForTokens.isPending || loading}
             className="rounded-full bg-gray-500/20 border-2 border-gray-500/30 hover:border-[#00FF85] hover:bg-[#00FF85]/10 theme-text hover:text-[#00FF85] transition-all duration-200">
             <ArrowDownUp className="w-4 h-4" />
           </Button>

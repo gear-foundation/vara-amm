@@ -1,5 +1,3 @@
-import { GearApi } from '@gear-js/api';
-import type { ISubmittableResult } from '@polkadot/types/types';
 import { formatBalance } from '@polkadot/util';
 
 import type { Network, PairsTokens, Token } from './types';
@@ -262,41 +260,6 @@ const calculateExistingPoolShare = (userLpBalance: bigint, totalSupply: bigint):
   }
 };
 
-const handleStatus = (
-  api: GearApi,
-  { status, events }: ISubmittableResult,
-  {
-    onSuccess = () => {},
-    onError = () => {},
-    onFinally = () => {},
-  }: {
-    onSuccess?: () => void;
-    onError?: (_error: string) => void;
-    onFinally?: () => void;
-  } = {},
-) => {
-  if (!status.isInBlock) return;
-  if (!api) {
-    throw new Error('API is not ready');
-  }
-
-  events
-    .filter(({ event }) => event.section === 'system')
-    .forEach(({ event }) => {
-      const { method } = event;
-
-      if (method === 'ExtrinsicSuccess' || method === 'ExtrinsicFailed') onFinally();
-
-      if (method === 'ExtrinsicSuccess') return onSuccess();
-
-      if (method === 'ExtrinsicFailed') {
-        const { name, method: methodName, docs } = api.getExtrinsicFailedError(event);
-
-        onError(`${name}.${methodName}: ${docs}`);
-      }
-    });
-};
-
 export {
   getNetworks,
   getFormattedBalance,
@@ -306,7 +269,6 @@ export {
   formatUnitsTrimmed,
   calculateProportionalAmount,
   getSelectedPair,
-  handleStatus,
   calculateLPTokens,
   calculatePoolShare,
   calculateExistingPoolShare,

@@ -1,9 +1,8 @@
 import type { HexString } from '@gear-js/api';
-import { useAccount, useAlert, usePrepareProgramTransaction } from '@gear-js/react-hooks';
+import { useAccount, usePrepareProgramTransaction } from '@gear-js/react-hooks';
 import { useMutation } from '@tanstack/react-query';
 
 import { usePairProgram } from '@/lib/sails/sails';
-import { getErrorMessage } from '@/lib/utils';
 
 type Params = {
   amountIn: string;
@@ -16,7 +15,6 @@ export const useSwapExactTokensForTokensMessage = (pairAddress?: HexString) => {
   const program = usePairProgram(pairAddress);
   const { account } = useAccount();
 
-  const alert = useAlert();
   const { prepareTransactionAsync } = usePrepareProgramTransaction({
     program,
     serviceName: 'pair',
@@ -24,7 +22,7 @@ export const useSwapExactTokensForTokensMessage = (pairAddress?: HexString) => {
   });
 
   const tx = async ({ amountIn, amountOutMin, isToken0ToToken1, deadline }: Params) => {
-    if (!program || !account) return;
+    if (!program || !account) throw new Error('Program or account is not found');
 
     const { transaction } = await prepareTransactionAsync({
       args: [amountIn, amountOutMin, isToken0ToToken1, deadline],
@@ -34,12 +32,7 @@ export const useSwapExactTokensForTokensMessage = (pairAddress?: HexString) => {
     return transaction;
   };
 
-  const { mutateAsync: swapExactTokensForTokensMessage, isPending } = useMutation({
-    mutationFn: tx,
-    onError: (error) => {
-      alert.error(getErrorMessage(error));
-    },
-  });
+  const { mutateAsync, isPending } = useMutation({ mutationFn: tx });
 
-  return { swapExactTokensForTokensMessage, isPending };
+  return { mutateAsync, isPending, program };
 };

@@ -1,10 +1,9 @@
-import { useAccount, useAlert, usePrepareProgramTransaction } from '@gear-js/react-hooks';
+import { useAccount, usePrepareProgramTransaction } from '@gear-js/react-hooks';
 import { useMutation } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
 import { usePairsTokens } from '@/features/pair';
 import { useVftVaraProgram } from '@/lib/sails/sails';
-import { getErrorMessage } from '@/lib/utils';
 
 type Params = {
   value: bigint;
@@ -20,7 +19,6 @@ export const useBurnMessage = () => {
   const program = useVftVaraProgram(varaTokenAddress);
   const { account } = useAccount();
 
-  const alert = useAlert();
   const { prepareTransactionAsync } = usePrepareProgramTransaction({
     program,
     serviceName: 'vftNativeExchange',
@@ -28,7 +26,7 @@ export const useBurnMessage = () => {
   });
 
   const tx = async ({ value }: Params) => {
-    if (!program || !account) return;
+    if (!program || !account) throw new Error('Program or account is not found');
     const { transaction } = await prepareTransactionAsync({
       args: [value],
       gasLimit: 105_000_000_000n,
@@ -37,12 +35,7 @@ export const useBurnMessage = () => {
     return transaction;
   };
 
-  const { mutateAsync: burnMessage, isPending } = useMutation({
-    mutationFn: tx,
-    onError: (error) => {
-      alert.error(getErrorMessage(error));
-    },
-  });
+  const { mutateAsync, isPending } = useMutation({ mutationFn: tx });
 
-  return { burnMessage, isPending };
+  return { mutateAsync, isPending, program };
 };

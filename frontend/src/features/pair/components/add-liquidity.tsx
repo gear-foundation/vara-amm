@@ -1,10 +1,10 @@
 import { useAccount, useAlert, useApi } from '@gear-js/react-hooks';
-import type { ISubmittableResult } from '@polkadot/types/types';
 import { Plus, ChevronDown, Info } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { Wallet, Button, Card, CardContent, CardHeader, CardTitle, TokenSelector, Input, Tooltip } from '@/components';
 import { SECONDS_IN_MINUTE } from '@/consts';
+import { useSignAndSend } from '@/hooks/use-sign-and-send';
 import {
   useAddLiquidityMessage,
   useGetReservesQuery,
@@ -21,7 +21,6 @@ import {
   parseUnits,
   calculatePercentage,
   calculateProportionalAmount,
-  handleStatus,
   getSelectedPair,
   calculateLPTokens,
   calculatePoolShare,
@@ -100,15 +99,18 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
       ? calculatePoolShare(totalSupply, lpTokensToMint)
       : '0';
 
-  const { approveMessage: token0ApproveMessage, isPending: isToken0ApprovePending } = useApproveMessage(token0.address);
-  const { approveMessage: token1ApproveMessage, isPending: isToken1ApprovePending } = useApproveMessage(token1.address);
+  const token0Approve = useApproveMessage(token0.address);
+  const token1Approve = useApproveMessage(token1.address);
 
-  const { addLiquidityMessage, isPending: isAddLiquidityPending } = useAddLiquidityMessage(pairAddress);
-  const { mintMessage } = useMintMessage();
+  const addLiquidity = useAddLiquidityMessage(pairAddress);
+  const mint = useMintMessage();
+  const signAndSend = useSignAndSend({
+    programs: [token0Approve.program, token1Approve.program, addLiquidity.program, mint.program],
+  });
   const isPending =
-    isToken0ApprovePending ||
-    isToken1ApprovePending ||
-    isAddLiquidityPending ||
+    token0Approve.isPending ||
+    token1Approve.isPending ||
+    addLiquidity.isPending ||
     isTotalSupplyFetching ||
     isReservesFetching ||
     loading;
@@ -142,7 +144,7 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token0.address, token1.address, reserves]);
 
-  const addLiquidity = async () => {
+  const addLiquidityHandler = async () => {
     setError(null);
 
     if (!api) {
@@ -221,15 +223,15 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
     });
 
     try {
-      const token0ApproveTx = await token0ApproveMessage({
+      const token0ApproveTx = await token0Approve.mutateAsync({
         value: amountADesired,
         spender: pairAddress,
       });
-      const token1ApproveTx = await token1ApproveMessage({
+      const token1ApproveTx = await token1Approve.mutateAsync({
         value: amountBDesired,
         spender: pairAddress,
       });
-      const addLiquidityTx = await addLiquidityMessage({
+      const addLiquidityTx = await addLiquidity.mutateAsync({
         amountADesired: isPairReverse ? amountBDesired : amountADesired,
         amountBDesired: isPairReverse ? amountADesired : amountBDesired,
         amountAMin: isPairReverse ? amountBMin : amountAMin,
@@ -246,35 +248,24 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
       setLoading(true);
 
       if (token0.isVaraNative) {
-        const mintTx0 = await mintMessage({ value: amountADesired });
+        const mintTx0 = await mint.mutateAsync({ value: amountADesired });
         if (mintTx0) {
           transactions.unshift(mintTx0.extrinsic);
         }
       }
       if (token1.isVaraNative) {
-        const mintTx1 = await mintMessage({ value: amountBDesired });
+        const mintTx1 = await mint.mutateAsync({ value: amountBDesired });
         if (mintTx1) {
           transactions.unshift(mintTx1.extrinsic);
         }
       }
 
-      const batch = api.tx.utility.batch(transactions);
-      const { address, signer } = account;
-      const statusCallback = (result: ISubmittableResult) =>
-        handleStatus(api, result, {
-          onSuccess: () => {
-            void refreshReserves();
-            void refreshTotalSupply();
-            onSuccess();
-            alert.success('Liquidity added successfully');
-          },
-          onError: (_error) => alert.error(_error),
-          onFinally: () => setLoading(false),
-        });
-      // TODO: check versions of polkadot and types
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-ignore
-      await batch.signAndSend(address, { signer }, statusCallback);
+      const extrinsic = api.tx.utility.batchAll(transactions);
+      await signAndSend.mutateAsync({ extrinsic });
+      void refreshReserves();
+      void refreshTotalSupply();
+      onSuccess();
+      alert.success('Liquidity added successfully');
     } catch (_error) {
       console.error('Error adding liquidity:', _error);
       alert.error(getErrorMessage(_error));
@@ -420,7 +411,7 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
 
           {account ? (
             <Button
-              onClick={addLiquidity}
+              onClick={addLiquidityHandler}
               disabled={isPending || !pairAddress}
               className="btn-primary w-full py-4 text-lg">
               ADD LIQUIDITY

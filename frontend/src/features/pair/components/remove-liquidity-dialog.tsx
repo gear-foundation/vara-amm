@@ -1,12 +1,12 @@
 import type { HexString } from '@gear-js/api';
 import { useAccount, useAlert, useApi } from '@gear-js/react-hooks';
-import type { ISubmittableResult } from '@polkadot/types/types';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { INPUT_PERCENTAGES, SECONDS_IN_MINUTE, SLIPPAGE } from '@/consts';
+import { useSignAndSend } from '@/hooks/use-sign-and-send';
 import {
   useBurnMessage,
   useCalculateRemoveLiquidityQuery,
@@ -17,7 +17,7 @@ import {
 import { getErrorMessage } from '@/lib/utils';
 
 import type { Token } from '../types';
-import { calculatePercentage, formatUnits, parseUnits, handleStatus } from '../utils';
+import { calculatePercentage, formatUnits, parseUnits } from '../utils';
 
 type RemoveLiquidityDialogProps = {
   isOpen: boolean;
@@ -43,10 +43,11 @@ const RemoveLiquidityDialog = ({
   const alert = useAlert();
   const { account } = useAccount();
 
-  const { removeLiquidityMessage, isPending: isRemoveLiquidityPending } = useRemoveLiquidityMessage(pairAddress);
+  const removeLiquidity = useRemoveLiquidityMessage(pairAddress);
   const { balance: userLpBalance, isFetching: isUserLpBalanceFetching } = useVftBalanceOfQuery(pairAddress);
   const { decimals: lpDecimals, isFetching: isLpDecimalsFetching } = useVftDecimalsQuery(pairAddress);
-  const { burnMessage } = useBurnMessage();
+  const burn = useBurnMessage();
+  const signAndSend = useSignAndSend({ programs: [removeLiquidity.program, burn.program] });
 
   const lpInput = lpDecimals && userInput ? parseUnits(userInput, lpDecimals) : 0n;
 
@@ -59,10 +60,10 @@ const RemoveLiquidityDialog = ({
     isUserLpBalanceFetching ||
     isLpDecimalsFetching ||
     isRemoveLiquidityAmountsFetching ||
-    isRemoveLiquidityPending ||
+    removeLiquidity.isPending ||
     loading;
 
-  const removeLiquidity = async () => {
+  const removeLiquidityHandler = async () => {
     setError(null);
     if (!api) {
       setError('API is not ready');
@@ -103,44 +104,29 @@ const RemoveLiquidityDialog = ({
     console.log('🚀 ~ removeLiquidity ~ params:', params);
 
     try {
-      const removeLiquidityTx = await removeLiquidityMessage(params);
-      if (!removeLiquidityTx?.extrinsic) {
-        setError('Failed to create remove liquidity transaction');
-        return;
-      }
-
+      const removeLiquidityTx = await removeLiquidity.mutateAsync(params);
       const transactions = [removeLiquidityTx.extrinsic];
 
       setLoading(true);
 
       if (token0.isVaraNative) {
-        const burnTx0 = await burnMessage({ value: BigInt(removeLiquidityAmounts[0]) });
+        const burnTx0 = await burn.mutateAsync({ value: BigInt(removeLiquidityAmounts[0]) });
         if (burnTx0) {
           transactions.push(burnTx0.extrinsic);
         }
       }
       if (token1.isVaraNative) {
-        const burnTx1 = await burnMessage({ value: BigInt(removeLiquidityAmounts[1]) });
+        const burnTx1 = await burn.mutateAsync({ value: BigInt(removeLiquidityAmounts[1]) });
         if (burnTx1) {
           transactions.push(burnTx1.extrinsic);
         }
       }
 
-      const batch = api.tx.utility.batch(transactions);
-      const { address, signer } = account;
-
-      const statusCallback = (result: ISubmittableResult) =>
-        handleStatus(api, result, {
-          onSuccess: () => {
-            alert.success('Liquidity removed successfully');
-            void refetchBalances();
-            onClose();
-          },
-          onError: (_error) => alert.error(_error),
-          onFinally: () => setLoading(false),
-        });
-
-      await batch.signAndSend(address, { signer }, statusCallback);
+      const extrinsic = api.tx.utility.batchAll(transactions);
+      await signAndSend.mutateAsync({ extrinsic });
+      refetchBalances();
+      onClose();
+      alert.success('Liquidity removed successfully');
     } catch (_error) {
       console.error('Error removing liquidity:', _error);
       alert.error(getErrorMessage(_error));
@@ -195,7 +181,7 @@ const RemoveLiquidityDialog = ({
 
         {error && <p className="text-red-500">{error}</p>}
 
-        <Button onClick={removeLiquidity} disabled={isFetching} className="btn-primary w-full py-4 text-lg">
+        <Button onClick={removeLiquidityHandler} disabled={isFetching} className="btn-primary w-full py-4 text-lg">
           REMOVE LIQUIDITY
         </Button>
       </DialogContent>
