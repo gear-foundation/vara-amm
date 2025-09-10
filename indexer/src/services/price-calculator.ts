@@ -67,13 +67,13 @@ export class PriceCalculator {
   /**
    * Calculate TVL (Total Value Locked) for a pair in USD
    */
-  async calculatePairTVL(
+  calculatePairTVL(
     pair: Pair,
     token0: Token,
     token1: Token,
     token0Price?: number,
     token1Price?: number
-  ): Promise<number> {
+  ): number {
     if (!token0 || !token1 || !token0Price || !token1Price) {
       return 0;
     }
