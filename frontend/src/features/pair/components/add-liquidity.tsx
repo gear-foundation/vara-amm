@@ -117,6 +117,31 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
 
   const { account } = useAccount();
 
+  const checkBalances = (_amount0: string, _amount1: string) => {
+    if (!account) return;
+
+    const amount0Wei = _amount0 ? parseUnits(_amount0, token0.decimals) : 0n;
+    const amount1Wei = _amount1 ? parseUnits(_amount1, token1.decimals) : 0n;
+
+    if (token0.balance && amount0Wei > token0.balance) {
+      setError(`Insufficient ${token0.displaySymbol} balance`);
+      return;
+    }
+
+    if (token1.balance && amount1Wei > token1.balance) {
+      setError(`Insufficient ${token1.displaySymbol} balance`);
+      return;
+    }
+
+    // Clear balance-related errors if balances are sufficient
+    if (
+      error === `Insufficient ${token0.displaySymbol} balance` ||
+      error === `Insufficient ${token1.displaySymbol} balance`
+    ) {
+      setError(null);
+    }
+  };
+
   useEffect(() => {
     if (!reserves || isPairReverse === undefined || isPoolEmpty) return;
 
@@ -130,6 +155,7 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
         isPairReverse,
       );
       setAmount1(newAmount1);
+      checkBalances(amount0, newAmount1);
     } else if (amount1) {
       const newAmount0 = calculateProportionalAmount(
         amount1,
@@ -140,9 +166,15 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
         isPairReverse,
       );
       setAmount0(newAmount0);
+      checkBalances(newAmount0, amount1);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token0.address, token1.address, reserves]);
+
+  useEffect(() => {
+    checkBalances(amount0, amount1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token0.balance, token1.balance]);
 
   const addLiquidityHandler = async () => {
     setError(null);
@@ -313,6 +345,7 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
                       isPairReverse,
                     );
                     setAmount1(newAmount1);
+                    checkBalances(e.target.value, newAmount1);
                   }
                 }}
                 placeholder="0.0"
@@ -362,6 +395,7 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
                       isPairReverse,
                     );
                     setAmount0(newAmount0);
+                    checkBalances(newAmount0, e.target.value);
                   }
                 }}
                 placeholder="0.0"
@@ -412,7 +446,7 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
           {account ? (
             <Button
               onClick={addLiquidityHandler}
-              disabled={isPending || !pairAddress}
+              disabled={isPending || !pairAddress || !!error}
               className="btn-primary w-full py-4 text-lg">
               ADD LIQUIDITY
             </Button>

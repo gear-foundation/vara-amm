@@ -304,6 +304,8 @@ export function Swap({ pairsTokens, refetchBalances }: TradePageProps) {
   }, [fromToken, toToken, pairPrograms, pairIndex, reserves]);
 
   const checkBalances = (amount: string) => {
+    if (!isWalletConnected) return;
+
     const amountIn = parseUnits(amount, fromToken.decimals);
 
     if (!fromToken.balance || amountIn > fromToken.balance) {
