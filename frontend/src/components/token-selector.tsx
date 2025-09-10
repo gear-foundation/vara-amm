@@ -33,7 +33,6 @@ export function TokenSelector({
         token.displaySymbol.toLowerCase().includes(searchQuery.toLowerCase())) &&
       token.address !== disabledTokenAddress,
   );
-  console.log('🚀 ~ TokenSelector ~ filteredTokens:', filteredTokens, disabledTokenAddress);
 
   const handleTokenSelect = (token: Token) => {
     onSelectToken(token, selectedNetwork);
