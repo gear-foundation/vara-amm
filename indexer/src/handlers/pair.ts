@@ -144,7 +144,7 @@ export class PairHandler extends BaseHandler {
     this._tokenManager = new TokenManager(ctx, this._vftCache);
 
     await this._initTokens();
-    await this._initSnapshots();
+    await this._initSnapshots(getBlockCommonData(ctx.blocks[0]).blockTimestamp);
 
     for (const block of ctx.blocks) {
       const common = getBlockCommonData(block);
@@ -696,7 +696,7 @@ export class PairHandler extends BaseHandler {
     this._pair.volume1y = volumes.volume1y;
   }
 
-  private async _initSnapshots(): Promise<void> {
+  private async _initSnapshots(timestamp: Date): Promise<void> {
     if (this._volumeSnapshots.size > 0) {
       return;
     }
@@ -706,7 +706,16 @@ export class PairHandler extends BaseHandler {
       order: { timestamp: "DESC" },
     });
 
-    this._volumeSnapshots.set(latestSnapshot.id, latestSnapshot);
-    this._lastPriceAndVolumeUpdate = latestSnapshot.timestamp;
+    if (latestSnapshot) {
+      this._volumeSnapshots.set(latestSnapshot.id, latestSnapshot);
+      this._lastPriceAndVolumeUpdate = latestSnapshot.timestamp;
+    } else {
+      const hourlySnapshot = VolumeCalculator.createEmptyHourlySnapshot(
+        this._pair.id,
+        timestamp
+      );
+      this._volumeSnapshots.set(hourlySnapshot.id, hourlySnapshot);
+      this._lastPriceAndVolumeUpdate = timestamp;
+    }
   }
 }
