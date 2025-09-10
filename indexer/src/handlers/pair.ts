@@ -253,8 +253,8 @@ export class PairHandler extends BaseHandler {
       this._tokens.set(token1.id, token1);
 
       // Load latest price snapshots and initialize token prices
-      await this._initTokenPrices(token0.id);
-      await this._initTokenPrices(token1.id);
+      await this._initTokenPrices(token0);
+      await this._initTokenPrices(token1);
 
       if (isToken0New || isToken1New) {
         this._isTokensUpdated = true;
@@ -265,27 +265,31 @@ export class PairHandler extends BaseHandler {
   /**
    * Load the latest price snapshot for a token and initialize its price in memory
    */
-  private async _initTokenPrices(tokenId: string): Promise<void> {
+  private async _initTokenPrices(token: Token): Promise<void> {
     const latestSnapshot = await this._ctx.store.findOne(TokenPriceSnapshot, {
       where: {
-        token: { id: tokenId },
+        token: { id: token.id },
       },
       order: { timestamp: "DESC" },
     });
 
     if (latestSnapshot) {
-      this._tokenPrices.set(tokenId, latestSnapshot.priceUsd);
+      this._tokenPrices.set(token.id, latestSnapshot.priceUsd);
       this._ctx.log.debug(
         {
-          tokenId,
+          tokenId: token.id,
           price: latestSnapshot.priceUsd,
           timestamp: latestSnapshot.timestamp,
         },
         "Initialized token price from latest snapshot"
       );
     } else {
+      if (PriceUtils.isStablecoin(token.symbol)) {
+        this._tokenPrices.set(token.id, 1);
+      }
+
       this._ctx.log.debug(
-        { tokenId },
+        { tokenId: token.id },
         "No price snapshot found for token, price will be calculated on first update"
       );
     }
