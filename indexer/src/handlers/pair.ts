@@ -152,7 +152,7 @@ export class PairHandler extends BaseHandler {
 
       // Perform hourly updates if needed
       if (this._shouldPerformHourlyUpdates(blockTimestamp)) {
-        this._performHourlyUpdates(blockTimestamp, blockNumber);
+        await this._performHourlyUpdates(blockTimestamp, blockNumber);
       }
 
       for (const event of block.events) {
