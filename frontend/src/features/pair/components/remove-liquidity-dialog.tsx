@@ -39,7 +39,6 @@ const RemoveLiquidityDialog = ({
   const { decimals: lpDecimals, isFetching: isLpDecimalsFetching } = useVftDecimalsQuery(pairAddress);
 
   const lpInput = lpDecimals && userInput ? parseUnits(userInput, lpDecimals) : 0n;
-
   const { removeLiquidityAmounts, isFetching: isRemoveLiquidityAmountsFetching } = useCalculateRemoveLiquidityQuery(
     pairAddress,
     String(lpInput),
