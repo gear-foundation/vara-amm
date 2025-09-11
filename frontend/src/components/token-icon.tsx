@@ -38,7 +38,7 @@ export function TokenIcon({ token, size = 'md', className = '' }: TokenIconProps
       {token.isVerified && (
         <div
           className={`absolute ${badgeClasses[size]} bg-[#00FF85] rounded-full flex items-center justify-center border-2 border-gray-900`}>
-          <Tooltip content="Official Vara or Verified Community Token">
+          <Tooltip content="Used in Vara Bridge for cross-chain swaps">
             <Shield className={`${shieldClasses[size]} text-black`} />
           </Tooltip>
         </div>
