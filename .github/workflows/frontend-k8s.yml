@@ -77,10 +77,7 @@ jobs:
           build-args: |
             VITE_NODE_ADDRESS=${{ secrets.VITE_NODE_ADDRESS }}
             VITE_FACTORY_PROGRAM_ID=${{ secrets.VITE_FACTORY_PROGRAM_ID }}
-<<<<<<< HEAD
             VITE_EXPLORER_URL=${{ secrets.VITE_EXPLORER_URL }}
-=======
->>>>>>> origin/master
 
   deploy-to-k8s:
     needs: [prepair, build-and-push-image]
