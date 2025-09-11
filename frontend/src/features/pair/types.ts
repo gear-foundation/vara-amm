@@ -10,6 +10,7 @@ interface Token {
   balance?: bigint;
   network?: string;
   isVaraNative?: boolean;
+  isVerified?: boolean;
 }
 
 interface Network {

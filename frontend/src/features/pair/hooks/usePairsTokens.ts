@@ -3,7 +3,7 @@ import { useAccount, useApi, useDeriveBalancesAll } from '@gear-js/react-hooks';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useMemo, useRef } from 'react';
 
-import { LOGO_URI_BY_SYMBOL } from '@/consts';
+import { LOGO_URI_BY_SYMBOL, VERIFIED_TOKENS } from '@/consts';
 import { useVaraSymbol } from '@/hooks';
 import { usePairsQuery } from '@/lib/sails';
 import { SailsProgram as VftProgram } from '@/lib/sails/extended-vft';
@@ -41,6 +41,7 @@ type TokenData = {
   decimals: number;
   balance?: bigint;
   isVaraNative?: boolean;
+  isVerified?: boolean;
 } | null;
 
 export type TokenDataMap = Map<HexString, NonNullable<TokenData>>;
@@ -107,12 +108,14 @@ const usePairsTokens = (): UsePairsTokensResult => {
 
       const setTokenData = (tokenDataMap: TokenDataMap, index: number, token: TokenData) => {
         if (!token) return;
-        const isVaraNative = token.symbol.toLowerCase().includes('vara');
-        tokenDataMap.set(vftAddresses[index], {
+        const tokenAddress = vftAddresses[index];
+        const isVaraNative = token.symbol.toLowerCase().includes('vara') && VERIFIED_TOKENS.includes(tokenAddress);
+        tokenDataMap.set(tokenAddress, {
           ...token,
           balance: isVaraNative ? nativeBalance?.transferable?.toBigInt() : token.balance,
           isVaraNative,
           displaySymbol: isVaraNative && varaSymbol ? varaSymbol : token.symbol,
+          isVerified: VERIFIED_TOKENS.includes(tokenAddress),
         });
       };
 
@@ -174,6 +177,7 @@ const usePairsTokens = (): UsePairsTokensResult => {
           logoURI: LOGO_URI_BY_SYMBOL[data.symbol],
           network: 'Vara Network',
           isVaraNative: data.isVaraNative,
+          isVerified: data.isVerified,
         };
         tokens.push(token);
       }

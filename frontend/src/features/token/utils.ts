@@ -7,14 +7,11 @@ import type { PairData, TokenDataMap } from '../pair';
 
 import type { TokenData } from './queries';
 
-function transformTokenDataForTable(
-  tokens: TokenData[],
-  pairs: PairData[],
-  tokensDataMap?: TokenDataMap,
-): Array<{
+export type TokenDataForTable = {
   name: string;
   symbol: string;
   logoURI: string;
+  address: HexString;
   price: number;
   change1h: number;
   change1d: number;
@@ -25,7 +22,13 @@ function transformTokenDataForTable(
   volume1m: number;
   volume1y: number;
   network: string;
-}> {
+};
+
+function transformTokenDataForTable(
+  tokens: TokenData[],
+  pairs: PairData[],
+  tokensDataMap?: TokenDataMap,
+): Array<TokenDataForTable> {
   if ((pairs && pairs.length === 0) || !tokensDataMap) {
     return [];
   }
@@ -34,11 +37,13 @@ function transformTokenDataForTable(
     const latestSnapshot = token.tokenPriceSnapshotsByTokenId?.nodes[0];
 
     const calculatedVolumes = calculateTokenTradingVolumeBySymbol(token.symbol, pairs);
-    const displaySymbol = tokensDataMap.get(token.id as HexString)?.displaySymbol || token.symbol;
+    const tokenData = tokensDataMap.get(token.id as HexString);
+    const displaySymbol = tokenData?.displaySymbol || token.symbol;
 
     return {
-      name: token.name || displaySymbol,
+      name: tokenData?.isVaraNative ? 'Vara Network Token' : token.name || displaySymbol,
       symbol: displaySymbol,
+      address: token.id as HexString,
       logoURI: LOGO_URI_BY_SYMBOL[token.symbol] || '/placeholder.svg',
       price: toNumber(latestSnapshot?.priceUsd) || 0,
       change1h: toNumber(latestSnapshot?.change1H) || 0,
@@ -49,6 +54,7 @@ function transformTokenDataForTable(
       volume1w: calculatedVolumes.volume7d,
       volume1m: calculatedVolumes.volume30d,
       volume1y: calculatedVolumes.volume1y,
+      isVerified: tokenData?.isVerified || false,
       network: 'Vara Network', // Default network
     };
   });
