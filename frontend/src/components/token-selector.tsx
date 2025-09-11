@@ -29,7 +29,8 @@ export function TokenSelector({
   const filteredTokens = selectedNetwork.tokens.filter(
     (token) =>
       (token.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        token.displaySymbol.toLowerCase().includes(searchQuery.toLowerCase())) &&
+        token.displaySymbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        token.address.toLowerCase().includes(searchQuery.toLowerCase())) &&
       token.address !== disabledTokenAddress,
   );
 
