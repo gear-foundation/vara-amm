@@ -50,7 +50,6 @@ const RemoveLiquidityDialog = ({
   const signAndSend = useSignAndSend({ programs: [removeLiquidity.program, burn.program] });
 
   const lpInput = lpDecimals && userInput ? parseUnits(userInput, lpDecimals) : 0n;
-
   const { removeLiquidityAmounts, isFetching: isRemoveLiquidityAmountsFetching } = useCalculateRemoveLiquidityQuery(
     pairAddress,
     String(lpInput),

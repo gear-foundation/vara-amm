@@ -3,9 +3,33 @@ import { TimeUtils } from "./utils";
 import { VolumePeriods } from "../types";
 
 export class VolumeCalculator {
-  /**
-   * Create or update hourly snapshot for the pair
-   */
+  static createEmptyHourlySnapshot(
+    pairId: string,
+    timestamp: Date
+  ): PairVolumeSnapshot {
+    const currentHour = TimeUtils.roundToHour(timestamp);
+    const snapshotId = `${pairId}:HOURLY:${currentHour.getTime()}`;
+
+    return new PairVolumeSnapshot({
+      id: snapshotId,
+      pair: { id: pairId } as any,
+      interval: VolumeInterval.HOURLY,
+      volumeUsd: 0,
+      transactionCount: 0,
+      timestamp: currentHour,
+      createdAt: new Date(),
+    });
+  }
+
+  static updateSnapshot(
+    snapshot: PairVolumeSnapshot,
+    value: number
+  ): PairVolumeSnapshot {
+    snapshot.volumeUsd += value;
+    snapshot.transactionCount += 1;
+    return snapshot;
+  }
+
   static createOrUpdateHourlySnapshot(
     existingSnapshots: Map<string, PairVolumeSnapshot>,
     pairId: string,
@@ -15,32 +39,27 @@ export class VolumeCalculator {
     const currentHour = TimeUtils.roundToHour(timestamp);
     const snapshotId = `${pairId}:HOURLY:${currentHour.getTime()}`;
 
-    // Try to get existing snapshot
-    let snapshot = existingSnapshots.get(snapshotId);
-
-    if (snapshot) {
-      // Update existing
-      snapshot.volumeUsd += value;
-      snapshot.transactionCount += 1;
-    } else {
-      // Create new
-      snapshot = new PairVolumeSnapshot({
-        id: snapshotId,
-        pair: { id: pairId } as any,
-        interval: VolumeInterval.HOURLY,
-        volumeUsd: value,
-        transactionCount: 1,
-        timestamp: currentHour,
-        createdAt: new Date(),
-      });
+    const existing = existingSnapshots.get(snapshotId);
+    if (existing) {
+      return this.updateSnapshot(existing, value);
     }
 
-    return snapshot;
+    const newSnapshot = this.createEmptyHourlySnapshot(pairId, timestamp);
+    return this.updateSnapshot(newSnapshot, value);
   }
 
-  /**
-   * Calculate volumes from existing snapshots
-   */
+  static clearOldSnapshots(
+    existingSnapshots: Map<string, PairVolumeSnapshot>,
+    timestamp: Date
+  ): void {
+    const oneDayAgo = TimeUtils.getTimePeriods(timestamp).oneDayAgo;
+    existingSnapshots.forEach((snapshot) => {
+      if (snapshot.timestamp < oneDayAgo) {
+        existingSnapshots.delete(snapshot.id);
+      }
+    });
+  }
+
   static calculateVolumesFromSnapshots(
     allSnapshots: PairVolumeSnapshot[],
     currentTime: Date
