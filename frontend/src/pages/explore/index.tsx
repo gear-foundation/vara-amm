@@ -11,7 +11,7 @@ import { ExplorePageTokensFilters } from './tokens-filters';
 import { ExplorePageTransactions } from './transactions';
 import { ExplorePageTransactionsFilters } from './transactions-filters';
 
-export function ExplorePage() {
+function ExplorePage() {
   const { pairsTokens, tokensData } = usePairsTokens();
 
   const { poolsData, metrics, isFetching: isPoolsLoading, error: poolsError } = usePoolsData(tokensData);
@@ -163,3 +163,5 @@ export function ExplorePage() {
     </div>
   );
 }
+
+export default ExplorePage;
