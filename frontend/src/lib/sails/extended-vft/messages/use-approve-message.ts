@@ -23,6 +23,11 @@ export const useApproveMessage = (vftAddress: HexString) => {
 
   const tx = async ({ spender, value }: Params) => {
     if (!program || !account) return;
+<<<<<<< HEAD
+=======
+    console.log('🚀 ~ tx ~ value:', value);
+    console.log('🚀 ~ tx ~ spender:', spender);
+>>>>>>> vt-add-indexer
 
     const { transaction } = await prepareTransactionAsync({
       args: [spender, value],
