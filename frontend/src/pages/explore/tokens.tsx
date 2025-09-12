@@ -1,12 +1,11 @@
-import { TrendingUp, TrendingDown, ChevronUp, ChevronDown } from 'lucide-react';
+import { TrendingUp, TrendingDown, ChevronUp, ChevronDown, ExternalLink } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 
+import { Address, TokenIcon } from '@/components';
 import type { TokenDataMap } from '@/features/pair';
 import { formatCurrency, formatPrice, getVolumeByTimeframe } from '@/utils';
 
 import { useTokensWithPrices, transformTokenDataForTable, usePairsData, TokenDataForTable } from '../../features/token';
-import { Address } from '../address';
-import { TokenIcon } from '../token-icon';
 
 type SortField = string;
 type SortDirection = 'asc' | 'desc';
@@ -286,6 +285,17 @@ export function ExplorePageTokens({
             )}
           </tbody>
         </table>
+      </div>
+
+      <div className="p-6 border-t border-gray-500/20">
+        <a
+          href="https://wiki.gear.foundation/docs/bridge/developer_hub#contract-addresses"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center space-x-2 text-sm text-gray-400 hover:text-[#00FF85] transition-colors">
+          <ExternalLink className="w-3 h-3" />
+          <span>View Vara Bridge token list on Vara Wiki</span>
+        </a>
       </div>
     </div>
   );
