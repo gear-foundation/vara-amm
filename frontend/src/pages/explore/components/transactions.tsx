@@ -36,10 +36,13 @@ const formatTime = (timestamp: string) => {
 };
 
 const formatAmount = (tx: Transaction, pairsTokens: PairsTokens) => {
-  const pairInfo = pairsTokens.find((pair) => pair.pairAddress === tx.pairId);
+  const pairInfo = pairsTokens.pairsByAddress.get(tx.pairId);
   if (!pairInfo) throw new Error(`unknown pair: ${tx.pairId}`);
 
-  const { token0, token1 } = pairInfo;
+  const token0 = pairsTokens.tokens.get(pairInfo.token0Address);
+  const token1 = pairsTokens.tokens.get(pairInfo.token1Address);
+
+  if (!token0 || !token1) throw new Error(`unknown tokens: ${pairInfo.token0Address} or ${pairInfo.token1Address}`);
 
   switch (tx.type) {
     case 'SWAP': {

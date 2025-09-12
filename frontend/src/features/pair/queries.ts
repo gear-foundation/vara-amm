@@ -13,11 +13,11 @@ export type Transaction = {
   tokenOut: string;
   type: string;
   user: string;
-  pairId: string;
+  pairId: HexString;
 };
 
 export type PairData = {
-  id: string;
+  id: HexString;
   token0: HexString;
   token1: HexString;
   token0Symbol: string | null;

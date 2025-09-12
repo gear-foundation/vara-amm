@@ -1,3 +1,4 @@
+import type { HexString } from '@gear-js/api';
 import { useAccount } from '@gear-js/react-hooks';
 import { useState } from 'react';
 import { useLocation } from 'react-router-dom';
@@ -11,7 +12,6 @@ import {
   usePairsTotalSupply,
   usePairsTokens,
 } from '@/features/pair';
-import type { Token } from '@/features/pair/types';
 import { calculateExistingPoolShare } from '@/features/pair/utils';
 import { usePairsQuery } from '@/lib/sails';
 
@@ -31,8 +31,8 @@ function Pool() {
   const { lpUserFees, refetchLpUserFees } = useLpUserFees({ pairPrograms });
   const { pairTotalSupplies, refetchPairTotalSupplies } = usePairsTotalSupply({ pairPrograms });
 
-  const [defaultToken0, setDefaultToken0] = useState<Token | null>(null);
-  const [defaultToken1, setDefaultToken1] = useState<Token | null>(null);
+  const [defaultToken0, setDefaultToken0] = useState<HexString | null>(null);
+  const [defaultToken1, setDefaultToken1] = useState<HexString | null>(null);
 
   if (!pairsTokens) {
     return <Loader size="lg" text="Loading..." className="py-20" />;
@@ -46,7 +46,10 @@ function Pool() {
   };
 
   const pairsWithUserLiquidity = pairs?.map((pair, index) => {
-    const { token0, token1, pairAddress } = pairsTokens.find((_pair) => _pair.pairAddress === pair[1]) || {};
+    const pairAddress = pair[1];
+    const token0 = pairsTokens.tokens.get(pair[0][0]);
+    const token1 = pairsTokens.tokens.get(pair[0][1]);
+
     if (!token0 || !token1) throw new Error('Token not found');
 
     const userLpBalance = (pairAddress && pairBalances?.[pairAddress]) || 0n;
@@ -94,8 +97,8 @@ function Pool() {
             refetchBalances={refetchBalances}
             onAddMore={(token0, token1) => {
               setActiveTab('new-position');
-              setDefaultToken0(token0);
-              setDefaultToken1(token1);
+              setDefaultToken0(token0.address);
+              setDefaultToken1(token1.address);
             }}
             onCreateFirst={() => setActiveTab('new-position')}
           />

@@ -5,7 +5,12 @@ import { Address, TokenIcon } from '@/components';
 import type { TokenDataMap } from '@/features/pair';
 import { formatCurrency, formatPrice, getVolumeByTimeframe } from '@/utils';
 
-import { useTokensWithPrices, transformTokenDataForTable, usePairsData, TokenDataForTable } from '../../../features/token';
+import {
+  useTokensWithPrices,
+  transformTokenDataForTable,
+  usePairsData,
+  TokenDataForTable,
+} from '../../../features/token';
 
 type SortField = string;
 type SortDirection = 'asc' | 'desc';

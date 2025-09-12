@@ -1,6 +1,9 @@
+import type { HexString } from '@gear-js/api';
 import { useAccount, useAlert, useApi } from '@gear-js/react-hooks';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { Plus, ChevronDown, Info } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
+import { useForm, useWatch } from 'react-hook-form';
 
 import { Wallet, Button, Card, CardContent, CardHeader, CardTitle, TokenSelector, Input, Tooltip } from '@/components';
 import { SECONDS_IN_MINUTE } from '@/consts';
@@ -14,6 +17,7 @@ import {
 } from '@/lib/sails';
 import { getErrorMessage } from '@/lib/utils';
 
+import { createAddLiquidityValidationSchema } from '../schema';
 import type { Token, Network, PairsTokens } from '../types';
 import {
   getFormattedBalance,
@@ -30,45 +34,69 @@ import {
 type AddLiquidityProps = {
   pairsTokens: PairsTokens;
   onSuccess: () => void;
-  defaultToken0: Token | null;
-  defaultToken1: Token | null;
+  defaultToken0: HexString | null;
+  defaultToken1: HexString | null;
+};
+
+type AddLiquidityFormData = {
+  token0Address: HexString;
+  token1Address: HexString;
+  amount0: string;
+  amount1: string;
 };
 
 const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: AddLiquidityProps) => {
-  const [token0, setToken0] = useState<Token>(defaultToken0 || pairsTokens[0].token0);
-  const [token1, setToken1] = useState<Token>(defaultToken1 || pairsTokens[0].token1);
-
-  useEffect(() => {
-    setToken0((prev) => ({
-      ...prev,
-      balance: pairsTokens.find((pair) => pair.token0.address === prev.address)?.token0.balance,
-    }));
-    setToken1((prev) => ({
-      ...prev,
-      balance: pairsTokens.find((pair) => pair.token1.address === prev.address)?.token1.balance,
-    }));
-  }, [pairsTokens]);
-
-  const [amount0, setAmount0] = useState('');
-  const [amount1, setAmount1] = useState('');
   const [showToken0Selector, setShowToken0Selector] = useState(false);
   const [showToken1Selector, setShowToken1Selector] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+
+  const defaultValues: AddLiquidityFormData = {
+    token0Address: defaultToken0 || pairsTokens.pairsArray[0].token0.address,
+    token1Address: defaultToken1 || pairsTokens.pairsArray[0].token1.address,
+    amount0: '',
+    amount1: '',
+  };
+
+  const validationSchema = useMemo(() => createAddLiquidityValidationSchema(pairsTokens.tokens), [pairsTokens.tokens]);
+
+  const form = useForm<AddLiquidityFormData>({
+    resolver: zodResolver(validationSchema),
+    defaultValues,
+    mode: 'onChange',
+  });
+
+  const { register, handleSubmit, setValue, formState, control, trigger } = form;
+  const { errors, isSubmitting } = formState;
+
+  const watchedValues = useWatch({ control });
+  const { token0Address, token1Address, amount0, amount1 } = watchedValues;
+
+  const token0 = useMemo(() => {
+    if (!token0Address) return undefined;
+    return pairsTokens.tokens.get(token0Address);
+  }, [pairsTokens, token0Address]);
+
+  const token1 = useMemo(() => {
+    if (!token1Address) return undefined;
+    return pairsTokens.tokens.get(token1Address);
+  }, [pairsTokens, token1Address]);
+
   const { api } = useApi();
   const alert = useAlert();
 
   const handleToken0Select = (token: Token, _network: Network) => {
-    setError(null);
-    setToken0(token);
+    setValue('token0Address', token.address);
   };
 
   const handleToken1Select = (token: Token, _network: Network) => {
-    setError(null);
-    setToken1(token);
+    setValue('token1Address', token.address);
   };
 
-  const { selectedPair, isPairReverse } = getSelectedPair(pairsTokens, token0, token1) || {};
+  const selectedPairResult = useMemo(() => {
+    if (!token0Address || !token1Address) return null;
+    return getSelectedPair(pairsTokens, token0Address, token1Address);
+  }, [pairsTokens, token0Address, token1Address]);
+
+  const { selectedPair, isPairReverse } = selectedPairResult || {};
   const pairAddress = selectedPair?.pairAddress;
 
   const { reserves, isFetching: isReservesFetching, refetch: refreshReserves } = useGetReservesQuery(pairAddress);
@@ -78,10 +106,58 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
     refetch: refreshTotalSupply,
   } = useVftTotalSupplyQuery(pairAddress);
 
+  const token0Approve = useApproveMessage(token0?.address || ('0x0' as HexString));
+  const token1Approve = useApproveMessage(token1?.address || ('0x0' as HexString));
+
+  const addLiquidity = useAddLiquidityMessage(pairAddress || ('0x0' as HexString));
+  const mint = useMintMessage();
+  const signAndSend = useSignAndSend({
+    programs: [token0Approve.program, token1Approve.program, addLiquidity.program, mint.program],
+  });
+
+  const { account } = useAccount();
   const isPoolEmpty = reserves?.[0] === 0n && reserves?.[1] === 0n && totalSupply === 0n;
 
+  const handleAmount0Change = (value: string) => {
+    if (!isPoolEmpty && reserves && isPairReverse !== undefined && token0 && token1) {
+      const newAmount1 = calculateProportionalAmount(
+        value,
+        token0.decimals,
+        reserves[0],
+        reserves[1],
+        token1.decimals,
+        isPairReverse,
+      );
+      setValue('amount1', newAmount1 ?? '', { shouldValidate: true });
+    }
+  };
+
+  const handleAmount1Change = (value: string) => {
+    if (!isPoolEmpty && reserves && isPairReverse !== undefined && token0 && token1) {
+      const newAmount0 = calculateProportionalAmount(
+        value,
+        token1.decimals,
+        reserves[1],
+        reserves[0],
+        token0.decimals,
+        isPairReverse,
+      );
+      setValue('amount0', newAmount0 ?? '', { shouldValidate: true });
+    }
+  };
+
+  useEffect(() => {
+    handleAmount0Change(amount0 || '');
+    void trigger();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token0Address, token1Address, reserves]);
+
+  if (!token0 || !token1) {
+    return <div>Error: Token not found</div>;
+  }
+
   const lpTokensToMint =
-    reserves && totalSupply !== undefined && isPairReverse !== undefined
+    reserves && totalSupply !== undefined && isPairReverse !== undefined && amount0 && amount1 && token0 && token1
       ? calculateLPTokens(
           amount0,
           amount1,
@@ -99,143 +175,21 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
       ? calculatePoolShare(totalSupply, lpTokensToMint)
       : '0';
 
-  const token0Approve = useApproveMessage(token0.address);
-  const token1Approve = useApproveMessage(token1.address);
-
-  const addLiquidity = useAddLiquidityMessage(pairAddress);
-  const mint = useMintMessage();
-  const signAndSend = useSignAndSend({
-    programs: [token0Approve.program, token1Approve.program, addLiquidity.program, mint.program],
-  });
   const isPending =
     token0Approve.isPending ||
     token1Approve.isPending ||
     addLiquidity.isPending ||
     isTotalSupplyFetching ||
     isReservesFetching ||
-    loading;
+    isSubmitting;
 
-  const { account } = useAccount();
-
-  const checkBalances = (_amount0: string, _amount1: string) => {
-    if (!account) return;
-
-    const amount0Wei = _amount0 ? parseUnits(_amount0, token0.decimals) : 0n;
-    const amount1Wei = _amount1 ? parseUnits(_amount1, token1.decimals) : 0n;
-
-    if (token0.balance && amount0Wei > token0.balance) {
-      setError(`Insufficient ${token0.displaySymbol} balance`);
-      return;
+  const onSubmit = async (data: AddLiquidityFormData) => {
+    if (!api || !pairAddress || !account?.decodedAddress) {
+      throw new Error('API, pairAddress or account is not ready');
     }
 
-    if (token1.balance && amount1Wei > token1.balance) {
-      setError(`Insufficient ${token1.displaySymbol} balance`);
-      return;
-    }
-
-    // Clear balance-related errors if balances are sufficient
-    if (
-      error === `Insufficient ${token0.displaySymbol} balance` ||
-      error === `Insufficient ${token1.displaySymbol} balance`
-    ) {
-      setError(null);
-    }
-  };
-
-  useEffect(() => {
-    if (!reserves || isPairReverse === undefined || isPoolEmpty) return;
-
-    if (amount0) {
-      const newAmount1 = calculateProportionalAmount(
-        amount0,
-        token0.decimals,
-        reserves[0],
-        reserves[1],
-        token1.decimals,
-        isPairReverse,
-      );
-      setAmount1(newAmount1);
-      checkBalances(amount0, newAmount1);
-    } else if (amount1) {
-      const newAmount0 = calculateProportionalAmount(
-        amount1,
-        token1.decimals,
-        reserves[1],
-        reserves[0],
-        token0.decimals,
-        isPairReverse,
-      );
-      setAmount0(newAmount0);
-      checkBalances(newAmount0, amount1);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token0.address, token1.address, reserves]);
-
-  useEffect(() => {
-    checkBalances(amount0, amount1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token0.balance, token1.balance]);
-
-  const addLiquidityHandler = async () => {
-    setError(null);
-
-    if (!api) {
-      setError('API is not ready');
-      return;
-    }
-
-    if (!pairAddress) {
-      setError('Pair not found');
-      return;
-    }
-
-    if (!amount0 || !amount1) {
-      setError('Please enter amounts for both tokens');
-      return;
-    }
-
-    if (token0.balance === undefined || token1.balance === undefined) {
-      setError('Please select tokens');
-      return;
-    }
-
-    if (!account?.decodedAddress) {
-      setError('Wallet not connected');
-      return;
-    }
-
-    const amountANum = parseFloat(amount0);
-    const amountBNum = parseFloat(amount1);
-
-    if (isNaN(amountANum) || amountANum <= 0) {
-      setError('Invalid amount for first token');
-      return;
-    }
-
-    if (isNaN(amountBNum) || amountBNum <= 0) {
-      setError('Invalid amount for second token');
-      return;
-    }
-
-    const token0Balance = token0.balance;
-    const token1Balance = token1.balance;
-
-    const amountADesired = parseUnits(amountANum.toString(), token0.decimals);
-    const amountBDesired = parseUnits(amountBNum.toString(), token1.decimals);
-
-    if (amountADesired > token0Balance) {
-      setError(
-        `Insufficient ${token0.displaySymbol} balance. Available: ${getFormattedBalance(token0Balance, token0.decimals, token0.displaySymbol)}`,
-      );
-      return;
-    }
-
-    if (amountBDesired > token1Balance) {
-      setError(
-        `Insufficient ${token1.displaySymbol} balance. Available: ${getFormattedBalance(token1Balance, token1.decimals, token1.displaySymbol)}`,
-      );
-      return;
-    }
+    const amountADesired = parseUnits(data.amount0, token0.decimals);
+    const amountBDesired = parseUnits(data.amount1, token1.decimals);
 
     const slippageTolerance = 0.05; // 5%
     const amountAMin = calculatePercentage(amountADesired, 1 - slippageTolerance);
@@ -271,13 +225,10 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
         deadline: deadline.toString(),
       });
       if (!token0ApproveTx?.extrinsic || !token1ApproveTx?.extrinsic || !addLiquidityTx?.extrinsic) {
-        setError('Failed to create batch');
-        return;
+        throw new Error('Failed to create batch');
       }
 
       const transactions = [token0ApproveTx.extrinsic, token1ApproveTx.extrinsic, addLiquidityTx.extrinsic];
-
-      setLoading(true);
 
       if (token0.isVaraNative) {
         const mintTx0 = await mint.mutateAsync({ value: amountADesired });
@@ -301,12 +252,17 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
     } catch (_error) {
       console.error('Error adding liquidity:', _error);
       alert.error(getErrorMessage(_error));
-    } finally {
-      setLoading(false);
     }
   };
 
-  const networks = getNetworks(pairsTokens);
+  const networks = getNetworks(pairsTokens.tokens);
+
+  const formError =
+    errors.amount0?.message ||
+    errors.amount1?.message ||
+    errors.token0Address?.message ||
+    errors.token1Address?.message;
+  const isFormValid = !formError && amount0 && amount1 && pairAddress;
 
   return (
     <>
@@ -315,146 +271,121 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
           <CardTitle className="text-lg font-bold uppercase theme-text">ADD LIQUIDITY</CardTitle>
           <div className="text-sm text-gray-400">Fixed fee tier: 0.3%</div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Token 0 */}
-          <div className="space-y-2">
-            <div className="flex justify-between gap-2 text-sm text-gray-400">
-              <span>TOKEN 1</span>
-              <span className="text-right">
-                Balance:{' '}
-                {token0.balance ? getFormattedBalance(token0.balance, token0.decimals, token0.displaySymbol) : '0'}
-              </span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Input
-                value={amount0}
-                type="number"
-                inputMode="decimal"
-                min={0}
-                max={token0.balance ? getFormattedBalance(token0.balance, token0.decimals) : undefined}
-                onChange={(e) => {
-                  setError(null);
-                  setAmount0(e.target.value);
-                  if (!isPoolEmpty && reserves && isPairReverse !== undefined) {
-                    const newAmount1 = calculateProportionalAmount(
-                      e.target.value,
-                      token0.decimals,
-                      reserves[0],
-                      reserves[1],
-                      token1.decimals,
-                      isPairReverse,
-                    );
-                    setAmount1(newAmount1);
-                    checkBalances(e.target.value, newAmount1);
-                  }
-                }}
-                placeholder="0.0"
-                className="input-field flex-1 text-xl"
-              />
-              <Button
-                onClick={() => setShowToken0Selector(true)}
-                variant="secondary"
-                className="flex items-center space-x-2 min-w-[120px]">
-                <img src={token0.logoURI || '/placeholder.svg'} alt={token0.name} className="w-5 h-5 rounded-full" />
-                <span>{token0.displaySymbol}</span>
-                <ChevronDown className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-
-          <div className="flex justify-center">
-            <Plus className="w-6 h-6 text-gray-400" />
-          </div>
-
-          {/* Token 1 */}
-          <div className="space-y-2">
-            <div className="flex justify-between gap-2 text-sm text-gray-400">
-              <span>TOKEN 2</span>
-              <span className="text-right">
-                Balance:{' '}
-                {token1.balance ? getFormattedBalance(token1.balance, token1.decimals, token1.displaySymbol) : '0'}
-              </span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Input
-                value={amount1}
-                type="number"
-                inputMode="decimal"
-                min={0}
-                max={token1.balance ? getFormattedBalance(token1.balance, token1.decimals) : undefined}
-                onChange={(e) => {
-                  setError(null);
-                  setAmount1(e.target.value);
-                  if (!isPoolEmpty && reserves && isPairReverse !== undefined) {
-                    const newAmount0 = calculateProportionalAmount(
-                      e.target.value,
-                      token1.decimals,
-                      reserves[1],
-                      reserves[0],
-                      token0.decimals,
-                      isPairReverse,
-                    );
-                    setAmount0(newAmount0);
-                    checkBalances(newAmount0, e.target.value);
-                  }
-                }}
-                placeholder="0.0"
-                className="input-field flex-1 text-xl"
-              />
-              <Button
-                onClick={() => setShowToken1Selector(true)}
-                variant="secondary"
-                className="flex items-center space-x-2 min-w-[120px]">
-                <img src={token1.logoURI || '/placeholder.svg'} alt={token1.name} className="w-5 h-5 rounded-full" />
-                <span>{token1.displaySymbol}</span>
-                <ChevronDown className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-
-          {/* Pool Info */}
-          <div className="bg-gray-500/10 border border-gray-500/20 rounded-lg p-4 space-y-3">
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-400">Pool Share</span>
-              <span className="theme-text">{poolSharePercentage}%</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-400">Fee Tier</span>
-              <span className="theme-text">0.3%</span>
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-400">LP Tokens</span>
-              <div className="flex items-center space-x-1">
-                <span className="theme-text">{formatUnits(lpTokensToMint, 18)}</span>
-                <Tooltip
-                  content={
-                    <p className="text-xs">
-                      LP tokens represent your share in the liquidity pool. They automatically earn trading fees (0.3%)
-                      and can be redeemed for underlying tokens at any time. The amount of LP tokens is proportional to
-                      your contribution to the pool&apos;s total liquidity.
-                    </p>
-                  }
-                  contentClassName="max-w-xs">
-                  <Info className="w-3 h-3 text-gray-400 cursor-help" />
-                </Tooltip>
+        <CardContent>
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            {/* Token 0 */}
+            <div className="space-y-2">
+              <div className="flex justify-between gap-2 text-sm text-gray-400">
+                <span>TOKEN 1</span>
+                <span className="text-right">
+                  Balance:{' '}
+                  {token0.balance ? getFormattedBalance(token0.balance, token0.decimals, token0.displaySymbol) : '0'}
+                </span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Input
+                  {...register('amount0', {
+                    onChange: (e: React.ChangeEvent<HTMLInputElement>) => handleAmount0Change(e.target.value),
+                  })}
+                  value={amount0}
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  max={token0.balance ? getFormattedBalance(token0.balance, token0.decimals) : undefined}
+                  placeholder="0.0"
+                  className="input-field flex-1 text-xl"
+                />
+                <Button
+                  type="button"
+                  onClick={() => setShowToken0Selector(true)}
+                  variant="secondary"
+                  className="flex items-center space-x-2 min-w-[120px]">
+                  <img src={token0.logoURI || '/placeholder.svg'} alt={token0.name} className="w-5 h-5 rounded-full" />
+                  <span>{token0.displaySymbol}</span>
+                  <ChevronDown className="w-4 h-4" />
+                </Button>
               </div>
             </div>
-          </div>
 
-          {account ? (
-            <Button
-              onClick={addLiquidityHandler}
-              disabled={isPending || !pairAddress || !!error}
-              className="btn-primary w-full py-4 text-lg">
-              ADD LIQUIDITY
-            </Button>
-          ) : (
-            <Wallet />
-          )}
+            <div className="flex justify-center">
+              <Plus className="w-6 h-6 text-gray-400" />
+            </div>
 
-          {!pairAddress && <div className="text-red-500"> Pair not found</div>}
+            {/* Token 1 */}
+            <div className="space-y-2">
+              <div className="flex justify-between gap-2 text-sm text-gray-400">
+                <span>TOKEN 2</span>
+                <span className="text-right">
+                  Balance:{' '}
+                  {token1.balance ? getFormattedBalance(token1.balance, token1.decimals, token1.displaySymbol) : '0'}
+                </span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Input
+                  {...register('amount1', {
+                    onChange: (e: React.ChangeEvent<HTMLInputElement>) => handleAmount1Change(e.target.value),
+                  })}
+                  value={amount1}
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  max={token1.balance ? getFormattedBalance(token1.balance, token1.decimals) : undefined}
+                  placeholder="0.0"
+                  className="input-field flex-1 text-xl"
+                />
+                <Button
+                  type="button"
+                  onClick={() => setShowToken1Selector(true)}
+                  variant="secondary"
+                  className="flex items-center space-x-2 min-w-[120px]">
+                  <img src={token1.logoURI || '/placeholder.svg'} alt={token1.name} className="w-5 h-5 rounded-full" />
+                  <span>{token1.displaySymbol}</span>
+                  <ChevronDown className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
 
-          {error && <div className="text-red-500">{error}</div>}
+            {/* Pool Info */}
+            <div className="bg-gray-500/10 border border-gray-500/20 rounded-lg p-4 space-y-3">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-400">Pool Share</span>
+                <span className="theme-text">{poolSharePercentage}%</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-400">Fee Tier</span>
+                <span className="theme-text">0.3%</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-400">LP Tokens</span>
+                <div className="flex items-center space-x-1">
+                  <span className="theme-text">{formatUnits(lpTokensToMint, 18)}</span>
+                  <Tooltip
+                    content={
+                      <p className="text-xs">
+                        LP tokens represent your share in the liquidity pool. They automatically earn trading fees
+                        (0.3%) and can be redeemed for underlying tokens at any time. The amount of LP tokens is
+                        proportional to your contribution to the pool&apos;s total liquidity.
+                      </p>
+                    }
+                    contentClassName="max-w-xs">
+                    <Info className="w-3 h-3 text-gray-400 cursor-help" />
+                  </Tooltip>
+                </div>
+              </div>
+            </div>
+
+            {account ? (
+              <Button type="submit" disabled={isPending || !isFormValid} className="btn-primary w-full py-4 text-lg">
+                ADD LIQUIDITY
+              </Button>
+            ) : (
+              <Wallet />
+            )}
+
+            {!pairAddress && <div className="text-red-500">Pair not found</div>}
+
+            {formError && <div className="text-red-500">{formError}</div>}
+          </form>
         </CardContent>
       </Card>
 
@@ -465,7 +396,7 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
         onSelectToken={handleToken0Select}
         title="Select first token"
         networks={networks}
-        disabledTokenAddress={token1.address}
+        disabledTokenAddress={token1Address}
       />
 
       <TokenSelector
@@ -474,7 +405,7 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
         onSelectToken={handleToken1Select}
         title="Select second token"
         networks={networks}
-        disabledTokenAddress={token0.address}
+        disabledTokenAddress={token0Address}
       />
     </>
   );
