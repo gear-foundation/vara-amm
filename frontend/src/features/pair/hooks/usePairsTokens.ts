@@ -5,8 +5,7 @@ import { useCallback, useMemo, useRef } from 'react';
 
 import { LOGO_URI_BY_SYMBOL, VERIFIED_TOKENS } from '@/consts';
 import { useVaraSymbol } from '@/hooks';
-import { usePairsQuery } from '@/lib/sails';
-import { SailsProgram as VftProgram } from '@/lib/sails/extended-vft';
+import { usePairsQuery, VftProgram } from '@/lib/sails';
 
 import type { PairsArray, Token, PairsTokens, TokenMap, PairMap, PairByAddressMap, PairInfo } from '../types';
 

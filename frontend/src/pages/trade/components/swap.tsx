@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Wallet } from '@/components/wallet';
 import { INPUT_PERCENTAGES, SECONDS_IN_MINUTE, SLIPPAGE } from '@/consts';
-import { usePairsBalances } from '@/features/pair';
+import { usePairsBalances, usePairsReserves } from '@/features/pair';
 import { createSwapValidationSchema } from '@/features/pair/schema';
 import type { Token, Network, PairsTokens } from '@/features/pair/types';
 import {
@@ -50,9 +50,13 @@ type SwapFormData = {
 export function Swap({ pairsTokens, refetchBalances }: TradePageProps) {
   const { api } = useApi();
   const alert = useAlert();
+  const { pairReserves, refetchReserves } = usePairsReserves();
   const [lastInputTouch, setLastInputTouch] = useState<'from' | 'to'>('from');
 
-  const swapFormSchema = useMemo(() => createSwapValidationSchema(pairsTokens.tokens), [pairsTokens.tokens]);
+  const swapFormSchema = useMemo(
+    () => createSwapValidationSchema(pairsTokens, pairReserves),
+    [pairsTokens, pairReserves],
+  );
 
   const form = useForm<SwapFormData>({
     resolver: zodResolver(swapFormSchema),
@@ -251,6 +255,7 @@ export function Swap({ pairsTokens, refetchBalances }: TradePageProps) {
 
       alert.success('Swap successful');
       void refetchBalances();
+      void refetchReserves();
       setValue('toAmount', '');
       setValue('fromAmount', '');
     } catch (_error) {

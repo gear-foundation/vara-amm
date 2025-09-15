@@ -35,6 +35,12 @@ export type PairData = {
   createdAt: string;
 };
 
+export type PairReserveData = {
+  id: HexString;
+  reserve0: string;
+  reserve1: string;
+};
+
 export const TransactionsOrderBy = {
   ID_ASC: 'ID_ASC',
   ID_DESC: 'ID_DESC',
@@ -92,6 +98,18 @@ export const GetPairsQuery = gql`
         volume1Y
         tvlUsd
         createdAt
+      }
+    }
+  }
+`;
+
+export const GetPairsReservesQuery = gql`
+  query GetPairs {
+    allPairs {
+      nodes {
+        id
+        reserve0
+        reserve1
       }
     }
   }
