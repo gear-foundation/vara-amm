@@ -263,7 +263,7 @@ export function Swap({ pairsTokens, refetchBalances }: TradePageProps) {
     const FEE = 0.003;
     const amount = parseUnits(watchedFromAmount || '0', fromToken.decimals);
     const fee = calculatePercentage(amount, FEE);
-    return formatUnits(fee, fromToken.decimals) + ' ' + fromToken.symbol;
+    return formatUnits(fee, fromToken.decimals) + ' ' + fromToken.displaySymbol;
   };
 
   const networks = getNetworks(pairsTokens.tokens);
@@ -310,7 +310,9 @@ export function Swap({ pairsTokens, refetchBalances }: TradePageProps) {
             <span>FROM</span>
             <span>
               Balance:{' '}
-              {fromToken.balance ? getFormattedBalance(fromToken.balance, fromToken.decimals, fromToken.symbol) : '0'}
+              {fromToken.balance
+                ? getFormattedBalance(fromToken.balance, fromToken.decimals, fromToken.displaySymbol)
+                : '0'}
             </span>
           </div>
           <div className="flex items-center space-x-2">
@@ -343,7 +345,7 @@ export function Swap({ pairsTokens, refetchBalances }: TradePageProps) {
                 alt={fromToken.name}
                 className="w-5 h-5 rounded-full"
               />
-              <span>{fromToken.symbol}</span>
+              <span>{fromToken.displaySymbol}</span>
               <ChevronDown className="w-4 h-4" />
             </Button>
           </div>
@@ -388,7 +390,8 @@ export function Swap({ pairsTokens, refetchBalances }: TradePageProps) {
           <div className="flex justify-between text-sm text-gray-400">
             <span>TO</span>
             <span>
-              Balance: {toToken.balance ? getFormattedBalance(toToken.balance, toToken.decimals, toToken.symbol) : '0'}
+              Balance:{' '}
+              {toToken.balance ? getFormattedBalance(toToken.balance, toToken.decimals, toToken.displaySymbol) : '0'}
             </span>
           </div>
           <div className="flex items-center space-x-2">
@@ -417,7 +420,7 @@ export function Swap({ pairsTokens, refetchBalances }: TradePageProps) {
               variant="secondary"
               className="flex items-center space-x-2 min-w-[120px]">
               <img src={toToken.logoURI || '/placeholder.svg'} alt={toToken.name} className="w-5 h-5 rounded-full" />
-              <span>{toToken.symbol}</span>
+              <span>{toToken.displaySymbol}</span>
               <ChevronDown className="w-4 h-4" />
             </Button>
           </div>
@@ -431,7 +434,7 @@ export function Swap({ pairsTokens, refetchBalances }: TradePageProps) {
             <div className="flex items-center space-x-2">
               {pairAddress ? (
                 <span className="text-sm theme-text">
-                  1 {fromToken.symbol} = {oneOutAmount} {toToken.symbol}
+                  1 {fromToken.displaySymbol} = {oneOutAmount} {toToken.displaySymbol}
                 </span>
               ) : (
                 <div className="text-red-500"> Pair not found</div>
