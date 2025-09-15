@@ -158,10 +158,14 @@ const createSwapValidationSchema = (
         return validateLiquidity(data, pairsTokens, pairsReserves, lastInputTouch);
       },
       {
-        message: 'This trade cannot be executed due to insufficient liquidity.',
+        message: 'This trade cannot be executed due to insufficient liquidity',
         path: [lastInputTouch === 'from' ? 'fromAmount' : 'toAmount'],
       },
     )
+    .refine((data) => validateBalance(data.fromTokenAddress as HexString, data.fromAmount, pairsTokens.tokens), {
+      message: 'Insufficient balance',
+      path: ['fromAmount'],
+    })
     .refine(
       (data) => {
         if (!pairsTokens || !pairsReserves) return true;
@@ -175,14 +179,10 @@ const createSwapValidationSchema = (
         );
       },
       {
-        message: 'Price Impact too high',
+        message: 'Price impact too high',
         path: ['fromAmount'],
       },
-    )
-    .refine((data) => validateBalance(data.fromTokenAddress as HexString, data.fromAmount, pairsTokens.tokens), {
-      message: 'Insufficient balance',
-      path: ['fromAmount'],
-    });
+    );
 };
 
 export { createAddLiquidityValidationSchema, createSwapValidationSchema };
