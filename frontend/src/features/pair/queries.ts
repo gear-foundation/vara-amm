@@ -13,11 +13,11 @@ export type Transaction = {
   tokenOut: string;
   type: string;
   user: string;
-  pairId: string;
+  pairId: HexString;
 };
 
 export type PairData = {
-  id: string;
+  id: HexString;
   token0: HexString;
   token1: HexString;
   token0Symbol: string | null;
@@ -33,6 +33,12 @@ export type PairData = {
   volume1Y: number | string | null;
   tvlUsd: number | string | null;
   createdAt: string;
+};
+
+export type PairReserveData = {
+  id: HexString;
+  reserve0: string;
+  reserve1: string;
 };
 
 export const TransactionsOrderBy = {
@@ -92,6 +98,18 @@ export const GetPairsQuery = gql`
         volume1Y
         tvlUsd
         createdAt
+      }
+    }
+  }
+`;
+
+export const GetPairsReservesQuery = gql`
+  query GetPairs {
+    allPairs {
+      nodes {
+        id
+        reserve0
+        reserve1
       }
     }
   }

@@ -62,7 +62,7 @@ export const usePoolsData = (tokensData?: TokenDataMap) => {
 
     const _poolsData: PoolData[] = pairs.map((pair) => {
       // Find matching tokens from pairsTokens
-      const matchingPair = pairsTokens.find((p) => p.pairAddress === pair.id);
+      const matchingPair = pairsTokens.pairsByAddress.get(pair.id);
 
       const token0Symbol = tokensData.get(pair.token0)?.displaySymbol || pair.token0Symbol || 'Unknown';
       const token1Symbol = tokensData.get(pair.token1)?.displaySymbol || pair.token1Symbol || 'Unknown';

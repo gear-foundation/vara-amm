@@ -1,23 +1,16 @@
+import type { HexString } from '@gear-js/api';
 import { formatBalance } from '@polkadot/util';
 
-import type { Network, PairsTokens, Token } from './types';
+import type { Network, PairsTokens, SelectedPairResult, TokenMap } from './types';
 
-const getNetworks = (pairsTokens: PairsTokens): Network[] => {
+const getNetworks = (tokens: TokenMap): Network[] => {
   return [
     {
       id: 'vara',
       name: 'Vara Network',
       chainId: 1,
       logoURI: '/tokens/vara.png',
-      tokens: pairsTokens.reduce<Token[]>((acc, { token0, token1 }) => {
-        if (!acc.some(({ address }) => address === token0.address)) {
-          acc.push(token0);
-        }
-        if (!acc.some(({ address }) => address === token1.address)) {
-          acc.push(token1);
-        }
-        return acc;
-      }, []),
+      tokens: Array.from(tokens.values()),
     },
     // TODO: add other networks
     // {
@@ -137,23 +130,38 @@ const calculateProportionalAmount = (
   }
 };
 
-const getSelectedPair = (pairsTokens: PairsTokens, token0: Token, token1: Token) => {
-  const pairIndex = pairsTokens.findIndex(
-    (pair) =>
-      (pair.token0.address === token0.address && pair.token1.address === token1.address) ||
-      (pair.token0.address === token1.address && pair.token1.address === token0.address),
-  );
-  if (pairIndex === -1) {
+const getSelectedPair = (
+  pairsTokens: PairsTokens,
+  token0Address: HexString,
+  token1Address: HexString,
+): SelectedPairResult | null => {
+  // Create sorted key for lookup
+  const sortedKey =
+    token0Address < token1Address ? `${token0Address}:${token1Address}` : `${token1Address}:${token0Address}`;
+
+  const pairInfo = pairsTokens.pairs.get(sortedKey);
+  if (!pairInfo) {
     return null;
   }
 
-  const selectedPair = pairsTokens[pairIndex];
-  const isPairReverse = token0.address === selectedPair?.token1.address;
+  const token0 = pairsTokens.tokens.get(token0Address);
+  const token1 = pairsTokens.tokens.get(token1Address);
+
+  if (!token0 || !token1) {
+    return null;
+  }
+
+  // Determine if pair is reversed based on original order vs stored order
+  const isPairReverse = token0Address === pairInfo.token1Address;
 
   return {
-    selectedPair,
+    selectedPair: {
+      token0: isPairReverse ? token1 : token0,
+      token1: isPairReverse ? token0 : token1,
+      pairAddress: pairInfo.pairAddress,
+    },
     isPairReverse,
-    pairIndex,
+    pairIndex: pairInfo.index,
   };
 };
 
@@ -260,6 +268,78 @@ const calculateExistingPoolShare = (userLpBalance: bigint, totalSupply: bigint):
   }
 };
 
+/**
+ * Calculate price impact for a swap
+ * Price impact shows how much the price changes due to the trade
+ * Formula based on Uniswap V2:
+ * - Current price = reserve_out / reserve_in
+ * - New price = (reserve_out - amount_out) / (reserve_in + amount_in)
+ * - Price impact = (current_price - new_price) / current_price
+ * @returns Price impact as a fraction (0.0 - 1.0), formatted as string with 2 decimal places
+ */
+const calculatePriceImpact = (
+  amountIn: bigint,
+  amountOut: bigint,
+  reserveIn: bigint,
+  reserveOut: bigint,
+  inputTokenDecimals: number,
+  outputTokenDecimals: number,
+): number => {
+  try {
+    if (reserveIn === 0n || reserveOut === 0n || amountIn === 0n || amountOut === 0n) {
+      return 0;
+    }
+
+    // Convert to same decimal precision for accurate calculation
+    // Use 18 decimals as common precision
+    const PRECISION = 18;
+    const PRECISION_MULTIPLIER = 10n ** BigInt(PRECISION);
+
+    // Normalize reserves to same precision
+    const normalizedReserveIn = reserveIn * 10n ** BigInt(PRECISION - inputTokenDecimals);
+    const normalizedReserveOut = reserveOut * 10n ** BigInt(PRECISION - outputTokenDecimals);
+    const normalizedAmountIn = amountIn * 10n ** BigInt(PRECISION - inputTokenDecimals);
+    const normalizedAmountOut = amountOut * 10n ** BigInt(PRECISION - outputTokenDecimals);
+
+    // Current price = reserve_out / reserve_in
+    const currentPrice = (normalizedReserveOut * PRECISION_MULTIPLIER) / normalizedReserveIn;
+
+    // New reserves after swap
+    const newReserveIn = normalizedReserveIn + normalizedAmountIn;
+    const newReserveOut = normalizedReserveOut - normalizedAmountOut;
+
+    if (newReserveOut <= 0n || newReserveIn <= 0n) {
+      return 1; // Maximum impact (100%) if trade would drain the pool
+    }
+
+    // New price = new_reserve_out / new_reserve_in
+    const newPrice = (newReserveOut * PRECISION_MULTIPLIER) / newReserveIn;
+
+    // Price impact = (current_price - new_price) / current_price
+    const priceDifference = currentPrice - newPrice;
+
+    if (currentPrice === 0n) {
+      return 0;
+    }
+
+    // Calculate impact as fraction (0-1) with high precision
+    const priceImpactBasisPoints =
+      (priceDifference * 10000n * PRECISION_MULTIPLIER) / (currentPrice * PRECISION_MULTIPLIER);
+    const priceImpactFraction = Number(priceImpactBasisPoints) / 10000;
+
+    // Ensure positive impact (absolute value)
+    const absoluteImpactFraction = Math.abs(priceImpactFraction);
+
+    // Cap at 1.0 (100%) for display purposes
+    const cappedImpactFraction = Math.min(absoluteImpactFraction, 1.0);
+
+    return cappedImpactFraction;
+  } catch (error) {
+    console.warn('Error calculating price impact:', error);
+    return 0;
+  }
+};
+
 export {
   getNetworks,
   getFormattedBalance,
@@ -272,4 +352,5 @@ export {
   calculateLPTokens,
   calculatePoolShare,
   calculateExistingPoolShare,
+  calculatePriceImpact,
 };

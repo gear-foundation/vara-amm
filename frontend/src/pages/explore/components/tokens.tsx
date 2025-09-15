@@ -1,26 +1,16 @@
-import { TrendingUp, TrendingDown, ChevronUp, ChevronDown } from 'lucide-react';
+import { TrendingUp, TrendingDown, ChevronUp, ChevronDown, ExternalLink } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 
+import { Address, TokenIcon } from '@/components';
 import type { TokenDataMap } from '@/features/pair';
 import { formatCurrency, formatPrice, getVolumeByTimeframe } from '@/utils';
 
-import { useTokensWithPrices, transformTokenDataForTable, usePairsData } from '../../features/token';
-
-type TokenData = {
-  name: string;
-  symbol: string;
-  logoURI: string;
-  price: number;
-  change1h: number;
-  change1d: number;
-  fdv: number;
-  volume1h: number;
-  volume1d: number;
-  volume1w: number;
-  volume1m: number;
-  volume1y: number;
-  network: string;
-};
+import {
+  useTokensWithPrices,
+  transformTokenDataForTable,
+  usePairsData,
+  TokenDataForTable,
+} from '../../../features/token';
 
 type SortField = string;
 type SortDirection = 'asc' | 'desc';
@@ -82,7 +72,7 @@ export function ExplorePageTokens({
     );
   };
 
-  const sortData = (data: TokenData[], sortConfig: { field: SortField; direction: SortDirection }) => {
+  const sortData = (data: TokenDataForTable[], sortConfig: { field: SortField; direction: SortDirection }) => {
     if (!sortConfig.field || !data?.length) return data;
 
     return [...data].sort((a, b) => {
@@ -91,13 +81,13 @@ export function ExplorePageTokens({
 
       // Handle volume fields with dynamic timeframe
       if (sortConfig.field === 'volume') {
-        const volumeField = `volume${tokenVolumeFilter}` as keyof TokenData;
+        const volumeField = `volume${tokenVolumeFilter}` as keyof TokenDataForTable;
         aVal = a[volumeField];
         bVal = b[volumeField];
       } else {
         // Handle all other fields including price snapshot fields
-        aVal = a[sortConfig.field as keyof TokenData];
-        bVal = b[sortConfig.field as keyof TokenData];
+        aVal = a[sortConfig.field as keyof TokenDataForTable];
+        bVal = b[sortConfig.field as keyof TokenDataForTable];
       }
 
       if (aVal == null && bVal == null) return 0;
@@ -223,7 +213,7 @@ export function ExplorePageTokens({
   }
 
   return (
-    <div className="card overflow-hidden">
+    <div className="card">
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
@@ -277,15 +267,14 @@ export function ExplorePageTokens({
               sortedTokens.map((token, index) => (
                 <tr key={`${token.symbol}-${index}`} className="table-row">
                   <td className="py-4 px-6">
-                    <div className="flex items-center space-x-3">
-                      <img
-                        src={token.logoURI || '/placeholder.svg'}
-                        alt={token.name}
-                        className="w-8 h-8 rounded-full"
-                      />
+                    <div className="flex items-center space-x-3 group">
+                      <TokenIcon token={token} />
                       <div>
                         <div className="font-medium theme-text">{token.name}</div>
-                        <div className="text-sm text-gray-400 mono">{token.symbol}</div>
+                        <div className="flex items-center space-x-2 mt-1">
+                          <div className="text-sm text-gray-400 mono">{token.symbol}</div>
+                          <Address address={token.address} />
+                        </div>
                       </div>
                     </div>
                   </td>
@@ -301,6 +290,17 @@ export function ExplorePageTokens({
             )}
           </tbody>
         </table>
+      </div>
+
+      <div className="p-6 border-t border-gray-500/20">
+        <a
+          href="https://wiki.gear.foundation/docs/bridge/developer_hub#contract-addresses"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center space-x-2 text-sm text-gray-400 hover:text-[#00FF85] transition-colors">
+          <ExternalLink className="w-3 h-3" />
+          <span>View Vara Bridge token list on Vara Wiki</span>
+        </a>
       </div>
     </div>
   );

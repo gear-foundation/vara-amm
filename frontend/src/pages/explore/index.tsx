@@ -4,14 +4,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { usePairsTokens, usePoolsData } from '@/features/pair';
 import { formatCurrency } from '@/utils';
 
-import { ExplorePagePools } from './pools';
-import { ExplorePagePoolsFilters } from './pools-filters';
-import { ExplorePageTokens } from './tokens';
-import { ExplorePageTokensFilters } from './tokens-filters';
-import { ExplorePageTransactions } from './transactions';
-import { ExplorePageTransactionsFilters } from './transactions-filters';
+import { ExplorePagePools } from './components/pools';
+import { ExplorePagePoolsFilters } from './components/pools-filters';
+import { ExplorePageTokens } from './components/tokens';
+import { ExplorePageTokensFilters } from './components/tokens-filters';
+import { ExplorePageTransactions } from './components/transactions';
+import { ExplorePageTransactionsFilters } from './components/transactions-filters';
 
-export function ExplorePage() {
+function ExplorePage() {
   const { pairsTokens, tokensData } = usePairsTokens();
 
   const { poolsData, metrics, isFetching: isPoolsLoading, error: poolsError } = usePoolsData(tokensData);
@@ -163,3 +163,5 @@ export function ExplorePage() {
     </div>
   );
 }
+
+export default ExplorePage;

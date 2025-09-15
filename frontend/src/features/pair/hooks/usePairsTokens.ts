@@ -3,12 +3,11 @@ import { useAccount, useApi, useDeriveBalancesAll } from '@gear-js/react-hooks';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useMemo, useRef } from 'react';
 
-import { LOGO_URI_BY_SYMBOL } from '@/consts';
+import { LOGO_URI_BY_SYMBOL, VERIFIED_TOKENS } from '@/consts';
 import { useVaraSymbol } from '@/hooks';
-import { usePairsQuery } from '@/lib/sails';
-import { SailsProgram as VftProgram } from '@/lib/sails/extended-vft';
+import { usePairsQuery, VftProgram } from '@/lib/sails';
 
-import type { PairsTokens, Token } from '../types';
+import type { PairsArray, Token, PairsTokens, TokenMap, PairMap, PairByAddressMap, PairInfo } from '../types';
 
 const fetchTokenData = async (program: VftProgram, address: HexString, userAddress?: HexString): Promise<TokenData> => {
   if (!program) return null;
@@ -41,6 +40,7 @@ type TokenData = {
   decimals: number;
   balance?: bigint;
   isVaraNative?: boolean;
+  isVerified?: boolean;
 } | null;
 
 export type TokenDataMap = Map<HexString, NonNullable<TokenData>>;
@@ -107,12 +107,14 @@ const usePairsTokens = (): UsePairsTokensResult => {
 
       const setTokenData = (tokenDataMap: TokenDataMap, index: number, token: TokenData) => {
         if (!token) return;
-        const isVaraNative = token.symbol.toLowerCase().includes('vara');
-        tokenDataMap.set(vftAddresses[index], {
+        const tokenAddress = vftAddresses[index];
+        const isVaraNative = token.symbol.toLowerCase().includes('vara') && VERIFIED_TOKENS.includes(tokenAddress);
+        tokenDataMap.set(tokenAddress, {
           ...token,
           balance: isVaraNative ? nativeBalance?.transferable?.toBigInt() : token.balance,
           isVaraNative,
           displaySymbol: isVaraNative && varaSymbol ? varaSymbol : token.symbol,
+          isVerified: VERIFIED_TOKENS.includes(tokenAddress),
         });
       };
 
@@ -152,13 +154,16 @@ const usePairsTokens = (): UsePairsTokensResult => {
     enabled: !!pairs && pairs.length > 0 && !!api,
   });
 
-  const pairsTokens = useMemo(() => {
-    if (!pairs || !tokensData) return undefined;
+  const { pairsTokens } = useMemo(() => {
+    if (!pairs || !tokensData) return { pairsTokens: undefined };
 
-    const result: PairsTokens = [];
+    const result: PairsArray = [];
+    const tokens: TokenMap = new Map();
+    const pairMap: PairMap = new Map();
+    const pairsByAddress: PairByAddressMap = new Map();
 
     for (const [ftAddresses, pairAddress] of pairs) {
-      const tokens: Token[] = [];
+      const pairTokens: Token[] = [];
       for (const [, address] of ftAddresses.entries()) {
         const data = tokensData.get(address);
         if (!data) continue;
@@ -174,17 +179,48 @@ const usePairsTokens = (): UsePairsTokensResult => {
           logoURI: LOGO_URI_BY_SYMBOL[data.symbol],
           network: 'Vara Network',
           isVaraNative: data.isVaraNative,
+          isVerified: data.isVerified,
         };
-        tokens.push(token);
+        pairTokens.push(token);
+        tokens.set(address, token);
       }
 
-      if (tokens.length === 2) {
-        const [token0, token1] = tokens;
-        result.push({ token0, token1, pairAddress });
+      if (pairTokens.length === 2) {
+        const [token0, token1] = pairTokens;
+        const pairData = { token0, token1, pairAddress };
+        result.push(pairData);
+
+        // Create pair info for optimized data
+        const pairInfo: PairInfo = {
+          token0Address: token0.address,
+          token1Address: token1.address,
+          pairAddress,
+          index: result.length - 1,
+        };
+
+        // Add to pairs map with sorted key for consistent lookup
+        const sortedKey =
+          token0.address < token1.address
+            ? `${token0.address}:${token1.address}`
+            : `${token1.address}:${token0.address}`;
+        pairMap.set(sortedKey, pairInfo);
+
+        // Add to pairs by address map
+        pairsByAddress.set(pairAddress, pairInfo);
       }
     }
 
-    return result.length > 0 ? result : undefined;
+    const pairsArray = result.length > 0 ? result : undefined;
+    const _pairsTokens = pairsArray
+      ? {
+          tokens,
+          pairs: pairMap,
+          pairsByAddress,
+          pairsArray,
+        }
+      : undefined;
+
+    return { pairsTokens: _pairsTokens };
   }, [pairs, tokensData, varaSymbol]);
 
   const refetchBalances = useCallback(() => {

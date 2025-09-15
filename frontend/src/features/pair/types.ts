@@ -10,6 +10,7 @@ interface Token {
   balance?: bigint;
   network?: string;
   isVaraNative?: boolean;
+  isVerified?: boolean;
 }
 
 interface Network {
@@ -20,6 +21,41 @@ interface Network {
   tokens: Token[];
 }
 
-type PairsTokens = { token0: Token; token1: Token; pairAddress: HexString }[];
+type PairsArray = { token0: Token; token1: Token; pairAddress: HexString }[];
 
-export type { Token, Network, PairsTokens };
+// Optimized data structures for better performance
+interface PairInfo {
+  token0Address: HexString;
+  token1Address: HexString;
+  pairAddress: HexString;
+  index: number;
+}
+
+interface SelectedPairResult {
+  selectedPair: { token0: Token; token1: Token; pairAddress: HexString };
+  isPairReverse: boolean;
+  pairIndex: number;
+}
+
+type TokenMap = Map<HexString, Token>;
+type PairMap = Map<string, PairInfo>; // key: "token0Address:token1Address" (sorted)
+type PairByAddressMap = Map<HexString, PairInfo>; // key: pairAddress
+
+interface PairsTokens {
+  tokens: TokenMap;
+  pairs: PairMap;
+  pairsByAddress: PairByAddressMap;
+  pairsArray: PairsArray; // Keep for backward compatibility
+}
+
+export type {
+  Token,
+  Network,
+  PairsArray,
+  PairInfo,
+  SelectedPairResult,
+  TokenMap,
+  PairMap,
+  PairByAddressMap,
+  PairsTokens,
+};
