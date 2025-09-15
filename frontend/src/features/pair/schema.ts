@@ -5,6 +5,53 @@ import { PairsReservesMap } from './hooks';
 import { TokenMap, PairsTokens } from './types';
 import { parseUnits, calculatePriceImpact, getSelectedPair } from './utils';
 
+type SwapFormData = {
+  fromAmount: string;
+  toAmount: string;
+  fromTokenAddress: string;
+  toTokenAddress: string;
+};
+
+const validateLiquidity = (
+  data: SwapFormData,
+  pairsTokens: PairsTokens,
+  pairsReserves: PairsReservesMap,
+  lastInputTouch: 'from' | 'to',
+) => {
+  const { selectedPair, isPairReverse } =
+    getSelectedPair(pairsTokens, data.fromTokenAddress as HexString, data.toTokenAddress as HexString) || {};
+
+  if (!selectedPair || isPairReverse === undefined) return true;
+
+  const reserves = pairsReserves.get(selectedPair.pairAddress) || [0n, 0n];
+
+  const isToken0ToToken1 = !isPairReverse;
+  const reserveOut = isToken0ToToken1 ? reserves[1] : reserves[0];
+
+  const toToken = pairsTokens.tokens.get(data.toTokenAddress as HexString);
+  const fromToken = pairsTokens.tokens.get(data.fromTokenAddress as HexString);
+
+  if (!toToken || !fromToken) return true;
+  const { fromAmount, toAmount } = data;
+
+  try {
+    if (lastInputTouch === 'from') {
+      const desiredOutWei = parseUnits(toAmount || '0', toToken.decimals);
+      if (desiredOutWei >= reserveOut && Number(fromAmount)) {
+        return false;
+      }
+    } else {
+      const desiredOutWei = parseUnits(toAmount || '0', toToken.decimals);
+      if (desiredOutWei >= reserveOut && Number(toAmount)) {
+        return false;
+      }
+    }
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 const validateBalance = (tokenAddress: HexString, amount: string, tokens: TokenMap) => {
   const token0 = tokens.get(tokenAddress);
   if (!token0?.balance || !amount) return true;
@@ -89,7 +136,11 @@ const createAddLiquidityValidationSchema = (tokens: TokenMap) => {
     });
 };
 
-const createSwapValidationSchema = (pairsTokens: PairsTokens, pairsReserves?: PairsReservesMap) => {
+const createSwapValidationSchema = (
+  pairsTokens: PairsTokens,
+  pairsReserves: PairsReservesMap | undefined,
+  lastInputTouch: 'from' | 'to',
+) => {
   return z
     .object({
       fromAmount: z.string(),
@@ -101,10 +152,16 @@ const createSwapValidationSchema = (pairsTokens: PairsTokens, pairsReserves?: Pa
       message: 'Please select different tokens',
       path: ['toTokenAddress'],
     })
-    .refine((data) => validateBalance(data.fromTokenAddress as HexString, data.fromAmount, pairsTokens.tokens), {
-      message: 'Insufficient balance',
-      path: ['fromAmount'],
-    })
+    .refine(
+      (data) => {
+        if (!pairsReserves || !pairsTokens) return true;
+        return validateLiquidity(data, pairsTokens, pairsReserves, lastInputTouch);
+      },
+      {
+        message: 'This trade cannot be executed due to insufficient liquidity.',
+        path: [lastInputTouch === 'from' ? 'fromAmount' : 'toAmount'],
+      },
+    )
     .refine(
       (data) => {
         if (!pairsTokens || !pairsReserves) return true;
@@ -121,7 +178,12 @@ const createSwapValidationSchema = (pairsTokens: PairsTokens, pairsReserves?: Pa
         message: 'Price Impact too high',
         path: ['fromAmount'],
       },
-    );
+    )
+    .refine((data) => validateBalance(data.fromTokenAddress as HexString, data.fromAmount, pairsTokens.tokens), {
+      message: 'Insufficient balance',
+      path: ['fromAmount'],
+    });
 };
 
 export { createAddLiquidityValidationSchema, createSwapValidationSchema };
+export type { SwapFormData };

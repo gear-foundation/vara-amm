@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Wallet } from '@/components/wallet';
 import { INPUT_PERCENTAGES, SECONDS_IN_MINUTE, SLIPPAGE } from '@/consts';
 import { usePairsBalances, usePairsReserves } from '@/features/pair';
-import { createSwapValidationSchema } from '@/features/pair/schema';
+import { createSwapValidationSchema, SwapFormData } from '@/features/pair/schema';
 import type { Token, Network, PairsTokens } from '@/features/pair/types';
 import {
   calculatePercentage,
@@ -40,13 +40,6 @@ type TradePageProps = {
   refetchBalances: () => void;
 };
 
-type SwapFormData = {
-  fromAmount: string;
-  toAmount: string;
-  fromTokenAddress: string;
-  toTokenAddress: string;
-};
-
 export function Swap({ pairsTokens, refetchBalances }: TradePageProps) {
   const { api } = useApi();
   const alert = useAlert();
@@ -54,8 +47,8 @@ export function Swap({ pairsTokens, refetchBalances }: TradePageProps) {
   const [lastInputTouch, setLastInputTouch] = useState<'from' | 'to'>('from');
 
   const swapFormSchema = useMemo(
-    () => createSwapValidationSchema(pairsTokens, pairReserves),
-    [pairsTokens, pairReserves],
+    () => createSwapValidationSchema(pairsTokens, pairReserves, lastInputTouch),
+    [pairsTokens, pairReserves, lastInputTouch],
   );
 
   const form = useForm<SwapFormData>({
@@ -69,7 +62,7 @@ export function Swap({ pairsTokens, refetchBalances }: TradePageProps) {
     },
   });
 
-  const { control, handleSubmit, setValue, watch, formState, clearErrors, setError: setFormError, trigger } = form;
+  const { control, handleSubmit, setValue, watch, formState, trigger } = form;
   const { errors, isSubmitting, isValid } = formState;
 
   const watchedFromAmount = watch('fromAmount');
@@ -126,11 +119,9 @@ export function Swap({ pairsTokens, refetchBalances }: TradePageProps) {
       if (lastInputTouch === 'from') {
         const amountOut = await getAmount(watchedFromAmount);
         setValue('toAmount', amountOut);
-        validateLiquidity(watchedFromAmount, amountOut);
       } else {
         const amountIn = await getAmount(watchedToAmount, true);
         setValue('fromAmount', amountIn);
-        validateLiquidity(amountIn, watchedToAmount);
       }
       void trigger();
     };
@@ -146,8 +137,6 @@ export function Swap({ pairsTokens, refetchBalances }: TradePageProps) {
   }
 
   const isWalletConnected = !!account;
-
-  const LIQUIDITY_ERROR = 'This trade cannot be executed due to insufficient liquidity or too much price impact.';
 
   const swapTokens = () => {
     const tempAddress = fromTokenAddress;
@@ -296,45 +285,10 @@ export function Swap({ pairsTokens, refetchBalances }: TradePageProps) {
         amountOut = await pairProgram.pair.getAmountIn(amountIn, !isToken0ToToken1);
       }
     } catch {
-      setFormError(lastInputTouch === 'from' ? 'fromAmount' : 'toAmount', { message: LIQUIDITY_ERROR });
       return '';
     }
 
     return formatUnits(amountOut, decimalsOut);
-  };
-
-  // TODO: Move to schema
-  const validateLiquidity = (currentFromAmount: string, currentToAmount: string) => {
-    if (!reserves || isPairReverse === undefined) return;
-    const isToken0ToToken1 = !isPairReverse;
-    const reserveOut = isToken0ToToken1 ? reserves[1] : reserves[0];
-
-    try {
-      if (lastInputTouch === 'from') {
-        const desiredOutWei = parseUnits(currentToAmount || '0', toToken.decimals);
-        if (desiredOutWei >= reserveOut && Number(currentFromAmount)) {
-          setFormError('fromAmount', { message: LIQUIDITY_ERROR });
-          return;
-        }
-      } else {
-        const desiredOutWei = parseUnits(currentToAmount || '0', toToken.decimals);
-        if (desiredOutWei >= reserveOut && Number(currentToAmount)) {
-          setFormError('toAmount', { message: LIQUIDITY_ERROR });
-          return;
-        }
-      }
-
-      // Clear liquidity errors when conditions no longer hold
-      if (errors.fromAmount?.message === LIQUIDITY_ERROR) {
-        clearErrors('fromAmount');
-      }
-      if (errors.toAmount?.message === LIQUIDITY_ERROR) {
-        clearErrors('toAmount');
-      }
-    } catch {
-      // Parsing issues: conservatively set error
-      setFormError(lastInputTouch === 'from' ? 'fromAmount' : 'toAmount', { message: LIQUIDITY_ERROR });
-    }
   };
 
   const isSwapDisabled =
@@ -374,7 +328,6 @@ export function Swap({ pairsTokens, refetchBalances }: TradePageProps) {
                     field.onChange(value);
                     const amountOut = await getAmount(value);
                     setValue('toAmount', amountOut);
-                    validateLiquidity(value, amountOut);
                   }}
                   placeholder="0.0"
                   className="input-field flex-1 text-xl"
@@ -407,10 +360,10 @@ export function Swap({ pairsTokens, refetchBalances }: TradePageProps) {
                     fromToken.decimals || 0,
                   );
                   const amountOut = await getAmount(amountIn);
-                  setValue('fromAmount', amountIn, { shouldValidate: true });
+                  setValue('fromAmount', amountIn);
                   setValue('toAmount', amountOut);
                   setLastInputTouch('from');
-                  validateLiquidity(amountIn, amountOut);
+                  void trigger();
                 }}>
                 {label}
               </Button>
@@ -453,7 +406,6 @@ export function Swap({ pairsTokens, refetchBalances }: TradePageProps) {
                     field.onChange(value);
                     const amountIn = await getAmount(value, true);
                     setValue('fromAmount', amountIn, { shouldValidate: true });
-                    validateLiquidity(amountIn, value);
                   }}
                   placeholder="0.0"
                   className="input-field flex-1 text-xl"
