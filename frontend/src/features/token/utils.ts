@@ -1,11 +1,11 @@
 import type { HexString } from '@gear-js/api';
 
 import { LOGO_URI_BY_SYMBOL } from '@/consts';
-import { toNumber } from '@/utils';
+import { toNumber } from '@/lib/utils/index';
 
-import type { PairData, TokenDataMap } from '../pair';
+import type { PairData, TokenMap } from '../pair';
 
-import type { TokenData } from './queries';
+import type { TokenWithPricesData } from './queries';
 
 export type TokenDataForTable = {
   name: string;
@@ -26,9 +26,9 @@ export type TokenDataForTable = {
 };
 
 function transformTokenDataForTable(
-  tokens: TokenData[],
+  tokens: TokenWithPricesData[],
   pairs: PairData[],
-  tokensDataMap?: TokenDataMap,
+  tokensDataMap?: TokenMap,
 ): Array<TokenDataForTable> {
   if ((pairs && pairs.length === 0) || !tokensDataMap) {
     return [];

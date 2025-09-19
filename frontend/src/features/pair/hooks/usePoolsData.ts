@@ -1,12 +1,12 @@
 import { useMemo } from 'react';
 
 import { LOGO_URI_BY_SYMBOL } from '@/consts';
-import { usePairsBalances, usePairsTokens, type TokenDataMap } from '@/features/pair/hooks';
+import { usePairsBalances, usePairsTokens } from '@/features/pair/hooks';
 import { GetPairsQuery, type PairData } from '@/features/pair/queries';
 import { useGraphQLQuery } from '@/hooks/useGraphQLQuery';
-import { toNumber } from '@/utils';
+import { toNumber } from '@/lib/utils/index';
 
-import { Token } from '../types';
+import type { Token, TokenMap } from '../types';
 
 export type PoolData = {
   id: string;
@@ -31,7 +31,7 @@ export type PoolsMetrics = {
   volumeChange24h: number; // Percentage change
 };
 
-export const usePoolsData = (tokensData?: TokenDataMap) => {
+export const usePoolsData = (tokenMap?: TokenMap) => {
   const { pairsTokens } = usePairsTokens();
   const { pairBalances } = usePairsBalances();
 
@@ -47,7 +47,7 @@ export const usePoolsData = (tokensData?: TokenDataMap) => {
 
   const { poolsData, metrics } = useMemo(() => {
     const pairs = pairsResult?.allPairs?.nodes || [];
-    if (!pairs.length || !pairsTokens || !tokensData) {
+    if (!pairs.length || !pairsTokens || !tokenMap) {
       return {
         poolsData: [],
         metrics: {
@@ -66,8 +66,8 @@ export const usePoolsData = (tokensData?: TokenDataMap) => {
       // Find matching tokens from pairsTokens
       const matchingPair = pairsTokens.pairsByAddress.get(pair.id);
 
-      const token0 = tokensData.get(pair.token0);
-      const token1 = tokensData.get(pair.token1);
+      const token0 = tokenMap.get(pair.token0);
+      const token1 = tokenMap.get(pair.token1);
       const token0Symbol = token0?.displaySymbol || pair.token0Symbol || 'Unknown';
       const token1Symbol = token1?.displaySymbol || pair.token1Symbol || 'Unknown';
 
@@ -116,7 +116,7 @@ export const usePoolsData = (tokensData?: TokenDataMap) => {
     };
 
     return { poolsData: _poolsData, metrics: _metrics };
-  }, [pairsResult?.allPairs?.nodes, pairsTokens, tokensData, pairBalances]);
+  }, [pairsResult?.allPairs?.nodes, pairsTokens, tokenMap, pairBalances]);
 
   return {
     poolsData,

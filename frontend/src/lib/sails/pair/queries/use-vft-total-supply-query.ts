@@ -11,6 +11,7 @@ export const useVftTotalSupplyQuery = (pairAddress?: HexString) => {
     serviceName: 'vft',
     functionName: 'totalSupply',
     args: [],
+    query: { enabled: !!pairAddress },
   });
 
   return { totalSupply: data, isFetching, refetch, error };

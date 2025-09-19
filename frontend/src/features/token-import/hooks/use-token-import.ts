@@ -1,41 +1,30 @@
 import { HexString } from '@gear-js/api';
-import { useAlert } from '@gear-js/react-hooks';
+import { useAccount, useAlert, useApi } from '@gear-js/react-hooks';
 import { useState } from 'react';
 
-import { Token } from '@/features/pair/types';
+import type { Token } from '@/features/pair/types';
+import { VftProgram } from '@/lib/sails';
+import { fetchTokenData } from '@/lib/utils/index';
 
 type UseTokenImportParams = {
-  onFindNewToken: () => void;
   onSelectToken: (token: Token) => void;
 };
 
-export const useTokenImport = ({ onSelectToken, onFindNewToken }: UseTokenImportParams) => {
+export const useTokenImport = ({ onSelectToken }: UseTokenImportParams) => {
   const [customToken, setCustomToken] = useState<Token | null>(null);
   const [customTokensMap, setCustomTokensMap] = useState<Map<HexString, Token>>(new Map());
   const [showImportModal, setShowImportModal] = useState(false);
   const alert = useAlert();
+  const { api } = useApi();
+  const { account } = useAccount();
 
-  const validateTokenContract = async (address: string): Promise<Token | null> => {
+  const validateTokenContract = async (address: HexString): Promise<Token | null> => {
     try {
-      // Simulate API call to validate VFT contract
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // Mock validation - in real app this would call Vara network
-      if (address.length === 66 && address.startsWith('0x')) {
-        const mockToken: Token = {
-          symbol: 'CUSTOM',
-          displaySymbol: 'CUSTOM',
-          name: 'Custom Token',
-          address: address as HexString,
-          decimals: 18,
-          logoURI: '', // No logo for custom tokens
-          balance: 1000000000000000000n, // Add test balance for custom tokens
-          isVerified: false,
-        };
-
-        return mockToken;
-      }
-      return null;
+      if (!api) return null;
+      const vftProgram = new VftProgram(api, address);
+      const token = await fetchTokenData(vftProgram, address, account?.decodedAddress);
+      if (!token) return null;
+      return token;
     } catch (_error) {
       return null;
     }
@@ -43,9 +32,8 @@ export const useTokenImport = ({ onSelectToken, onFindNewToken }: UseTokenImport
 
   const handleAddressSearch = async (address: string) => {
     if (address.length === 66 && address.startsWith('0x')) {
-      const token = await validateTokenContract(address);
+      const token = await validateTokenContract(address as HexString);
       if (token) {
-        onFindNewToken();
         setCustomToken(token);
         setShowImportModal(true);
       } else {

@@ -4,7 +4,7 @@ import { useState } from 'react';
 
 import { TokenIcon } from '@/components';
 import { type PoolData } from '@/features/pair';
-import { formatCurrency, getVolumeByTimeframe } from '@/utils';
+import { formatCurrency, getVolumeByTimeframe } from '@/lib/utils/index';
 
 type SortField = string;
 type SortDirection = 'asc' | 'desc';

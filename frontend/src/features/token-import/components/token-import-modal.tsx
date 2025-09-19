@@ -11,7 +11,7 @@ import {
   TokenCustomIcon,
 } from '@/components';
 import { Token } from '@/features/pair/types';
-import { openBlockExplorer } from '@/utils';
+import { getBlockExplorerUrl } from '@/lib/utils/index';
 
 type Props = {
   customToken: Token | null;
@@ -69,14 +69,16 @@ const TokenImportModal = ({ customToken, isOpen, onClose, onAddNewToken }: Props
                   className="mb-2"
                   size="small"
                   hoverCopyButton={false}
+                  showBlockExplorer={false}
                 />
 
-                <button
-                  onClick={() => openBlockExplorer(customToken.address)}
-                  tabIndex={-1}
+                <a
+                  href={getBlockExplorerUrl(customToken.address)}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="text-xs text-[#00FF85] hover:underline">
                   View on Block Explorer
-                </button>
+                </a>
               </div>
 
               <div className="flex items-center space-x-2">
