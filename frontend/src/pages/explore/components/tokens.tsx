@@ -2,8 +2,8 @@ import { TrendingUp, TrendingDown, ChevronUp, ChevronDown, ExternalLink } from '
 import { useState, type ReactNode } from 'react';
 
 import { Address, TokenIcon } from '@/components';
-import type { TokenDataMap } from '@/features/pair';
-import { formatCurrency, formatPrice, getVolumeByTimeframe } from '@/utils';
+import type { TokenMap } from '@/features/pair';
+import { formatCurrency, formatPrice, getVolumeByTimeframe } from '@/lib/utils/index';
 
 import {
   useTokensWithPrices,
@@ -19,14 +19,14 @@ type ExplorePageTokensProps = {
   tokenNetworkFilter: string;
   tokenFilter: string;
   tokenVolumeFilter: string;
-  tokensDataMap?: TokenDataMap;
+  tokenMap?: TokenMap;
 };
 
 export function ExplorePageTokens({
   tokenNetworkFilter,
   tokenFilter,
   tokenVolumeFilter,
-  tokensDataMap,
+  tokenMap,
 }: ExplorePageTokensProps) {
   const [tokenSort, setTokenSort] = useState<{ field: SortField; direction: SortDirection }>({
     field: 'volume',
@@ -48,7 +48,7 @@ export function ExplorePageTokens({
   const tokensData = transformTokenDataForTable(
     tokensResponse?.allTokens.nodes || [],
     pairsData?.allPairs.nodes || [],
-    tokensDataMap,
+    tokenMap,
   );
 
   const isLoading = tokensLoading || pairsLoading;
@@ -268,7 +268,7 @@ export function ExplorePageTokens({
                 <tr key={`${token.symbol}-${index}`} className="table-row">
                   <td className="py-4 px-6">
                     <div className="flex items-center space-x-3 group">
-                      <TokenIcon token={token} />
+                      <TokenIcon token={token} withBadge />
                       <div>
                         <div className="font-medium theme-text">{token.name}</div>
                         <div className="flex items-center space-x-2 mt-1">

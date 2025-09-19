@@ -1,16 +1,19 @@
 import type { HexString } from '@gear-js/api';
 import { formatBalance } from '@polkadot/util';
 
-import type { Network, PairsTokens, SelectedPairResult, TokenMap } from './types';
+import type { Network, PairsTokens, SelectedPairResult, Token, TokenMap } from './types';
 
-const getNetworks = (tokens: TokenMap): Network[] => {
+const getNetworks = (tokens: TokenMap, customTokensMap?: Map<HexString, Token>): Network[] => {
+  const baseTokens = Array.from(tokens.values());
+  const customTokens = customTokensMap ? Array.from(customTokensMap.values()) : [];
+
   return [
     {
       id: 'vara',
       name: 'Vara Network',
       chainId: 1,
       logoURI: '/tokens/vara.png',
-      tokens: Array.from(tokens.values()),
+      tokens: baseTokens.concat(customTokens),
     },
     // TODO: add other networks
     // {

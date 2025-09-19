@@ -201,6 +201,12 @@
     -moz-appearance: textfield;
   }
 
+  input[type='checkbox'] {
+    -webkit-appearance: checkbox;
+    -moz-appearance: checkbox;
+    appearance: checkbox;
+  }
+
   .card {
     @apply rounded-xl backdrop-blur-sm;
   }
@@ -227,6 +233,10 @@
 
   .light .table-row {
     border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  }
+
+  .text-xxs {
+    font-size: 8px;
   }
 
   .dark .table-row:hover {

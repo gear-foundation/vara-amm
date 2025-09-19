@@ -2,7 +2,7 @@ import { useState } from 'react';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { usePairsTokens, usePoolsData } from '@/features/pair';
-import { formatCurrency } from '@/utils';
+import { formatCurrency } from '@/lib/utils/index';
 
 import { ExplorePagePools } from './components/pools';
 import { ExplorePagePoolsFilters } from './components/pools-filters';
@@ -12,9 +12,9 @@ import { ExplorePageTransactions } from './components/transactions';
 import { ExplorePageTransactionsFilters } from './components/transactions-filters';
 
 function ExplorePage() {
-  const { pairsTokens, tokensData } = usePairsTokens();
+  const { pairsTokens } = usePairsTokens();
 
-  const { poolsData, metrics, isFetching: isPoolsLoading, error: poolsError } = usePoolsData(tokensData);
+  const { poolsData, metrics, isFetching: isPoolsLoading, error: poolsError } = usePoolsData(pairsTokens?.tokens);
   const [tokenNetworkFilter, setTokenNetworkFilter] = useState('all');
   const [tokenFilter, setTokenFilter] = useState('all');
   const [tokenVolumeFilter, setTokenVolumeFilter] = useState('1d');
@@ -137,7 +137,7 @@ function ExplorePage() {
             tokenNetworkFilter={tokenNetworkFilter}
             tokenFilter={tokenFilter}
             tokenVolumeFilter={tokenVolumeFilter}
-            tokensDataMap={tokensData}
+            tokenMap={pairsTokens?.tokens}
           />
         </TabsContent>
 

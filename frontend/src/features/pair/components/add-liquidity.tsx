@@ -5,8 +5,20 @@ import { Plus, ChevronDown, Info } from 'lucide-react';
 import { useEffect, useState, useMemo } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 
-import { Wallet, Button, Card, CardContent, CardHeader, CardTitle, TokenSelector, Input, Tooltip } from '@/components';
+import {
+  Wallet,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  TokenSelector,
+  Input,
+  Tooltip,
+  TokenIcon,
+} from '@/components';
 import { SECONDS_IN_MINUTE } from '@/consts';
+import { TokenImportModal, useTokenImport } from '@/features/token-import';
 import { useSignAndSend } from '@/hooks/use-sign-and-send';
 import {
   useAddLiquidityMessage,
@@ -17,6 +29,7 @@ import {
 } from '@/lib/sails';
 import { getErrorMessage } from '@/lib/utils';
 
+import { useCreatePair, useTokenPrices } from '../hooks';
 import { createAddLiquidityValidationSchema } from '../schema';
 import type { Token, Network, PairsTokens } from '../types';
 import {
@@ -30,6 +43,8 @@ import {
   calculatePoolShare,
   formatUnits,
 } from '../utils';
+
+import { InitialLiquidityInfo } from './initial-liquidity-info';
 
 type AddLiquidityProps = {
   pairsTokens: PairsTokens;
@@ -70,15 +85,29 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
   const watchedValues = useWatch({ control });
   const { token0Address, token1Address, amount0, amount1 } = watchedValues;
 
+  const { tokenImportModalProps, handleAddressSearch, customTokensMap } = useTokenImport({
+    onSelectToken: (token: Token) => {
+      if (showToken0Selector) {
+        setValue('token0Address', token.address);
+        setShowToken0Selector(false);
+      }
+      if (showToken1Selector) {
+        setValue('token1Address', token.address);
+        setShowToken1Selector(false);
+      }
+      setShowToken1Selector(false);
+    },
+  });
+
   const token0 = useMemo(() => {
     if (!token0Address) return undefined;
-    return pairsTokens.tokens.get(token0Address);
-  }, [pairsTokens, token0Address]);
+    return pairsTokens.tokens.get(token0Address) || customTokensMap.get(token0Address);
+  }, [pairsTokens, token0Address, customTokensMap]);
 
   const token1 = useMemo(() => {
     if (!token1Address) return undefined;
-    return pairsTokens.tokens.get(token1Address);
-  }, [pairsTokens, token1Address]);
+    return pairsTokens.tokens.get(token1Address) || customTokensMap.get(token1Address);
+  }, [pairsTokens, token1Address, customTokensMap]);
 
   const { api } = useApi();
   const alert = useAlert();
@@ -109,7 +138,7 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
   const token0Approve = useApproveMessage(token0?.address || ('0x0' as HexString));
   const token1Approve = useApproveMessage(token1?.address || ('0x0' as HexString));
 
-  const addLiquidity = useAddLiquidityMessage(pairAddress || ('0x0' as HexString));
+  const addLiquidity = useAddLiquidityMessage(pairAddress);
   const mint = useMintMessage();
   const signAndSend = useSignAndSend({
     programs: [token0Approve.program, token1Approve.program, addLiquidity.program, mint.program],
@@ -152,6 +181,9 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token0Address, token1Address, reserves]);
 
+  const { createPair } = useCreatePair();
+  const { prices, isLowLiquidity } = useTokenPrices(amount0, amount1, token0, token1);
+
   if (!token0 || !token1) {
     return <div>Error: Token not found</div>;
   }
@@ -183,9 +215,16 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
     isReservesFetching ||
     isSubmitting;
 
+  const isInitialLiquidity = isPoolEmpty || !pairAddress;
+
   const onSubmit = async (data: AddLiquidityFormData) => {
-    if (!api || !pairAddress || !account?.decodedAddress) {
-      throw new Error('API, pairAddress or account is not ready');
+    if (!api || !account?.decodedAddress) {
+      throw new Error('API or account is not ready');
+    }
+
+    if (!pairAddress) {
+      await createPair(token0.address, token1.address);
+      return;
     }
 
     const amountADesired = parseUnits(data.amount0, token0.decimals);
@@ -255,14 +294,14 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
     }
   };
 
-  const networks = getNetworks(pairsTokens.tokens);
+  const networks = getNetworks(pairsTokens.tokens, customTokensMap);
 
   const formError =
     errors.amount0?.message ||
     errors.amount1?.message ||
     errors.token0Address?.message ||
     errors.token1Address?.message;
-  const isFormValid = !formError && amount0 && amount1 && pairAddress;
+  const isFormValid = !formError && amount0 && amount1 && !isLowLiquidity;
 
   return (
     <>
@@ -290,8 +329,6 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
                   value={amount0}
                   type="number"
                   inputMode="decimal"
-                  min={0}
-                  max={token0.balance ? getFormattedBalance(token0.balance, token0.decimals) : undefined}
                   placeholder="0.0"
                   className="input-field flex-1 text-xl"
                 />
@@ -300,17 +337,15 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
                   onClick={() => setShowToken0Selector(true)}
                   variant="secondary"
                   className="flex items-center space-x-2 min-w-[120px]">
-                  <img src={token0.logoURI || '/placeholder.svg'} alt={token0.name} className="w-5 h-5 rounded-full" />
+                  <TokenIcon token={token0} size="xs" />
                   <span>{token0.displaySymbol}</span>
                   <ChevronDown className="w-4 h-4" />
                 </Button>
               </div>
             </div>
-
             <div className="flex justify-center">
               <Plus className="w-6 h-6 text-gray-400" />
             </div>
-
             {/* Token 1 */}
             <div className="space-y-2">
               <div className="flex justify-between gap-2 text-sm text-gray-400">
@@ -328,8 +363,6 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
                   value={amount1}
                   type="number"
                   inputMode="decimal"
-                  min={0}
-                  max={token1.balance ? getFormattedBalance(token1.balance, token1.decimals) : undefined}
                   placeholder="0.0"
                   className="input-field flex-1 text-xl"
                 />
@@ -338,13 +371,15 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
                   onClick={() => setShowToken1Selector(true)}
                   variant="secondary"
                   className="flex items-center space-x-2 min-w-[120px]">
-                  <img src={token1.logoURI || '/placeholder.svg'} alt={token1.name} className="w-5 h-5 rounded-full" />
+                  <TokenIcon token={token1} size="xs" />
                   <span>{token1.displaySymbol}</span>
                   <ChevronDown className="w-4 h-4" />
                 </Button>
               </div>
             </div>
-
+            {isInitialLiquidity && (
+              <InitialLiquidityInfo token0={token0} token1={token1} prices={prices} isLowLiquidity={isLowLiquidity} />
+            )}
             {/* Pool Info */}
             <div className="bg-gray-500/10 border border-gray-500/20 rounded-lg p-4 space-y-3">
               <div className="flex justify-between text-sm">
@@ -358,7 +393,9 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-400">LP Tokens</span>
                 <div className="flex items-center space-x-1">
-                  <span className="theme-text">{formatUnits(lpTokensToMint, 18)}</span>
+                  <span className="theme-text">
+                    {isInitialLiquidity ? 'New Pool' : formatUnits(lpTokensToMint, 18)}
+                  </span>
                   <Tooltip
                     content={
                       <p className="text-xs">
@@ -373,17 +410,13 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
                 </div>
               </div>
             </div>
-
             {account ? (
               <Button type="submit" disabled={isPending || !isFormValid} className="btn-primary w-full py-4 text-lg">
-                ADD LIQUIDITY
+                {pairAddress ? 'ADD LIQUIDITY' : 'CREATE PAIR'}
               </Button>
             ) : (
               <Wallet />
             )}
-
-            {!pairAddress && <div className="text-red-500">Pair not found</div>}
-
             {formError && <div className="text-red-500">{formError}</div>}
           </form>
         </CardContent>
@@ -397,6 +430,7 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
         title="Select first token"
         networks={networks}
         disabledTokenAddress={token1Address}
+        onSearch={handleAddressSearch}
       />
 
       <TokenSelector
@@ -406,7 +440,10 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
         title="Select second token"
         networks={networks}
         disabledTokenAddress={token0Address}
+        onSearch={handleAddressSearch}
       />
+
+      <TokenImportModal {...tokenImportModalProps} />
     </>
   );
 };

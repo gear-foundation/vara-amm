@@ -10,10 +10,10 @@ type Params = {
 };
 
 export const useBurnMessage = () => {
-  const { tokensData } = usePairsTokens();
+  const tokenMap = usePairsTokens().pairsTokens?.tokens;
   const varaTokenAddress = useMemo(
-    () => tokensData && Array.from(tokensData).find(([_, { isVaraNative }]) => isVaraNative)?.[0],
-    [tokensData],
+    () => tokenMap && Array.from(tokenMap).find(([_, { isVaraNative }]) => isVaraNative)?.[0],
+    [tokenMap],
   );
 
   const program = useVftVaraProgram(varaTokenAddress);

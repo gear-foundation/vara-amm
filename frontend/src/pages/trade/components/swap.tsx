@@ -7,11 +7,7 @@ import { ArrowDownUp, Info, ChevronDown, ChevronUp } from 'lucide-react';
 import { useEffect, useState, useMemo } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 
-import { TokenSelector } from '@/components/token-selector';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Wallet } from '@/components/wallet';
+import { TokenIcon, TokenSelector, Button, Input, Card, CardContent, CardHeader, Wallet } from '@/components';
 import { INPUT_PERCENTAGES, SECONDS_IN_MINUTE, SLIPPAGE } from '@/consts';
 import { usePairsBalances, usePairsReserves } from '@/features/pair';
 import { createSwapValidationSchema, SwapFormData } from '@/features/pair/schema';
@@ -340,11 +336,7 @@ export function Swap({ pairsTokens, refetchBalances }: TradePageProps) {
               onClick={() => setShowFromTokenSelector(true)}
               variant="secondary"
               className="flex items-center space-x-2 min-w-[120px]">
-              <img
-                src={fromToken.logoURI || '/placeholder.svg'}
-                alt={fromToken.name}
-                className="w-5 h-5 rounded-full"
-              />
+              <TokenIcon token={fromToken} size="xs" />
               <span>{fromToken.displaySymbol}</span>
               <ChevronDown className="w-4 h-4" />
             </Button>
@@ -419,7 +411,7 @@ export function Swap({ pairsTokens, refetchBalances }: TradePageProps) {
               onClick={() => setShowToTokenSelector(true)}
               variant="secondary"
               className="flex items-center space-x-2 min-w-[120px]">
-              <img src={toToken.logoURI || '/placeholder.svg'} alt={toToken.name} className="w-5 h-5 rounded-full" />
+              <TokenIcon token={toToken} size="xs" />
               <span>{toToken.displaySymbol}</span>
               <ChevronDown className="w-4 h-4" />
             </Button>
