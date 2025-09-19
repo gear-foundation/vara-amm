@@ -1,6 +1,6 @@
 import { HexString } from '@gear-js/api';
 import { Search, Check } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, Input, Address, TokenIcon } from '@/components';
 import type { Network, Token } from '@/features/pair/types';
@@ -13,6 +13,7 @@ interface TokenSelectorProps {
   title?: string;
   networks: Network[];
   disabledTokenAddress?: HexString;
+  onSearch?: (query: string) => void;
 }
 
 export function TokenSelector({
@@ -22,8 +23,10 @@ export function TokenSelector({
   title = 'Select a token',
   networks,
   disabledTokenAddress,
+  onSearch,
 }: TokenSelectorProps) {
-  const [selectedNetwork, setSelectedNetwork] = useState<Network>(networks[0]);
+  const [selectedNetworkId, setSelectedNetworkId] = useState<string>(networks[0].id);
+  const selectedNetwork = networks.find((network) => network.id === selectedNetworkId)!;
   const [searchQuery, setSearchQuery] = useState('');
 
   const filteredTokens = selectedNetwork.tokens.filter(
@@ -41,8 +44,14 @@ export function TokenSelector({
   };
 
   const handleNetworkSelect = (network: Network) => {
-    setSelectedNetwork(network);
+    setSelectedNetworkId(network.id);
   };
+
+  useEffect(() => {
+    if (isOpen) {
+      setSearchQuery('');
+    }
+  }, [isOpen]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose} aria-describedby="token-selector-dialog">
@@ -56,9 +65,12 @@ export function TokenSelector({
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <Input
-              placeholder="Search tokens"
+              placeholder="Search tokens or paste address"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                onSearch?.(e.target.value);
+              }}
               className="input-field pl-10"
             />
           </div>
@@ -73,7 +85,7 @@ export function TokenSelector({
                     key={token.symbol}
                     onClick={() => handleTokenSelect(token)}
                     className="w-full flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-500/10 transition-colors text-left group">
-                    <TokenIcon token={token} />
+                    <TokenIcon token={token} withBadge />
 
                     <div className="flex-1 min-w-0">
                       <div className="font-medium theme-text text-base mb-1 leading-none">{token.displaySymbol}</div>
@@ -104,11 +116,7 @@ export function TokenSelector({
                         selectedNetwork.id === network.id ? 'bg-[#00FF85]/10 border border-[#00FF85]/20' : ''
                       }`}>
                       <div className="flex items-center space-x-2">
-                        <img
-                          src={network.logoURI || '/placeholder.svg'}
-                          alt={network.name}
-                          className="w-6 h-6 rounded-full"
-                        />
+                        <img src={network.logoURI} alt={network.name} className="w-6 h-6 rounded-full" />
                         <span className="text-sm theme-text">{network.name}</span>
                       </div>
                       {selectedNetwork.id === network.id && <Check className="w-4 h-4 text-[#00FF85]" />}

@@ -268,7 +268,7 @@ export function ExplorePageTokens({
                 <tr key={`${token.symbol}-${index}`} className="table-row">
                   <td className="py-4 px-6">
                     <div className="flex items-center space-x-3 group">
-                      <TokenIcon token={token} />
+                      <TokenIcon token={token} withBadge />
                       <div>
                         <div className="font-medium theme-text">{token.name}</div>
                         <div className="flex items-center space-x-2 mt-1">

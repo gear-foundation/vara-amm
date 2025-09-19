@@ -1,4 +1,5 @@
 export * from './ui';
+export * from './token-custom-icon';
 export * from './token-selector';
 export * from './token-icon';
 export * from './wallet';

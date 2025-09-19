@@ -6,11 +6,13 @@ import { GetPairsQuery, type PairData } from '@/features/pair/queries';
 import { useGraphQLQuery } from '@/hooks/useGraphQLQuery';
 import { toNumber } from '@/utils';
 
+import { Token } from '../types';
+
 export type PoolData = {
   id: string;
   name: string;
-  token0: { symbol: string; logoURI: string };
-  token1: { symbol: string; logoURI: string };
+  token0: Pick<Token, 'logoURI' | 'name' | 'isVerified' | 'displaySymbol'>;
+  token1: Pick<Token, 'logoURI' | 'name' | 'isVerified' | 'displaySymbol'>;
   feeTier: number;
   tvl: number;
   volume1h: number;
@@ -64,8 +66,10 @@ export const usePoolsData = (tokensData?: TokenDataMap) => {
       // Find matching tokens from pairsTokens
       const matchingPair = pairsTokens.pairsByAddress.get(pair.id);
 
-      const token0Symbol = tokensData.get(pair.token0)?.displaySymbol || pair.token0Symbol || 'Unknown';
-      const token1Symbol = tokensData.get(pair.token1)?.displaySymbol || pair.token1Symbol || 'Unknown';
+      const token0 = tokensData.get(pair.token0);
+      const token1 = tokensData.get(pair.token1);
+      const token0Symbol = token0?.displaySymbol || pair.token0Symbol || 'Unknown';
+      const token1Symbol = token1?.displaySymbol || pair.token1Symbol || 'Unknown';
 
       const tvl = toNumber(pair.tvlUsd);
       const volume24h = toNumber(pair.volume24H);
@@ -81,12 +85,14 @@ export const usePoolsData = (tokensData?: TokenDataMap) => {
         id: pair.id,
         name: `${token0Symbol}/${token1Symbol}`,
         token0: {
-          symbol: token0Symbol,
-          logoURI: LOGO_URI_BY_SYMBOL[token0Symbol] || '/placeholder.svg',
+          displaySymbol: token0Symbol,
+          logoURI: LOGO_URI_BY_SYMBOL[token0Symbol] || '',
+          name: token0?.name || 'Unknown',
         },
         token1: {
-          symbol: token1Symbol,
-          logoURI: LOGO_URI_BY_SYMBOL[token1Symbol] || '/placeholder.svg',
+          displaySymbol: token1Symbol,
+          logoURI: LOGO_URI_BY_SYMBOL[token1Symbol] || '',
+          name: token1?.name || 'Unknown',
         },
         feeTier: 0.3, // Default fee tier
         tvl,

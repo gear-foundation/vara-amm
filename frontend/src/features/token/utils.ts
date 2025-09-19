@@ -11,6 +11,7 @@ export type TokenDataForTable = {
   name: string;
   symbol: string;
   logoURI: string;
+  displaySymbol: string;
   address: HexString;
   price: number;
   change1h: number;
@@ -44,7 +45,8 @@ function transformTokenDataForTable(
       name: tokenData?.isVaraNative ? 'Vara Network Token' : token.name || displaySymbol,
       symbol: displaySymbol,
       address: token.id as HexString,
-      logoURI: LOGO_URI_BY_SYMBOL[token.symbol] || '/placeholder.svg',
+      logoURI: LOGO_URI_BY_SYMBOL[token.symbol] || '',
+      displaySymbol: displaySymbol,
       price: toNumber(latestSnapshot?.priceUsd) || 0,
       change1h: toNumber(latestSnapshot?.change1H) || 0,
       change1d: toNumber(latestSnapshot?.change24H) || 0,

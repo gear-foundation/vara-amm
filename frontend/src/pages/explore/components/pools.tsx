@@ -2,6 +2,7 @@ import { ChevronUp, ChevronDown } from 'lucide-react';
 import type React from 'react';
 import { useState } from 'react';
 
+import { TokenIcon } from '@/components';
 import { type PoolData } from '@/features/pair';
 import { formatCurrency, getVolumeByTimeframe } from '@/utils';
 
@@ -222,16 +223,8 @@ export function ExplorePagePools({
                   <td className="py-4 px-6">
                     <div className="flex items-center space-x-3">
                       <div className="flex -space-x-2 min-w-10">
-                        <img
-                          src={pool.token0.logoURI || '/placeholder.svg'}
-                          alt={pool.token0.symbol}
-                          className="w-6 h-6 rounded-full border-2 border-gray-500/20"
-                        />
-                        <img
-                          src={pool.token1.logoURI || '/placeholder.svg'}
-                          alt={pool.token1.symbol}
-                          className="w-6 h-6 rounded-full border-2 border-gray-500/20"
-                        />
+                        <TokenIcon token={pool.token0} size="sm" withBorder />
+                        <TokenIcon token={pool.token1} size="sm" withBorder />
                       </div>
                       <span className="font-medium mono theme-text">{pool.name}</span>
                       {pool.isMyPool && (

@@ -5,8 +5,20 @@ import { Plus, ChevronDown, Info } from 'lucide-react';
 import { useEffect, useState, useMemo } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 
-import { Wallet, Button, Card, CardContent, CardHeader, CardTitle, TokenSelector, Input, Tooltip } from '@/components';
+import {
+  Wallet,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  TokenSelector,
+  Input,
+  Tooltip,
+  TokenIcon,
+} from '@/components';
 import { SECONDS_IN_MINUTE } from '@/consts';
+import { TokenImportModal, useTokenImport } from '@/features/token-import';
 import { useSignAndSend } from '@/hooks/use-sign-and-send';
 import {
   useAddLiquidityMessage,
@@ -70,15 +82,30 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
   const watchedValues = useWatch({ control });
   const { token0Address, token1Address, amount0, amount1 } = watchedValues;
 
+  const { tokenImportModalProps, handleAddressSearch, customTokensMap } = useTokenImport({
+    onSelectToken: (token: Token) => {
+      if (showToken0Selector) {
+        setValue('token0Address', token.address);
+        setShowToken0Selector(false);
+      }
+      if (showToken1Selector) {
+        setValue('token1Address', token.address);
+        setShowToken1Selector(false);
+      }
+      setShowToken1Selector(false);
+    },
+    onFindNewToken: () => {},
+  });
+
   const token0 = useMemo(() => {
     if (!token0Address) return undefined;
-    return pairsTokens.tokens.get(token0Address);
-  }, [pairsTokens, token0Address]);
+    return pairsTokens.tokens.get(token0Address) || customTokensMap.get(token0Address);
+  }, [pairsTokens, token0Address, customTokensMap]);
 
   const token1 = useMemo(() => {
     if (!token1Address) return undefined;
-    return pairsTokens.tokens.get(token1Address);
-  }, [pairsTokens, token1Address]);
+    return pairsTokens.tokens.get(token1Address) || customTokensMap.get(token1Address);
+  }, [pairsTokens, token1Address, customTokensMap]);
 
   const { api } = useApi();
   const alert = useAlert();
@@ -255,7 +282,8 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
     }
   };
 
-  const networks = getNetworks(pairsTokens.tokens);
+  const networks = getNetworks(pairsTokens.tokens, customTokensMap);
+  console.log('🚀 ~ AddLiquidity ~ networks:', networks);
 
   const formError =
     errors.amount0?.message ||
@@ -290,8 +318,6 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
                   value={amount0}
                   type="number"
                   inputMode="decimal"
-                  min={0}
-                  max={token0.balance ? getFormattedBalance(token0.balance, token0.decimals) : undefined}
                   placeholder="0.0"
                   className="input-field flex-1 text-xl"
                 />
@@ -300,7 +326,7 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
                   onClick={() => setShowToken0Selector(true)}
                   variant="secondary"
                   className="flex items-center space-x-2 min-w-[120px]">
-                  <img src={token0.logoURI || '/placeholder.svg'} alt={token0.name} className="w-5 h-5 rounded-full" />
+                  <TokenIcon token={token0} size="xs" />
                   <span>{token0.displaySymbol}</span>
                   <ChevronDown className="w-4 h-4" />
                 </Button>
@@ -328,8 +354,6 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
                   value={amount1}
                   type="number"
                   inputMode="decimal"
-                  min={0}
-                  max={token1.balance ? getFormattedBalance(token1.balance, token1.decimals) : undefined}
                   placeholder="0.0"
                   className="input-field flex-1 text-xl"
                 />
@@ -338,7 +362,7 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
                   onClick={() => setShowToken1Selector(true)}
                   variant="secondary"
                   className="flex items-center space-x-2 min-w-[120px]">
-                  <img src={token1.logoURI || '/placeholder.svg'} alt={token1.name} className="w-5 h-5 rounded-full" />
+                  <TokenIcon token={token1} size="xs" />
                   <span>{token1.displaySymbol}</span>
                   <ChevronDown className="w-4 h-4" />
                 </Button>
@@ -397,6 +421,7 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
         title="Select first token"
         networks={networks}
         disabledTokenAddress={token1Address}
+        onSearch={handleAddressSearch}
       />
 
       <TokenSelector
@@ -406,7 +431,10 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
         title="Select second token"
         networks={networks}
         disabledTokenAddress={token0Address}
+        onSearch={handleAddressSearch}
       />
+
+      <TokenImportModal {...tokenImportModalProps} />
     </>
   );
 };
