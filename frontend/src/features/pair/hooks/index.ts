@@ -7,3 +7,4 @@ export { usePoolsData, type PoolData, type PoolsMetrics } from './usePoolsData';
 export { usePairsReserves, type PairsReservesMap } from './useReserves';
 export { useCreatePair } from './useCreatePair';
 export { useTokenPrices } from './use-token-prices';
+export { useVaraTokenAddress } from './use-vara-token-address';

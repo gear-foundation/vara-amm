@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useCallback, useMemo, useRef } from 'react';
 
 import { useTokensWithPrices } from '@/features/token/hooks';
-import { useVaraSymbol } from '@/hooks';
+import { useVaraSymbol } from '@/hooks/use-vara-symbol';
 import { usePairsQuery, VftProgram } from '@/lib/sails';
 import { fetchTokenData } from '@/lib/utils/index';
 

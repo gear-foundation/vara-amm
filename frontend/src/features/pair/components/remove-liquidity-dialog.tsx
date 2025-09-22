@@ -16,6 +16,7 @@ import {
 } from '@/lib/sails';
 import { getErrorMessage } from '@/lib/utils';
 
+import { useVaraTokenAddress } from '../hooks';
 import type { Token } from '../types';
 import { calculatePercentage, formatUnits, parseUnits } from '../utils';
 
@@ -46,7 +47,8 @@ const RemoveLiquidityDialog = ({
   const removeLiquidity = useRemoveLiquidityMessage(pairAddress);
   const { balance: userLpBalance, isFetching: isUserLpBalanceFetching } = useVftBalanceOfQuery(pairAddress);
   const { decimals: lpDecimals, isFetching: isLpDecimalsFetching } = useVftDecimalsQuery(pairAddress);
-  const burn = useBurnMessage();
+  const varaTokenAddress = useVaraTokenAddress();
+  const burn = useBurnMessage(varaTokenAddress);
   const signAndSend = useSignAndSend({ programs: [removeLiquidity.program, burn.program] });
 
   const lpInput = lpDecimals && userInput ? parseUnits(userInput, lpDecimals) : 0n;

@@ -10,6 +10,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { TokenIcon, TokenSelector, Button, Input, Card, CardContent, CardHeader, Wallet } from '@/components';
 import { INPUT_PERCENTAGES, SECONDS_IN_MINUTE, SLIPPAGE } from '@/consts';
 import { usePairsBalances, usePairsReserves } from '@/features/pair';
+import { useVaraTokenAddress } from '@/features/pair/hooks';
 import { createSwapValidationSchema, SwapFormData } from '@/features/pair/schema';
 import type { Token, Network, PairsTokens } from '@/features/pair/types';
 import {
@@ -81,8 +82,9 @@ export function Swap({ pairsTokens, refetchBalances }: TradePageProps) {
   const { reserves } = useGetReservesQuery(pairAddress);
 
   const approve = useApproveMessage(fromToken?.address || ('0x0' as HexString));
-  const mint = useMintMessage();
-  const burn = useBurnMessage();
+  const varaTokenAddress = useVaraTokenAddress();
+  const mint = useMintMessage(varaTokenAddress);
+  const burn = useBurnMessage(varaTokenAddress);
 
   const swapTokensForExactTokens = useSwapTokensForExactTokensMessage(pairAddress);
   const swapExactTokensForTokens = useSwapExactTokensForTokensMessage(pairAddress);

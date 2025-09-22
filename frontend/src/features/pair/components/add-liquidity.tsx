@@ -29,7 +29,7 @@ import {
 } from '@/lib/sails';
 import { getErrorMessage } from '@/lib/utils';
 
-import { useCreatePair, useTokenPrices } from '../hooks';
+import { useCreatePair, useTokenPrices, useVaraTokenAddress } from '../hooks';
 import { createAddLiquidityValidationSchema } from '../schema';
 import type { Token, Network, PairsTokens } from '../types';
 import {
@@ -139,7 +139,8 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
   const token1Approve = useApproveMessage(token1?.address || ('0x0' as HexString));
 
   const addLiquidity = useAddLiquidityMessage(pairAddress);
-  const mint = useMintMessage();
+  const varaTokenAddress = useVaraTokenAddress();
+  const mint = useMintMessage(varaTokenAddress);
   const signAndSend = useSignAndSend({
     programs: [token0Approve.program, token1Approve.program, addLiquidity.program, mint.program],
   });
