@@ -69,12 +69,15 @@ const RemoveLiquidityDialog = ({
 
     const deadline = (Math.floor(Date.now() / 1000) + 20 * SECONDS_IN_MINUTE) * 1000;
 
-    await removeLiquidityMessage({
+    const params = {
       liquidity: String(lpInput),
       amountAMin: String(amountAMin),
       amountBMin: String(amountBMin),
       deadline: String(deadline),
-    });
+    };
+    console.log('🚀 ~ removeLiquidity ~ params:', params);
+
+    await removeLiquidityMessage(params);
     refetchBalances();
     onClose();
   };

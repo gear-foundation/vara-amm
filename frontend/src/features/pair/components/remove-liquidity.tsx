@@ -19,7 +19,7 @@ const RemoveLiquidity = ({ pairAddress, token0, token1, refetchBalances }: Remov
 
   return (
     <>
-      <Button className="btn-secondary" onClick={() => setIsOpen(true)}>
+      <Button variant="secondary" onClick={() => setIsOpen(true)}>
         REMOVE
       </Button>
       <RemoveLiquidityDialog

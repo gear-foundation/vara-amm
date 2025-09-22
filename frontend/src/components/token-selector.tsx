@@ -72,10 +72,7 @@ export function TokenSelector({
                     <img src={token.logoURI || '/placeholder.svg'} alt={token.name} className="w-8 h-8 rounded-full" />
                     <div className="flex-1">
                       <div className="font-medium theme-text">{token.symbol}</div>
-                      <div className="text-sm text-gray-400">{token.name}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-sm theme-text mono">
+                      <div className="text-sm text-gray-400 mono">
                         {token.balance ? getFormattedBalance(token.balance, token.decimals) : '0'}
                       </div>
                     </div>

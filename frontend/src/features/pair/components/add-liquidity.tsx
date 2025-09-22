@@ -3,11 +3,7 @@ import type { ISubmittableResult } from '@polkadot/types/types';
 import { Plus, ChevronDown, Info } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
-import { TokenSelector } from '@/components/token-selector';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Wallet } from '@/components/wallet';
+import { Wallet, Button, Card, CardContent, CardHeader, CardTitle, TokenSelector, Input, Tooltip } from '@/components';
 import { SECONDS_IN_MINUTE } from '@/consts';
 import { useAddLiquidityMessage, useGetReservesQuery, useVftTotalSupplyQuery, useApproveMessage } from '@/lib/sails';
 
@@ -189,53 +185,53 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
       recipient: account.decodedAddress,
     });
 
-    const token0ApproveTx = await token0ApproveMessage({
-      value: amountADesired,
-      spender: pairAddress,
-    });
-
-    const token1ApproveTx = await token1ApproveMessage({
-      value: amountBDesired,
-      spender: pairAddress,
-    });
-
-    const addLiquidityTx = await addLiquidityMessage({
-      amountADesired: isPairReverse ? amountBDesired : amountADesired,
-      amountBDesired: isPairReverse ? amountADesired : amountBDesired,
-      amountAMin: isPairReverse ? amountBMin : amountAMin,
-      amountBMin: isPairReverse ? amountAMin : amountBMin,
-      deadline: deadline.toString(),
-    });
-
-    if (!token0ApproveTx?.extrinsic || !token1ApproveTx?.extrinsic || !addLiquidityTx?.extrinsic) {
-      setError('Failed to create batch');
-      return;
-    }
-    setLoading(true);
-
-    const batch = api.tx.utility.batch([
-      token0ApproveTx.extrinsic,
-      token1ApproveTx.extrinsic,
-      addLiquidityTx.extrinsic,
-    ]);
-
-    const { address, signer } = account;
-    const statusCallback = (result: ISubmittableResult) =>
-      handleStatus(api, result, {
-        onSuccess: () => {
-          void refreshReserves();
-          void refreshTotalSupply();
-          onSuccess();
-          alert.success('Liquidity added successfully');
-        },
-        onError: (_error) => alert.error(_error),
-        onFinally: () => setLoading(false),
+    try {
+      const token0ApproveTx = await token0ApproveMessage({
+        value: amountADesired,
+        spender: pairAddress,
       });
-
-    // TODO: check versions of polkadot and types
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
-    await batch.signAndSend(address, { signer }, statusCallback);
+      const token1ApproveTx = await token1ApproveMessage({
+        value: amountBDesired,
+        spender: pairAddress,
+      });
+      const addLiquidityTx = await addLiquidityMessage({
+        amountADesired: isPairReverse ? amountBDesired : amountADesired,
+        amountBDesired: isPairReverse ? amountADesired : amountBDesired,
+        amountAMin: isPairReverse ? amountBMin : amountAMin,
+        amountBMin: isPairReverse ? amountAMin : amountBMin,
+        deadline: deadline.toString(),
+      });
+      if (!token0ApproveTx?.extrinsic || !token1ApproveTx?.extrinsic || !addLiquidityTx?.extrinsic) {
+        setError('Failed to create batch');
+        return;
+      }
+      setLoading(true);
+      const batch = api.tx.utility.batch([
+        token0ApproveTx.extrinsic,
+        token1ApproveTx.extrinsic,
+        addLiquidityTx.extrinsic,
+      ]);
+      const { address, signer } = account;
+      const statusCallback = (result: ISubmittableResult) =>
+        handleStatus(api, result, {
+          onSuccess: () => {
+            void refreshReserves();
+            void refreshTotalSupply();
+            onSuccess();
+            alert.success('Liquidity added successfully');
+          },
+          onError: (_error) => alert.error(_error),
+          onFinally: () => setLoading(false),
+        });
+      // TODO: check versions of polkadot and types
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore
+      await batch.signAndSend(address, { signer }, statusCallback);
+    } catch (_error) {
+      console.error('Error adding liquidity:', _error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const networks = getNetworks(pairsTokens);
@@ -250,9 +246,9 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
         <CardContent className="space-y-4">
           {/* Token 0 */}
           <div className="space-y-2">
-            <div className="flex justify-between text-sm text-gray-400">
+            <div className="flex justify-between gap-2 text-sm text-gray-400">
               <span>TOKEN 1</span>
-              <span>
+              <span className="text-right">
                 Balance: {token0.balance ? getFormattedBalance(token0.balance, token0.decimals, token0.symbol) : '0'}
               </span>
             </div>
@@ -283,7 +279,8 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
               />
               <Button
                 onClick={() => setShowToken0Selector(true)}
-                className="btn-secondary flex items-center space-x-2 min-w-[120px]">
+                variant="secondary"
+                className="flex items-center space-x-2 min-w-[120px]">
                 <img src={token0.logoURI || '/placeholder.svg'} alt={token0.name} className="w-5 h-5 rounded-full" />
                 <span>{token0.symbol}</span>
                 <ChevronDown className="w-4 h-4" />
@@ -297,9 +294,9 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
 
           {/* Token 1 */}
           <div className="space-y-2">
-            <div className="flex justify-between text-sm text-gray-400">
+            <div className="flex justify-between gap-2 text-sm text-gray-400">
               <span>TOKEN 2</span>
-              <span>
+              <span className="text-right">
                 Balance: {token1.balance ? getFormattedBalance(token1.balance, token1.decimals, token1.symbol) : '0'}
               </span>
             </div>
@@ -330,7 +327,8 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
               />
               <Button
                 onClick={() => setShowToken1Selector(true)}
-                className="btn-secondary flex items-center space-x-2 min-w-[120px]">
+                variant="secondary"
+                className="flex items-center space-x-2 min-w-[120px]">
                 <img src={token1.logoURI || '/placeholder.svg'} alt={token1.name} className="w-5 h-5 rounded-full" />
                 <span>{token1.symbol}</span>
                 <ChevronDown className="w-4 h-4" />
@@ -352,7 +350,19 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
               <span className="text-gray-400">LP Tokens</span>
               <div className="flex items-center space-x-1">
                 <span className="theme-text">{formatUnits(lpTokensToMint, 18)}</span>
-                <Info className="w-3 h-3 text-gray-400" />
+                <Tooltip
+                  content={
+                    <p className="text-xs">
+                      LP tokens represent your share in the liquidity pool. They automatically earn trading fees (0.3%)
+                      and can be redeemed for underlying tokens at any time. The amount of LP tokens is proportional to
+                      your contribution to the pool&apos;s total liquidity.
+                    </p>
+                  }
+                  side="top"
+                  contentClassName="max-w-xs bg-gray-900 text-white border-gray-700"
+                  delayDuration={200}>
+                  <Info className="w-3 h-3 text-gray-400 cursor-help" />
+                </Tooltip>
               </div>
             </div>
           </div>

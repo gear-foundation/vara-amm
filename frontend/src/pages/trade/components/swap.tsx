@@ -26,6 +26,7 @@ import {
   useSwapExactTokensForTokensMessage,
   useSwapTokensForExactTokensMessage,
 } from '@/lib/sails';
+import { getErrorMessage } from '@/lib/utils';
 
 type TradePageProps = {
   pairsTokens: PairsTokens;
@@ -97,83 +98,89 @@ export function Swap({ pairsTokens, refetchBalances }: TradePageProps) {
     const deadline = (Math.floor(Date.now() / 1000) + 20 * SECONDS_IN_MINUTE) * 1000;
     const isToken0ToToken1 = !isPairReverse;
 
-    let batch: ReturnType<typeof api.tx.utility.batch>;
+    try {
+      let batch: ReturnType<typeof api.tx.utility.batch>;
 
-    if (lastInputTouch === 'from') {
-      const amountIn = parseUnits(fromAmount, fromToken.decimals);
-      const amountOut = await pairPrograms[pairIndex].pair.getAmountOut(amountIn, isToken0ToToken1);
-      const amountOutMin = calculatePercentage(amountOut, 1 - SLIPPAGE).toString();
+      if (lastInputTouch === 'from') {
+        const amountIn = parseUnits(fromAmount, fromToken.decimals);
+        const amountOut = await pairPrograms[pairIndex].pair.getAmountOut(amountIn, isToken0ToToken1);
+        const amountOutMin = calculatePercentage(amountOut, 1 - SLIPPAGE).toString();
 
-      console.log('swapExactTokensForTokensMessage', {
-        amountIn: amountIn.toString(),
-        amountOutMin,
-        isToken0ToToken1,
-        deadline: deadline.toString(),
-      });
+        console.log('swapExactTokensForTokensMessage', {
+          amountIn: amountIn.toString(),
+          amountOutMin,
+          isToken0ToToken1,
+          deadline: deadline.toString(),
+        });
 
-      const approveTx = await approveMessage({ value: amountIn, spender: pairAddress });
+        const approveTx = await approveMessage({ value: amountIn, spender: pairAddress });
 
-      const swapExactTokensForTokensTx = await swapExactTokensForTokensMessage({
-        amountIn: amountIn.toString(),
-        amountOutMin,
-        isToken0ToToken1,
-        deadline: deadline.toString(),
-      });
+        const swapExactTokensForTokensTx = await swapExactTokensForTokensMessage({
+          amountIn: amountIn.toString(),
+          amountOutMin,
+          isToken0ToToken1,
+          deadline: deadline.toString(),
+        });
 
-      if (!approveTx?.extrinsic || !swapExactTokensForTokensTx?.extrinsic) {
-        alert.error('Failed to create batch');
-        return;
+        if (!approveTx?.extrinsic || !swapExactTokensForTokensTx?.extrinsic) {
+          alert.error('Failed to create batch');
+          return;
+        }
+
+        batch = api.tx.utility.batch([approveTx.extrinsic, swapExactTokensForTokensTx.extrinsic]);
+      } else {
+        const amountOut = parseUnits(toAmount, toToken.decimals);
+        const amountIn = await pairPrograms[pairIndex].pair.getAmountIn(amountOut, isToken0ToToken1);
+        const amountInMax = calculatePercentage(amountIn, 1 + SLIPPAGE).toString();
+
+        console.log('swapTokensForExactTokensMessage', {
+          amountOut: amountOut.toString(),
+          amountInMax,
+          isToken0ToToken1,
+          deadline: deadline.toString(),
+        });
+
+        const swapTokensForExactTokensTx = await swapTokensForExactTokensMessage({
+          amountOut: amountOut.toString(),
+          amountInMax,
+          isToken0ToToken1,
+          deadline: deadline.toString(),
+        });
+
+        const approveTx = await approveMessage({ value: amountInMax, spender: pairAddress });
+        if (!approveTx?.extrinsic || !swapTokensForExactTokensTx?.extrinsic) {
+          alert.error('Failed to create batch');
+          return;
+        }
+
+        batch = api.tx.utility.batch([approveTx.extrinsic, swapTokensForExactTokensTx.extrinsic]);
       }
 
-      batch = api.tx.utility.batch([approveTx.extrinsic, swapExactTokensForTokensTx.extrinsic]);
-    } else {
-      const amountOut = parseUnits(toAmount, toToken.decimals);
-      const amountIn = await pairPrograms[pairIndex].pair.getAmountIn(amountOut, isToken0ToToken1);
-      const amountInMax = calculatePercentage(amountIn, 1 + SLIPPAGE).toString();
+      setLoading(true);
 
-      console.log('swapTokensForExactTokensMessage', {
-        amountOut: amountOut.toString(),
-        amountInMax,
-        isToken0ToToken1,
-        deadline: deadline.toString(),
-      });
+      const { address, signer } = account;
+      const statusCallback = (result: ISubmittableResult) => {
+        return handleStatus(api, result, {
+          // TODO: SEEMS LIKE BATCH SUCCESS EVERYTIME ON FAILED TX
+          onSuccess: () => {
+            alert.success('Swap successful');
+            void refetchBalances();
+            setToAmount('');
+            setFromAmount('');
+          },
+          onError: (_error) => alert.error(_error),
+          onFinally: () => setLoading(false),
+        });
+      };
 
-      const swapTokensForExactTokensTx = await swapTokensForExactTokensMessage({
-        amountOut: amountOut.toString(),
-        amountInMax,
-        isToken0ToToken1,
-        deadline: deadline.toString(),
-      });
-
-      const approveTx = await approveMessage({ value: amountInMax, spender: pairAddress });
-      if (!approveTx?.extrinsic || !swapTokensForExactTokensTx?.extrinsic) {
-        alert.error('Failed to create batch');
-        return;
-      }
-
-      batch = api.tx.utility.batch([approveTx.extrinsic, swapTokensForExactTokensTx.extrinsic]);
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore
+      await batch.signAndSend(address, { signer }, statusCallback);
+    } catch (_error) {
+      alert.error(getErrorMessage(_error));
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(true);
-
-    const { address, signer } = account;
-    const statusCallback = (result: ISubmittableResult) => {
-      return handleStatus(api, result, {
-        // TODO: SEEMS LIKE BATCH SUCCESS EVERYTIME ON FAILED TX
-        onSuccess: () => {
-          alert.success('Swap successful');
-          void refetchBalances();
-          setToAmount('');
-          setFromAmount('');
-        },
-        onError: (_error) => alert.error(_error),
-        onFinally: () => setLoading(false),
-      });
-    };
-
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
-    await batch.signAndSend(address, { signer }, statusCallback);
   };
 
   const getSwapDirection = () => {
@@ -272,8 +279,8 @@ export function Swap({ pairsTokens, refetchBalances }: TradePageProps) {
             />
             <Button
               onClick={() => setShowFromTokenSelector(true)}
-              className="btn-secondary flex items-center space-x-2 min-w-[120px]"
-              variant="secondary">
+              variant="secondary"
+              className="flex items-center space-x-2 min-w-[120px]">
               <img
                 src={fromToken.logoURI || '/placeholder.svg'}
                 alt={fromToken.name}
@@ -344,8 +351,8 @@ export function Swap({ pairsTokens, refetchBalances }: TradePageProps) {
             />
             <Button
               onClick={() => setShowToTokenSelector(true)}
-              className="btn-secondary flex items-center space-x-2 min-w-[120px]"
-              variant="secondary">
+              variant="secondary"
+              className="flex items-center space-x-2 min-w-[120px]">
               <img src={toToken.logoURI || '/placeholder.svg'} alt={toToken.name} className="w-5 h-5 rounded-full" />
               <span>{toToken.symbol}</span>
               <ChevronDown className="w-4 h-4" />

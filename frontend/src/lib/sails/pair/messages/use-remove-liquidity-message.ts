@@ -28,6 +28,7 @@ export const useRemoveLiquidityMessage = (pairAddress: HexString) => {
 
     const { transaction } = await prepareTransactionAsync({
       args: [liquidity, amountAMin, amountBMin, deadline],
+      gasLimit: 105_000_000_000n,
     });
 
     await transaction.signAndSend();

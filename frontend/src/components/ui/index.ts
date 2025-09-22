@@ -10,5 +10,4 @@ export * from './label';
 export * from './loader';
 export * from './select';
 export * from './tabs';
-export * from './textarea';
 export * from './tooltip';

@@ -1,5 +1,6 @@
 import { useAccount } from '@gear-js/react-hooks';
 import { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 
 import { Loader, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components';
 import {
@@ -16,11 +17,15 @@ import { usePairsQuery } from '@/lib/sails';
 
 import { YourPositions } from './components/your-positions';
 
+type Tab = 'positions' | 'new-position';
+
 function Pool() {
   const { account } = useAccount();
   const { pairsTokens, refetchBalances: refetchVftBalances } = usePairsTokens();
   const { pairs } = usePairsQuery();
-  const [activeTab, setActiveTab] = useState<'positions' | 'new'>('positions');
+  const location = useLocation();
+  const routerState = location.state as { tab?: Tab } | null;
+  const [activeTab, setActiveTab] = useState<Tab>(routerState?.tab || 'positions');
   const { pairBalances, refetchPairBalances, pairPrograms } = usePairsBalances({ pairs });
   const { lpDecimals } = useLpDecimals({ pairPrograms });
   const { lpUserFees, refetchLpUserFees } = useLpUserFees({ pairPrograms });
@@ -65,7 +70,7 @@ function Pool() {
 
   return (
     <div className="max-w-4xl mx-auto">
-      <Tabs value={activeTab} className="w-full" onValueChange={(value) => setActiveTab(value as 'positions' | 'new')}>
+      <Tabs value={activeTab} className="w-full" onValueChange={(value) => setActiveTab(value as Tab)}>
         <TabsList className="card p-1 mb-8">
           <TabsTrigger
             value="positions"
@@ -77,7 +82,7 @@ function Pool() {
             YOUR POSITIONS
           </TabsTrigger>
           <TabsTrigger
-            value="new"
+            value="new-position"
             className="data-[state=active]:bg-[#00FF85] data-[state=active]:text-black font-bold uppercase">
             NEW POSITION
           </TabsTrigger>
@@ -89,15 +94,15 @@ function Pool() {
             account={account}
             refetchBalances={refetchBalances}
             onAddMore={(token0, token1) => {
-              setActiveTab('new');
+              setActiveTab('new-position');
               setDefaultToken0(token0);
               setDefaultToken1(token1);
             }}
-            onCreateFirst={() => setActiveTab('new')}
+            onCreateFirst={() => setActiveTab('new-position')}
           />
         </TabsContent>
 
-        <TabsContent value="new">
+        <TabsContent value="new-position">
           <AddLiquidity
             pairsTokens={pairsTokens}
             onSuccess={() => {

@@ -33,6 +33,7 @@
     "clsx": "2.1.1",
     "cmdk": "1.0.4",
     "framer-motion": "12.3.1",
+    "graphql": "16.10.0",
     "jotai": "2.11.3",
     "lucide-react": "0.454.0",
     "react": "19.1.0",
@@ -44,6 +45,7 @@
     "shadcn": "latest",
     "tailwind-merge": "3.0.1",
     "tailwindcss-animate": "1.0.7",
+    "graphql-request": "^7.0.1",
     "zod": "3.24.1"
   },
   "devDependencies": {

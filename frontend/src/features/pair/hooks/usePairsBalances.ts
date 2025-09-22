@@ -2,7 +2,7 @@ import type { HexString } from '@gear-js/api';
 import { useAccount, useApi } from '@gear-js/react-hooks';
 import { useQuery } from '@tanstack/react-query';
 
-import { Program as PairProgram } from '@/lib/sails/pair';
+import { SailsProgram as PairProgram } from '@/lib/sails/pair';
 
 type UsePairsBalancesProps = {
   pairs?: [[HexString, HexString], HexString][];

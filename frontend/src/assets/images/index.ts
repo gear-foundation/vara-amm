@@ -1,1 +1,1 @@
-export { default as CrossSVG } from './cross.svg';
+export { default as CrossSVG } from './cross.svg?react';

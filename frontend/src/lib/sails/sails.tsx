@@ -3,9 +3,9 @@ import { useProgram as useGearJsProgram } from '@gear-js/react-hooks';
 
 import { ENV } from '@/consts';
 
-import { Program as VftProgram } from './extended-vft';
-import { Program as FactoryProgram } from './factory';
-import { Program as PairProgram } from './pair';
+import { SailsProgram as VftProgram } from './extended-vft';
+import { SailsProgram as FactoryProgram } from './factory';
+import { SailsProgram as PairProgram } from './pair';
 
 const useFactoryProgram = () => {
   const { data: program } = useGearJsProgram({
