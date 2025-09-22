@@ -3,7 +3,8 @@ import { useAccount, useApi, useDeriveBalancesAll } from '@gear-js/react-hooks';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useMemo, useRef } from 'react';
 
-import { useVaraSymbol } from '@/hooks';
+import { useTokensWithPrices } from '@/features/token/hooks';
+import { useVaraSymbol } from '@/hooks/use-vara-symbol';
 import { usePairsQuery, VftProgram } from '@/lib/sails';
 import { fetchTokenData } from '@/lib/utils/index';
 
@@ -20,8 +21,19 @@ const usePairsTokens = (): UsePairsTokensResult => {
   const { pairs } = usePairsQuery();
   const varaSymbol = useVaraSymbol();
   const { account } = useAccount();
+  const { data: tokensResponse } = useTokensWithPrices();
   const { data: nativeBalance, refetch: refetchNativeBalance } = useDeriveBalancesAll({ address: account?.address });
   const { api } = useApi();
+
+  const tokensFdvMap = useMemo(() => {
+    const map = new Map<HexString, number>();
+
+    tokensResponse?.allTokens.nodes.forEach((token) => {
+      map.set(token.id as HexString, token.tokenPriceSnapshotsByTokenId?.nodes[0].fdv ?? 0);
+    });
+
+    return map;
+  }, [tokensResponse]);
 
   const vftProgramsRef = useRef<Map<HexString, VftProgram>>(new Map());
 
@@ -152,11 +164,12 @@ const usePairsTokens = (): UsePairsTokensResult => {
           pairs: pairMap,
           pairsByAddress,
           pairsArray,
+          tokensFdvMap,
         }
       : undefined;
 
     return { pairsTokens: _pairsTokens };
-  }, [pairs, tokenMap]);
+  }, [pairs, tokenMap, tokensFdvMap]);
 
   const refetchBalances = useCallback(() => {
     void refetchTokensData();

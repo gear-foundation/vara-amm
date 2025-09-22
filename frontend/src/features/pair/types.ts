@@ -35,6 +35,7 @@ interface PairsTokens {
   pairs: PairMap;
   pairsByAddress: PairByAddressMap;
   pairsArray: PairsArray; // Keep for backward compatibility
+  tokensFdvMap: Map<HexString, number>;
 }
 
 export type {

@@ -77,6 +77,7 @@ export function ExplorePagePools({
   const filteredPools = (poolsData || []).filter((pool: PoolData) => {
     if (poolNetworkFilter !== 'all' && pool.network !== poolNetworkFilter) return false;
     if (showMyPools && !pool.isMyPool) return false;
+    if (pool.tvl === 0) return false;
     return true;
   });
 

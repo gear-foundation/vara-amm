@@ -1,10 +1,17 @@
 import type { HexString } from '@gear-js/api';
 import { formatBalance } from '@polkadot/util';
 
-import type { Network, PairsTokens, SelectedPairResult, Token, TokenMap } from './types';
+import type { Network, PairsTokens, SelectedPairResult, Token } from './types';
 
-const getNetworks = (tokens: TokenMap, customTokensMap?: Map<HexString, Token>): Network[] => {
-  const baseTokens = Array.from(tokens.values());
+const getNetworks = (
+  pairsTokens: PairsTokens,
+  customTokensMap?: Map<HexString, Token>,
+  hideZeroFdvTokens?: boolean,
+): Network[] => {
+  const tokens = pairsTokens.tokens;
+  const baseTokens = Array.from(tokens.values()).filter(
+    (token) => (!hideZeroFdvTokens || pairsTokens.tokensFdvMap.get(token.address)) ?? 0 > 0,
+  );
   const customTokens = customTokensMap ? Array.from(customTokensMap.values()) : [];
 
   return [

@@ -129,6 +129,7 @@ export function ExplorePageTokens({
     tokensData?.filter((token) => {
       if (tokenNetworkFilter !== 'all' && token.network !== tokenNetworkFilter) return false;
       if (tokenFilter !== 'all' && !token.symbol.toLowerCase().includes(tokenFilter.toLowerCase())) return false;
+      if (token.fdv === 0) return false;
       return true;
     }) || [];
 
