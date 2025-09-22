@@ -5,4 +5,6 @@ export {
   PairEventPayload,
   LiquidityEventPayload,
   SwapEventPayload,
+  FactoryEventPayload,
+  PairCreatedEventPayload,
 } from "./types";

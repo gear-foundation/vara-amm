@@ -14,6 +14,19 @@ interface SwapEventPayload {
   is_token0_to_token1: boolean;
 }
 
-type PairEventPayload = LiquidityEventPayload | SwapEventPayload;
+interface PairCreatedEventPayload {
+  token0: HexString;
+  token1: HexString;
+  pair_address: HexString;
+}
 
-export { PairEventPayload, LiquidityEventPayload, SwapEventPayload };
+type PairEventPayload = LiquidityEventPayload | SwapEventPayload;
+type FactoryEventPayload = PairCreatedEventPayload;
+
+export { 
+  PairEventPayload, 
+  LiquidityEventPayload, 
+  SwapEventPayload,
+  FactoryEventPayload,
+  PairCreatedEventPayload
+};
