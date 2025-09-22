@@ -294,7 +294,7 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
     }
   };
 
-  const networks = getNetworks(pairsTokens.tokens, customTokensMap);
+  const networks = getNetworks(pairsTokens, customTokensMap);
 
   const formError =
     errors.amount0?.message ||

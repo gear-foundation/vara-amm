@@ -262,7 +262,7 @@ export function Swap({ pairsTokens, refetchBalances }: TradePageProps) {
     return formatUnits(fee, fromToken.decimals) + ' ' + fromToken.displaySymbol;
   };
 
-  const networks = getNetworks(pairsTokens.tokens);
+  const networks = getNetworks(pairsTokens, undefined, true);
 
   const getAmount = async (amount: string, isReverse?: boolean) => {
     if (pairIndex === undefined || !pairPrograms || isPairReverse === undefined) return '';
