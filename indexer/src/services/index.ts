@@ -1,4 +1,3 @@
-export * from "./factory-manager";
 export * from "./price-calculator";
 export * from "./token-manager";
 export * from "./volume-calculator";
