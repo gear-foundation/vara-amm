@@ -92,6 +92,7 @@ export class PairHandler extends BaseHandler {
   public async save(): Promise<void> {
     // Save pair if updated
     if (this._isPairUpdated) {
+      this._ctx.log.info({ pair: this._pair }, "Saving pair");
       await this._ctx.store.save(this._pair);
     }
 
@@ -236,6 +237,7 @@ export class PairHandler extends BaseHandler {
         createdAt: new Date(),
         updatedAt: new Date(),
       });
+      this._ctx.log.info({ pair: this._pair }, "Created new pair");
 
       this._isPairUpdated = true;
     }
