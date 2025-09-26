@@ -11,7 +11,7 @@ const useTokenPrices = (_amount0?: string, _amount1?: string, token0?: Token, to
   const tokenPricesMap = useMemo(
     () =>
       new Map(
-        tokenPrices?.allTokens.nodes.map((token) => [token.id, token.tokenPriceSnapshotsByTokenId?.nodes[0].priceUsd]),
+        tokenPrices?.allTokens.nodes.map((token) => [token.id, token.tokenPriceSnapshotsByTokenId?.nodes[0]?.priceUsd]),
       ),
     [tokenPrices],
   );
