@@ -87,7 +87,6 @@ const usePairsTokens = (): UsePairsTokensResult => {
         const tokenBalancesPromises = tokenPrograms.map(({ program }) => program.vft.balanceOf(account.decodedAddress));
 
         const tokenBalances = await Promise.all(tokenBalancesPromises);
-        console.log('🚀 ~ usePairsTokens ~ tokenBalances:', tokenBalances);
         tokenBalances.forEach((balance, index) => {
           const token = tokenDataMap.get(vftAddresses[index]);
           if (!token) return;
@@ -117,7 +116,6 @@ const usePairsTokens = (): UsePairsTokensResult => {
     },
     enabled: !!pairs && pairs.length > 0 && !!api,
   });
-  console.log('🚀 ~ usePairsTokens ~ tokenMap:', tokenMap);
 
   const { pairsTokens } = useMemo(() => {
     if (!pairs || !tokenMap) return { pairsTokens: undefined };
