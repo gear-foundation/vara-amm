@@ -384,7 +384,7 @@ export class PairHandler extends BaseHandler {
               : this._pair.token0,
           }
         );
-        await this._processTransaction(transaction, swapPayload, common, true);
+        await this._processTransaction(transaction, swapPayload, common);
         this._ctx.log.info({ transaction }, "Processed Swap event with data");
 
         break;
@@ -423,8 +423,7 @@ export class PairHandler extends BaseHandler {
   private async _processTransaction(
     transaction: Transaction,
     payload: PairEventPayload,
-    common: BlockCommonData,
-    isSwap: boolean = false
+    common: BlockCommonData
   ): Promise<void> {
     // Calculate USD values
     await this._calculateTransactionUSDValues(transaction);
@@ -433,7 +432,10 @@ export class PairHandler extends BaseHandler {
     await this._updatePairReserves(payload, common);
 
     // Update volume metrics for swaps
-    if (isSwap) {
+    if (
+      transaction.type === TransactionType.SWAP ||
+      transaction.type === TransactionType.ADD_LIQUIDITY
+    ) {
       await this._updateTokenPrices(
         common.blockTimestamp,
         BigInt(common.blockNumber)
