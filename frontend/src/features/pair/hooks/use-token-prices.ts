@@ -1,11 +1,18 @@
 import { useMemo } from 'react';
 
+import { MIN_FIRST_LIQUIDITY_USD } from '@/consts';
 import { useTokensWithPrices } from '@/features/token';
 import { formatPrice } from '@/lib/utils';
 
 import type { Token } from '../types';
 
-const useTokenPrices = (_amount0?: string, _amount1?: string, token0?: Token, token1?: Token) => {
+const useTokenPrices = (
+  _amount0?: string,
+  _amount1?: string,
+  token0?: Token,
+  token1?: Token,
+  isPoolEmpty?: boolean,
+) => {
   const { data: tokenPrices, isLoading: isTokenPricesLoading } = useTokensWithPrices();
 
   const tokenPricesMap = useMemo(
@@ -42,7 +49,7 @@ const useTokenPrices = (_amount0?: string, _amount1?: string, token0?: Token, to
     totalUsdLiquidity: totalUsdLiquidity ? formatPrice(totalUsdLiquidity) : null,
   };
 
-  const isLowLiquidity = Boolean(totalUsdLiquidity && totalUsdLiquidity < 1000);
+  const isLowLiquidity = Boolean(isPoolEmpty && totalUsdLiquidity && totalUsdLiquidity < MIN_FIRST_LIQUIDITY_USD);
 
   return { prices, isTokenPricesLoading, isLowLiquidity };
 };

@@ -2,15 +2,16 @@ import { HexString } from '@gear-js/api';
 import { useAccount, useAlert, useApi } from '@gear-js/react-hooks';
 import { useState } from 'react';
 
-import type { Token } from '@/features/pair/types';
+import type { Token, TokenMap } from '@/features/pair/types';
 import { VftProgram } from '@/lib/sails';
 import { fetchTokenData } from '@/lib/utils/index';
 
 type UseTokenImportParams = {
   onSelectToken: (token: Token) => void;
+  tokens: TokenMap;
 };
 
-export const useTokenImport = ({ onSelectToken }: UseTokenImportParams) => {
+export const useTokenImport = ({ onSelectToken, tokens }: UseTokenImportParams) => {
   const [customToken, setCustomToken] = useState<Token | null>(null);
   const [customTokensMap, setCustomTokensMap] = useState<Map<HexString, Token>>(new Map());
   const [showImportModal, setShowImportModal] = useState(false);
@@ -32,6 +33,9 @@ export const useTokenImport = ({ onSelectToken }: UseTokenImportParams) => {
 
   const handleAddressSearch = async (address: string) => {
     if (address.length === 66 && address.startsWith('0x')) {
+      const isTokenExists = tokens.get(address as HexString)?.address.toLowerCase() === address.toLowerCase();
+      if (isTokenExists) return;
+
       const token = await validateTokenContract(address as HexString);
       if (token) {
         setCustomToken(token);
