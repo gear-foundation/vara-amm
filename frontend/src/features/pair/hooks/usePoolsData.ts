@@ -86,12 +86,12 @@ export const usePoolsData = (tokenMap?: TokenMap) => {
         name: `${token0Symbol}/${token1Symbol}`,
         token0: {
           displaySymbol: token0Symbol,
-          logoURI: LOGO_URI_BY_SYMBOL[token0Symbol] || '',
+          logoURI: (token0?.isVerified && LOGO_URI_BY_SYMBOL[token0Symbol]) || '',
           name: token0?.name || 'Unknown',
         },
         token1: {
           displaySymbol: token1Symbol,
-          logoURI: LOGO_URI_BY_SYMBOL[token1Symbol] || '',
+          logoURI: (token1?.isVerified && LOGO_URI_BY_SYMBOL[token1Symbol]) || '',
           name: token1?.name || 'Unknown',
         },
         feeTier: 0.3, // Default fee tier

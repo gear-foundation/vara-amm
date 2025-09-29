@@ -82,7 +82,7 @@ export function TokenSelector({
                 <div className="text-sm font-medium text-gray-400 uppercase mb-3">Tokens</div>
                 {filteredTokens.map((token) => (
                   <button
-                    key={token.symbol}
+                    key={token.address}
                     onClick={() => handleTokenSelect(token)}
                     className="w-full flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-500/10 transition-colors text-left group">
                     <TokenIcon token={token} withBadge />

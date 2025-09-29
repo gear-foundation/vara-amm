@@ -97,6 +97,7 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
       }
       setShowToken1Selector(false);
     },
+    tokens: pairsTokens.tokens,
   });
 
   const token0 = useMemo(() => {
@@ -183,7 +184,7 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
   }, [token0Address, token1Address, reserves]);
 
   const { createPair } = useCreatePair();
-  const { prices, isLowLiquidity } = useTokenPrices(amount0, amount1, token0, token1);
+  const { prices, isLowLiquidity } = useTokenPrices(amount0, amount1, token0, token1, isPoolEmpty);
 
   if (!token0 || !token1) {
     return <div>Error: Token not found</div>;
