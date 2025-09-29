@@ -110,7 +110,26 @@ export class PairsHandler extends BaseHandler {
       if (state.isPairUpdated && state.pair) {
         this._ctx.log.info({ pair: state.pair }, "Saving pair");
         await this._ctx.store.save(state.pair);
-        state.isPairUpdated = false;
+      }
+
+      if (state.isVolumeSnapshotsUpdated) {
+        const volumeSnapshots = Array.from(state.volumeSnapshots.values());
+        if (volumeSnapshots.length > 0) {
+          this._ctx.log.info(
+            { count: volumeSnapshots.length },
+            "Saving volume snapshots"
+          );
+          await this._ctx.store.save(volumeSnapshots);
+        }
+      }
+
+      const transactions = Array.from(state.transactions.values());
+      if (transactions.length > 0) {
+        this._ctx.log.info(
+          { count: transactions.length },
+          "Saving transactions"
+        );
+        await this._ctx.store.save(transactions);
       }
     }
 
@@ -123,8 +142,6 @@ export class PairsHandler extends BaseHandler {
         this._ctx.log.info({ count: tokens.length }, "Saving tokens");
         await this._ctx.store.save(tokens);
       }
-
-      this._tokensToSave.clear();
     }
 
     if (this._priceSnapshots.size > 0) {
@@ -134,31 +151,6 @@ export class PairsHandler extends BaseHandler {
         "Saving price snapshots"
       );
       await this._ctx.store.save(priceSnapshots);
-      this._priceSnapshots.clear();
-    }
-
-    for (const state of this._pairs.values()) {
-      if (state.isVolumeSnapshotsUpdated) {
-        const volumeSnapshots = Array.from(state.volumeSnapshots.values());
-        if (volumeSnapshots.length > 0) {
-          this._ctx.log.info(
-            { count: volumeSnapshots.length },
-            "Saving volume snapshots"
-          );
-          await this._ctx.store.save(volumeSnapshots);
-        }
-        state.isVolumeSnapshotsUpdated = false;
-      }
-
-      const transactions = Array.from(state.transactions.values());
-      if (transactions.length > 0) {
-        this._ctx.log.info(
-          { count: transactions.length },
-          "Saving transactions"
-        );
-        await this._ctx.store.save(transactions);
-        state.transactions.clear();
-      }
     }
   }
 
@@ -169,13 +161,9 @@ export class PairsHandler extends BaseHandler {
       return;
     }
 
-    if (!this._priceCalculator) {
-      this._priceCalculator = new PriceCalculator(ctx);
-    }
-
-    if (!this._tokenManager) {
-      this._tokenManager = new TokenManager(ctx, this._vftCache);
-    }
+    // Recreate per batch to avoid holding a stale ctx across mapping runs
+    this._priceCalculator = new PriceCalculator(ctx);
+    this._tokenManager = new TokenManager(ctx, this._vftCache);
 
     const firstBlock = ctx.blocks[0];
     const firstCommon = getBlockCommonData(firstBlock);
@@ -195,7 +183,11 @@ export class PairsHandler extends BaseHandler {
           state.pair &&
           this._shouldPerformHourlyUpdates(state, blockTimestamp)
         ) {
-          await this._performHourlyUpdates(state, blockTimestamp, BigInt(blockNumber));
+          await this._performHourlyUpdates(
+            state,
+            blockTimestamp,
+            BigInt(blockNumber)
+          );
         }
       }
 
@@ -309,18 +301,14 @@ export class PairsHandler extends BaseHandler {
     }
 
     const ensureToken = async (tokenId: string) => {
-      if (!this._tokens.has(tokenId)) {
-        const { token, isNew } = await this._tokenManager.getOrCreateToken(
-          tokenId
-        );
-        this._tokens.set(token.id, token);
+      const token = this._tokens.get(tokenId);
 
-        if (isNew) {
-          this._tokensToSave.add(token.id);
-        }
+      if (!token) {
+        const token = await this._tokenManager.createTokenFromContract(tokenId);
+        this._tokens.set(token.id, token);
+        this._tokensToSave.add(token.id);
       }
 
-      const token = this._tokens.get(tokenId);
       if (token && !this._tokenPrices.has(tokenId)) {
         await this._initTokenPrices(token);
       }
@@ -409,10 +397,7 @@ export class PairsHandler extends BaseHandler {
           liquidityPayload,
           common
         );
-        this._ctx.log.info(
-          { transaction },
-          "Processed LiquidityAdded event"
-        );
+        this._ctx.log.info({ transaction }, "Processed LiquidityAdded event");
         break;
       }
 
@@ -437,10 +422,7 @@ export class PairsHandler extends BaseHandler {
           liquidityPayload,
           common
         );
-        this._ctx.log.info(
-          { transaction },
-          "Processed LiquidityRemoved event"
-        );
+        this._ctx.log.info({ transaction }, "Processed LiquidityRemoved event");
         break;
       }
 
@@ -465,10 +447,7 @@ export class PairsHandler extends BaseHandler {
         );
 
         await this._processTransaction(state, transaction, swapPayload, common);
-        this._ctx.log.info(
-          { transaction },
-          "Processed Swap event with data"
-        );
+        this._ctx.log.info({ transaction }, "Processed Swap event with data");
         break;
       }
 
@@ -519,8 +498,10 @@ export class PairsHandler extends BaseHandler {
         common.blockTimestamp,
         BigInt(common.blockNumber)
       );
-      this._updatePairVolumeMetrics(state, transaction);
       state.lastPriceAndVolumeUpdate = common.blockTimestamp;
+    }
+    if (transaction.type === TransactionType.SWAP) {
+      this._updatePairVolumeMetrics(state, transaction);
       state.isVolumeSnapshotsUpdated = true;
     }
 
@@ -636,13 +617,14 @@ export class PairsHandler extends BaseHandler {
 
     const token0 = this._tokens.get(state.pair.token0);
     if (token0) {
-      const token0Snapshot = await this._priceCalculator.prepareTokenPriceSnapshot(
-        token0,
-        timestamp,
-        blockNumber,
-        this._getPairsForToken(token0.id),
-        this._tokens
-      );
+      const token0Snapshot =
+        await this._priceCalculator.prepareTokenPriceSnapshot(
+          token0,
+          timestamp,
+          blockNumber,
+          this._getPairsForToken(token0.id),
+          this._tokens
+        );
 
       if (token0Snapshot.snapshot) {
         this._tokenPrices.set(
@@ -658,13 +640,14 @@ export class PairsHandler extends BaseHandler {
 
     const token1 = this._tokens.get(state.pair.token1);
     if (token1) {
-      const token1Snapshot = await this._priceCalculator.prepareTokenPriceSnapshot(
-        token1,
-        timestamp,
-        blockNumber,
-        this._getPairsForToken(token1.id),
-        this._tokens
-      );
+      const token1Snapshot =
+        await this._priceCalculator.prepareTokenPriceSnapshot(
+          token1,
+          timestamp,
+          blockNumber,
+          this._getPairsForToken(token1.id),
+          this._tokens
+        );
 
       if (token1Snapshot.snapshot) {
         this._tokenPrices.set(

@@ -1,4 +1,4 @@
-import { GearApi, HexString } from "@gear-js/api";
+import { HexString } from "@gear-js/api";
 import { isSailsEvent, isUserMessageSentEvent } from "../helpers";
 import { Pair } from "../model";
 import { ProcessorContext } from "../processor";
@@ -14,19 +14,18 @@ export class FactoryHandler extends BaseHandler {
   private _pairsHandler: PairsHandler;
   private _existingPairsLoaded: boolean;
 
-  constructor(factoryProgramId: string) {
+  constructor(factoryProgramId: string, pairsHandler: PairsHandler) {
     super();
     this._factoryProgramId = factoryProgramId;
-    this._pairsHandler = new PairsHandler();
+    this._pairsHandler = pairsHandler;
     this._existingPairsLoaded = false;
     this.userMessageSentProgramIds = [factoryProgramId];
     this.events = [];
     this.messageQueuedProgramIds = [];
   }
 
-  public async init(api: GearApi): Promise<void> {
+  public async init(): Promise<void> {
     this._factoryDecoder = await SailsDecoder.new("assets/factory.idl");
-    await this._pairsHandler.init(api);
   }
 
   /**
@@ -75,13 +74,9 @@ export class FactoryHandler extends BaseHandler {
     );
   }
 
-  public async clear(): Promise<void> {
-    await this._pairsHandler.clear();
-  }
+  public async clear(): Promise<void> {}
 
-  public async save(): Promise<void> {
-    await this._pairsHandler.save();
-  }
+  public async save(): Promise<void> {}
 
   public async process(ctx: ProcessorContext): Promise<void> {
     // Always call super.process(ctx) first
@@ -103,8 +98,6 @@ export class FactoryHandler extends BaseHandler {
         }
       }
     }
-
-    await this._pairsHandler.process(ctx);
   }
 
   private async _handleUserMessageSentEvent(event: UserMessageSentEvent) {
@@ -161,16 +154,14 @@ export class FactoryHandler extends BaseHandler {
       tokens: [payload.token0, payload.token1],
     };
 
-    if (this._pairsHandler) {
-      this._pairsHandler.registerPair(pairInfo);
-      this._ctx.log.info(
-        {
-          pairAddress: pairInfo.address,
-          token0: pairInfo.tokens[0],
-          token1: pairInfo.tokens[1],
-        },
-        "Registered new pair"
-      );
-    }
+    this._pairsHandler.registerPair(pairInfo);
+    this._ctx.log.info(
+      {
+        pairAddress: pairInfo.address,
+        token0: pairInfo.tokens[0],
+        token1: pairInfo.tokens[1],
+      },
+      "Registered new pair"
+    );
   }
 }
