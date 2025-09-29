@@ -14,13 +14,12 @@ export class PriceCalculator {
    * Calculate token price in USD based on pair reserves
    * Uses liquidity-weighted average price from all stablecoin pairs
    */
-  async calculateTokenPrice(token: Token): Promise<number | null> {
-    // Get all pairs containing this token
-    const pairs = await this.ctx.store.find(Pair, {
-      where: [{ token0: token.id }, { token1: token.id }],
-    });
-
-    if (pairs.length === 0) {
+  async calculateTokenPrice(
+    token: Token,
+    pairs: Pair[],
+    tokens: Map<string, Token>
+  ): Promise<number | null> {
+    if (!pairs.length) {
       return null;
     }
 
@@ -37,11 +36,8 @@ export class PriceCalculator {
         const stablecoinReserve = isToken0 ? pair.reserve1 : pair.reserve0;
 
         if (tokenReserve > 0n && stablecoinReserve > 0n) {
-          // Get other token for accurate calculation
-          const otherToken = await this.ctx.store.get(
-            Token,
-            isToken0 ? pair.token1 : pair.token0
-          );
+          const otherTokenId = isToken0 ? pair.token1 : pair.token0;
+          const otherToken = tokens.get(otherTokenId);
 
           if (!otherToken) continue;
 
@@ -59,6 +55,10 @@ export class PriceCalculator {
           totalWeight += weight;
         }
       }
+    }
+
+    if (totalWeight === 0) {
+      return null;
     }
 
     return totalWeightedPrice / totalWeight;
@@ -134,12 +134,14 @@ export class PriceCalculator {
   async prepareTokenPriceSnapshot(
     token: Token,
     timestamp: Date,
-    blockNumber: bigint
+    blockNumber: bigint,
+    pairs: Pair[],
+    tokens: Map<string, Token>
   ): Promise<{
     snapshot: TokenPriceSnapshot | null;
   }> {
     // Calculate current price
-    const currentPrice = await this.calculateTokenPrice(token);
+    const currentPrice = await this.calculateTokenPrice(token, pairs, tokens);
     if (!currentPrice) return { snapshot: null };
 
     // Calculate price changes

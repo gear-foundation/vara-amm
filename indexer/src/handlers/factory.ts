@@ -6,23 +6,18 @@ import { FactoryEventPayload, PairCreatedEventPayload } from "../services";
 import { SailsDecoder } from "../sails-decoder";
 import { UserMessageSentEvent, PairInfo } from "../types";
 import { BaseHandler } from "./base";
-import { PairHandler } from "./pair";
-
-interface IGearProcessor {
-  registerHandler(handler: BaseHandler): void;
-}
+import { PairsHandler } from "./pair";
 
 export class FactoryHandler extends BaseHandler {
   private _factoryDecoder: SailsDecoder;
   private _factoryProgramId: string;
-  private _api: GearApi;
-  private _pairHandlers: Map<string, PairHandler>;
+  private _pairsHandler: PairsHandler;
   private _existingPairsLoaded: boolean;
 
   constructor(factoryProgramId: string) {
     super();
     this._factoryProgramId = factoryProgramId;
-    this._pairHandlers = new Map();
+    this._pairsHandler = new PairsHandler();
     this._existingPairsLoaded = false;
     this.userMessageSentProgramIds = [factoryProgramId];
     this.events = [];
@@ -30,8 +25,8 @@ export class FactoryHandler extends BaseHandler {
   }
 
   public async init(api: GearApi): Promise<void> {
-    this._api = api;
     this._factoryDecoder = await SailsDecoder.new("assets/factory.idl");
+    await this._pairsHandler.init(api);
   }
 
   /**
@@ -53,11 +48,6 @@ export class FactoryHandler extends BaseHandler {
     );
 
     for (const pair of existingPairs) {
-      // Check if we already have this pair handler
-      if (this._pairHandlers.has(pair.id)) {
-        continue;
-      }
-
       const pairInfo: PairInfo = {
         address: pair.id as HexString,
         tokens: [pair.token0 as HexString, pair.token1 as HexString],
@@ -72,37 +62,25 @@ export class FactoryHandler extends BaseHandler {
             pair.token1Symbol || "Unknown"
           }`,
         },
-        "Initializing existing pair handler from database"
+        "Registering existing pair"
       );
 
-      // Create new pair handler
-      const pairHandler = new PairHandler(pairInfo);
-      await pairHandler.init(this._api);
-
-      console.log(
-        `[*] Registering pair handler ${pairHandler.constructor.name}`
-      );
-
-      // Store the handler locally for processing
-      this._pairHandlers.set(pairInfo.address, pairHandler);
+      this._pairsHandler.registerExistingPair(pair);
+      this._pairsHandler.registerPair(pairInfo);
     }
 
     this._ctx.log.info(
-      { totalPairs: this._pairHandlers.size },
-      "Successfully loaded and registered all existing pair handlers"
+      { totalPairs: existingPairs.length },
+      "Successfully loaded existing pairs into memory"
     );
   }
 
   public async clear(): Promise<void> {
-    for (const pairHandler of this._pairHandlers.values()) {
-      await pairHandler.clear();
-    }
+    await this._pairsHandler.clear();
   }
 
   public async save(): Promise<void> {
-    for (const pairHandler of this._pairHandlers.values()) {
-      await pairHandler.save();
-    }
+    await this._pairsHandler.save();
   }
 
   public async process(ctx: ProcessorContext): Promise<void> {
@@ -126,10 +104,7 @@ export class FactoryHandler extends BaseHandler {
       }
     }
 
-    // Process all pair handlers
-    for (const pairHandler of this._pairHandlers.values()) {
-      await pairHandler.process(ctx);
-    }
+    await this._pairsHandler.process(ctx);
   }
 
   private async _handleUserMessageSentEvent(event: UserMessageSentEvent) {
@@ -186,36 +161,16 @@ export class FactoryHandler extends BaseHandler {
       tokens: [payload.token0, payload.token1],
     };
 
-    // Check if we already have this pair handler
-    if (this._pairHandlers.has(pairInfo.address)) {
-      this._ctx.log.warn(
-        { pairAddress: pairInfo.address },
-        "Pair handler already exists, skipping"
+    if (this._pairsHandler) {
+      this._pairsHandler.registerPair(pairInfo);
+      this._ctx.log.info(
+        {
+          pairAddress: pairInfo.address,
+          token0: pairInfo.tokens[0],
+          token1: pairInfo.tokens[1],
+        },
+        "Registered new pair"
       );
-      return;
     }
-
-    // Create new pair handler
-    const pairHandler = new PairHandler(pairInfo);
-
-    this._ctx.log.info(
-      { pairAddress: pairInfo.address },
-      "Initializing new pair handler"
-    );
-
-    await pairHandler.init(this._api);
-
-    // Store the handler locally for processing
-    this._pairHandlers.set(pairInfo.address, pairHandler);
-
-    this._ctx.log.info(
-      {
-        pairAddress: pairInfo.address,
-        token0: pairInfo.tokens[0],
-        token1: pairInfo.tokens[1],
-        totalPairs: this._pairHandlers.size,
-      },
-      "Successfully registered new pair handler"
-    );
   }
 }

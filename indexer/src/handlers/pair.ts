@@ -1,4 +1,4 @@
-import { GearApi } from "@gear-js/api";
+import { GearApi, HexString } from "@gear-js/api";
 import {
   getBlockCommonData,
   isSailsEvent,
@@ -38,235 +38,298 @@ import {
   SwapEventPayload,
 } from "../services/sails";
 
-export class PairHandler extends BaseHandler {
+interface PairState {
+  info: PairInfo;
+  pair: Pair | null;
+  pairProgram: PairProgram;
+  transactions: Map<string, Transaction>;
+  volumeSnapshots: Map<string, PairVolumeSnapshot>;
+  isPairUpdated: boolean;
+  isVolumeSnapshotsUpdated: boolean;
+  lastPriceAndVolumeUpdate: Date | null;
+  fromDatabase: boolean;
+}
+
+export class PairsHandler extends BaseHandler {
   private _pairDecoder: SailsDecoder;
-  private _transactions: Map<string, Transaction>;
-  private _priceSnapshots: Map<string, TokenPriceSnapshot>;
-  private _volumeSnapshots: Map<string, PairVolumeSnapshot>;
-  private _pairInfo: PairInfo;
-  private _pair: Pair;
-  private _isPairUpdated: boolean;
-  private _isTokensUpdated: boolean;
-  private _isVolumeSnapshotsUpdated: boolean;
+  private _pairs: Map<string, PairState>;
   private _priceCalculator: PriceCalculator;
   private _tokenManager: TokenManager;
   private _vftCache: VftProgramCache;
-  private _pairProgram: PairProgram;
   private _tokens: Map<string, Token>;
-  private _tokenPrices: Map<string, number>; // Store current token prices in memory
+  private _tokenPrices: Map<string, number>;
+  private _tokensToSave: Set<string>;
+  private _priceSnapshots: Map<string, TokenPriceSnapshot>;
   private _api: GearApi;
-  private _lastPriceAndVolumeUpdate: Date | null;
 
-  constructor(pairInfo: PairInfo) {
+  constructor() {
     super();
-    this._pairInfo = pairInfo;
-    this.userMessageSentProgramIds = [pairInfo.address];
-    this.events = [];
-    this.messageQueuedProgramIds = [];
-    this._isPairUpdated = false;
-    this._isTokensUpdated = false;
-    this._isVolumeSnapshotsUpdated = false;
-    this._transactions = new Map();
+    this._pairs = new Map();
     this._tokens = new Map();
     this._tokenPrices = new Map();
+    this._tokensToSave = new Set();
     this._priceSnapshots = new Map();
-    this._volumeSnapshots = new Map();
-    this._lastPriceAndVolumeUpdate = null;
+    this.userMessageSentProgramIds = [];
+    this.events = [];
+    this.messageQueuedProgramIds = [];
   }
 
   public async init(api: GearApi): Promise<void> {
     this._api = api;
     this._vftCache = new VftProgramCache(api);
-    this._pairProgram = new PairProgram(api, this._pairInfo.address);
     this._pairDecoder = await SailsDecoder.new("assets/pair.idl");
   }
 
+  public registerExistingPair(pair: Pair): void {
+    const info: PairInfo = {
+      address: pair.id as HexString,
+      tokens: [pair.token0 as HexString, pair.token1 as HexString],
+    };
+
+    const state = this._getOrCreateState(info, true);
+    state.pair = pair;
+  }
+
+  public registerPair(pairInfo: PairInfo): void {
+    this._getOrCreateState(pairInfo, false);
+  }
+
   public async clear(): Promise<void> {
-    this._transactions.clear();
     this._priceSnapshots.clear();
-    this._isPairUpdated = false;
-    this._isTokensUpdated = false;
-    this._isVolumeSnapshotsUpdated = false;
+    this._tokensToSave.clear();
+
+    for (const state of this._pairs.values()) {
+      state.transactions.clear();
+      state.isPairUpdated = false;
+      state.isVolumeSnapshotsUpdated = false;
+    }
   }
 
   public async save(): Promise<void> {
-    // Save pair if updated
-    if (this._isPairUpdated) {
-      this._ctx.log.info({ pair: this._pair }, "Saving pair");
-      await this._ctx.store.save(this._pair);
+    for (const state of this._pairs.values()) {
+      if (state.isPairUpdated && state.pair) {
+        this._ctx.log.info({ pair: state.pair }, "Saving pair");
+        await this._ctx.store.save(state.pair);
+        state.isPairUpdated = false;
+      }
     }
 
-    // Save tokens
-    if (this._isTokensUpdated) {
-      const tokens = Array.from(this._tokens.values());
-      this._ctx.log.info({ count: tokens.length }, "Saving tokens");
-      await this._ctx.store.save(tokens);
+    if (this._tokensToSave.size > 0) {
+      const tokens = Array.from(this._tokensToSave)
+        .map((tokenId) => this._tokens.get(tokenId))
+        .filter((token): token is Token => token !== undefined);
+
+      if (tokens.length > 0) {
+        this._ctx.log.info({ count: tokens.length }, "Saving tokens");
+        await this._ctx.store.save(tokens);
+      }
+
+      this._tokensToSave.clear();
     }
 
-    // Save price snapshots
-    const priceSnapshots = Array.from(this._priceSnapshots.values());
-    if (priceSnapshots.length > 0) {
+    if (this._priceSnapshots.size > 0) {
+      const priceSnapshots = Array.from(this._priceSnapshots.values());
       this._ctx.log.info(
         { count: priceSnapshots.length },
         "Saving price snapshots"
       );
       await this._ctx.store.save(priceSnapshots);
+      this._priceSnapshots.clear();
     }
 
-    // Save volume snapshots
-    if (this._isVolumeSnapshotsUpdated) {
-      const volumeSnapshots = Array.from(this._volumeSnapshots.values());
-      if (volumeSnapshots.length > 0) {
-        this._ctx.log.info(
-          { count: volumeSnapshots.length },
-          "Saving volume snapshots"
-        );
-        await this._ctx.store.save(volumeSnapshots);
+    for (const state of this._pairs.values()) {
+      if (state.isVolumeSnapshotsUpdated) {
+        const volumeSnapshots = Array.from(state.volumeSnapshots.values());
+        if (volumeSnapshots.length > 0) {
+          this._ctx.log.info(
+            { count: volumeSnapshots.length },
+            "Saving volume snapshots"
+          );
+          await this._ctx.store.save(volumeSnapshots);
+        }
+        state.isVolumeSnapshotsUpdated = false;
       }
-    }
 
-    // Save transactions
-    const transactions = Array.from(this._transactions.values());
-    if (transactions.length > 0) {
-      this._ctx.log.info({ count: transactions.length }, "Saving transactions");
-      await this._ctx.store.save(transactions);
+      const transactions = Array.from(state.transactions.values());
+      if (transactions.length > 0) {
+        this._ctx.log.info(
+          { count: transactions.length },
+          "Saving transactions"
+        );
+        await this._ctx.store.save(transactions);
+        state.transactions.clear();
+      }
     }
   }
 
   public async process(ctx: ProcessorContext): Promise<void> {
-    // Always call super.process(ctx) first
     await super.process(ctx);
 
-    // Check if pair already exists in database and load existing data
-    await this._checkAndLoadExistingPair();
+    if (!this._pairs.size) {
+      return;
+    }
 
-    // Initialize services
-    this._priceCalculator = new PriceCalculator(ctx);
-    this._tokenManager = new TokenManager(ctx, this._vftCache);
+    if (!this._priceCalculator) {
+      this._priceCalculator = new PriceCalculator(ctx);
+    }
 
-    await this._initTokens();
-    await this._initSnapshots(getBlockCommonData(ctx.blocks[0]).blockTimestamp);
+    if (!this._tokenManager) {
+      this._tokenManager = new TokenManager(ctx, this._vftCache);
+    }
+
+    const firstBlock = ctx.blocks[0];
+    const firstCommon = getBlockCommonData(firstBlock);
+
+    for (const state of this._pairs.values()) {
+      await this._ensurePair(state);
+      await this._initTokens(state);
+      await this._initSnapshots(state, firstCommon.blockTimestamp);
+    }
 
     for (const block of ctx.blocks) {
       const common = getBlockCommonData(block);
       const { blockTimestamp, blockNumber } = common;
 
-      // Perform hourly updates if needed
-      if (this._shouldPerformHourlyUpdates(blockTimestamp)) {
-        await this._performHourlyUpdates(blockTimestamp, blockNumber);
+      for (const state of this._pairs.values()) {
+        if (
+          state.pair &&
+          this._shouldPerformHourlyUpdates(state, blockTimestamp)
+        ) {
+          await this._performHourlyUpdates(state, blockTimestamp, BigInt(blockNumber));
+        }
       }
 
       for (const event of block.events) {
-        if (
-          isUserMessageSentEvent(event) &&
-          event.args.message.source === this._pairInfo.address
-        ) {
-          await this._handleUserMessageSentEvent(event, common);
+        if (isUserMessageSentEvent(event)) {
+          const source = event.args.message.source;
+          const state = this._pairs.get(source);
+
+          if (state) {
+            await this._handleUserMessageSentEvent(state, event, common);
+          }
         }
       }
     }
 
-    if (this._isVolumeSnapshotsUpdated) {
-      const lastBlock = ctx.blocks[ctx.blocks.length - 1];
-      const { blockTimestamp } = getBlockCommonData(lastBlock);
-      await this._updatePairVolumes(blockTimestamp);
-      VolumeCalculator.clearOldSnapshots(this._volumeSnapshots, blockTimestamp);
-    }
+    for (const state of this._pairs.values()) {
+      if (state.isVolumeSnapshotsUpdated && state.pair) {
+        const lastBlock = ctx.blocks[ctx.blocks.length - 1];
+        const { blockTimestamp } = getBlockCommonData(lastBlock);
+        await this._updatePairVolumes(state, blockTimestamp);
+        VolumeCalculator.clearOldSnapshots(
+          state.volumeSnapshots,
+          blockTimestamp
+        );
+      }
 
-    this._updatePairTVL();
-  }
-
-  private async _checkAndLoadExistingPair(): Promise<void> {
-    // If pair is already loaded/cached, no need to query database
-    if (this._pair) {
-      return;
-    }
-
-    // Query database only during initialization when pair is not yet cached
-    const existingPair = await this._ctx.store.get(
-      Pair,
-      this._pairInfo.address
-    );
-
-    if (existingPair) {
-      this._ctx.log.info(
-        {
-          pairId: this._pairInfo.address,
-          symbols: `${existingPair.token0Symbol} / ${existingPair.token1Symbol}`,
-          existingVolumeUsd: existingPair.volumeUsd,
-          existingTvlUsd: existingPair.tvlUsd,
-          existingVolume24h: existingPair.volume24h,
-        },
-        "Found existing pair in database, preserving accumulated metrics"
-      );
-
-      this._pair = existingPair;
-    } else {
-      this._ctx.log.info(
-        { pairId: this._pairInfo.address },
-        "Creating new pair entry in database"
-      );
-
-      const token0Program = this._vftCache.getOrCreate(
-        this._pairInfo.tokens[0]
-      );
-      const token1Program = this._vftCache.getOrCreate(
-        this._pairInfo.tokens[1]
-      );
-
-      const token0Symbol = await token0Program.vft.symbol();
-      const token1Symbol = await token1Program.vft.symbol();
-      const [reserve0, reserve1] = await this._pairProgram.pair.getReserves();
-      const totalSupply = await this._pairProgram.vft.totalSupply();
-
-      this._pair = new Pair({
-        id: this._pairInfo.address,
-        token0: this._pairInfo.tokens[0],
-        token1: this._pairInfo.tokens[1],
-        token0Symbol,
-        token1Symbol,
-        reserve0: BigInt(reserve0),
-        reserve1: BigInt(reserve1),
-        totalSupply: BigInt(totalSupply),
-        volumeUsd: 0,
-        volume24h: 0,
-        volume7d: 0,
-        volume30d: 0,
-        volume1y: 0,
-        tvlUsd: 0,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
-      this._ctx.log.info({ pair: this._pair }, "Created new pair");
-
-      this._isPairUpdated = true;
-    }
-  }
-
-  private async _initTokens(): Promise<void> {
-    if (this._tokens.size === 0) {
-      // Ensure tokens exist and prepare them for saving
-      const { token: token0, isNew: isToken0New } =
-        await this._tokenManager.getOrCreateToken(this._pairInfo.tokens[0]);
-      const { token: token1, isNew: isToken1New } =
-        await this._tokenManager.getOrCreateToken(this._pairInfo.tokens[1]);
-
-      this._tokens.set(token0.id, token0);
-      this._tokens.set(token1.id, token1);
-
-      // Load latest price snapshots and initialize token prices
-      await this._initTokenPrices(token0);
-      await this._initTokenPrices(token1);
-
-      if (isToken0New || isToken1New) {
-        this._isTokensUpdated = true;
+      if (state.pair) {
+        this._updatePairTVL(state);
       }
     }
   }
 
-  /**
-   * Load the latest price snapshot for a token and initialize its price in memory
-   */
+  private _getOrCreateState(info: PairInfo, fromDatabase: boolean): PairState {
+    let state = this._pairs.get(info.address);
+
+    if (!state) {
+      state = {
+        info,
+        pair: null,
+        pairProgram: new PairProgram(this._api, info.address),
+        transactions: new Map(),
+        volumeSnapshots: new Map(),
+        isPairUpdated: false,
+        isVolumeSnapshotsUpdated: false,
+        lastPriceAndVolumeUpdate: null,
+        fromDatabase,
+      };
+      this._pairs.set(info.address, state);
+    } else {
+      state.info = info;
+      if (fromDatabase) {
+        state.fromDatabase = true;
+      }
+    }
+
+    return state;
+  }
+
+  private async _ensurePair(state: PairState): Promise<void> {
+    if (state.pair) {
+      return;
+    }
+
+    if (state.fromDatabase) {
+      const existingPair = await this._ctx.store.get(Pair, state.info.address);
+      if (existingPair) {
+        state.pair = existingPair;
+        return;
+      }
+
+      state.fromDatabase = false;
+    }
+
+    const token0Program = this._vftCache.getOrCreate(state.info.tokens[0]);
+    const token1Program = this._vftCache.getOrCreate(state.info.tokens[1]);
+
+    const token0Symbol = await token0Program.vft.symbol();
+    const token1Symbol = await token1Program.vft.symbol();
+    const [reserve0, reserve1] = await state.pairProgram.pair.getReserves();
+    const totalSupply = await state.pairProgram.vft.totalSupply();
+
+    const pair = new Pair({
+      id: state.info.address,
+      token0: state.info.tokens[0],
+      token1: state.info.tokens[1],
+      token0Symbol,
+      token1Symbol,
+      reserve0: BigInt(reserve0),
+      reserve1: BigInt(reserve1),
+      totalSupply: BigInt(totalSupply),
+      volumeUsd: 0,
+      volume24h: 0,
+      volume7d: 0,
+      volume30d: 0,
+      volume1y: 0,
+      tvlUsd: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    this._ctx.log.info({ pair }, "Created new pair");
+
+    state.pair = pair;
+    state.isPairUpdated = true;
+  }
+
+  private async _initTokens(state: PairState): Promise<void> {
+    const pair = state.pair;
+    if (!pair) {
+      return;
+    }
+
+    const ensureToken = async (tokenId: string) => {
+      if (!this._tokens.has(tokenId)) {
+        const { token, isNew } = await this._tokenManager.getOrCreateToken(
+          tokenId
+        );
+        this._tokens.set(token.id, token);
+
+        if (isNew) {
+          this._tokensToSave.add(token.id);
+        }
+      }
+
+      const token = this._tokens.get(tokenId);
+      if (token && !this._tokenPrices.has(tokenId)) {
+        await this._initTokenPrices(token);
+      }
+    };
+
+    await ensureToken(pair.token0);
+    await ensureToken(pair.token1);
+  }
+
   private async _initTokenPrices(token: Token): Promise<void> {
     const latestSnapshot = await this._ctx.store.findOne(TokenPriceSnapshot, {
       where: {
@@ -285,42 +348,40 @@ export class PairHandler extends BaseHandler {
         },
         "Initialized token price from latest snapshot"
       );
-    } else {
-      if (PriceUtils.isStablecoin(token.symbol)) {
-        this._tokenPrices.set(token.id, 1);
-      }
-
-      this._ctx.log.debug(
-        { tokenId: token.id },
-        "No price snapshot found for token, price will be calculated on first update"
-      );
+    } else if (PriceUtils.isStablecoin(token.symbol)) {
+      this._tokenPrices.set(token.id, 1);
     }
   }
 
   private async _handleUserMessageSentEvent(
+    state: PairState,
     event: UserMessageSentEvent,
     common: BlockCommonData
   ) {
-    if (isSailsEvent(event)) {
-      const { service, method, payload } = this._pairDecoder.decodeEvent(event);
+    if (!isSailsEvent(event)) {
+      return;
+    }
 
-      this._ctx.log.info(
-        { service, method, payload },
-        `UserMessageSentEvent from ${this._pairInfo.address}`
+    const { service, method, payload } = this._pairDecoder.decodeEvent(event);
+
+    this._ctx.log.info(
+      { service, method, payload },
+      `UserMessageSentEvent from ${state.info.address}`
+    );
+
+    if (service === "Pair") {
+      await this._handlePairService(
+        state,
+        method,
+        payload as PairEventPayload,
+        common,
+        event
       );
-
-      if (service === "Pair") {
-        await this._handlePairService(
-          method,
-          payload as PairEventPayload,
-          common,
-          event
-        );
-      }
     }
   }
 
   private async _handlePairService(
+    state: PairState,
     method: string,
     payload: PairEventPayload,
     common: BlockCommonData,
@@ -330,6 +391,7 @@ export class PairHandler extends BaseHandler {
       case "LiquidityAdded": {
         const liquidityPayload = payload as LiquidityEventPayload;
         const transaction = this._createTransaction(
+          state,
           event,
           common,
           TransactionType.ADD_LIQUIDITY,
@@ -341,14 +403,23 @@ export class PairHandler extends BaseHandler {
           }
         );
 
-        await this._processTransaction(transaction, liquidityPayload, common);
-        this._ctx.log.info({ transaction }, "Processed LiquidityAdded event");
+        await this._processTransaction(
+          state,
+          transaction,
+          liquidityPayload,
+          common
+        );
+        this._ctx.log.info(
+          { transaction },
+          "Processed LiquidityAdded event"
+        );
         break;
       }
 
       case "LiquidityRemoved": {
         const liquidityPayload = payload as LiquidityEventPayload;
         const transaction = this._createTransaction(
+          state,
           event,
           common,
           TransactionType.REMOVE_LIQUIDITY,
@@ -360,15 +431,23 @@ export class PairHandler extends BaseHandler {
           }
         );
 
-        await this._processTransaction(transaction, liquidityPayload, common);
-        this._ctx.log.info({ transaction }, "Processed LiquidityRemoved event");
+        await this._processTransaction(
+          state,
+          transaction,
+          liquidityPayload,
+          common
+        );
+        this._ctx.log.info(
+          { transaction },
+          "Processed LiquidityRemoved event"
+        );
         break;
       }
 
       case "Swap": {
         const swapPayload = payload as SwapEventPayload;
-
         const transaction = this._createTransaction(
+          state,
           event,
           common,
           TransactionType.SWAP,
@@ -377,16 +456,19 @@ export class PairHandler extends BaseHandler {
             amountIn: BigInt(swapPayload.amount_in),
             amountOut: BigInt(swapPayload.amount_out),
             tokenIn: swapPayload.is_token0_to_token1
-              ? this._pair.token0
-              : this._pair.token1,
+              ? state.pair?.token0
+              : state.pair?.token1,
             tokenOut: swapPayload.is_token0_to_token1
-              ? this._pair.token1
-              : this._pair.token0,
+              ? state.pair?.token1
+              : state.pair?.token0,
           }
         );
-        await this._processTransaction(transaction, swapPayload, common);
-        this._ctx.log.info({ transaction }, "Processed Swap event with data");
 
+        await this._processTransaction(state, transaction, swapPayload, common);
+        this._ctx.log.info(
+          { transaction },
+          "Processed Swap event with data"
+        );
         break;
       }
 
@@ -398,127 +480,120 @@ export class PairHandler extends BaseHandler {
     }
   }
 
-  /**
-   * Create a transaction object with common fields
-   */
   private _createTransaction(
+    state: PairState,
     event: UserMessageSentEvent,
     common: BlockCommonData,
     type: TransactionType,
     additionalFields: Partial<Transaction> = {}
   ): Transaction {
+    if (!state.pair) {
+      throw new Error("Pair is not initialized for transaction creation");
+    }
+
     return new Transaction({
       id: event.args.message.id,
       type,
       blockNumber: BigInt(common.blockNumber),
       timestamp: common.blockTimestamp,
-      pair: { id: this._pair.id } as Pair,
+      pair: { id: state.pair.id } as Pair,
       ...additionalFields,
     });
   }
 
-  /**
-   * Process transaction with common operations
-   */
   private async _processTransaction(
+    state: PairState,
     transaction: Transaction,
     payload: PairEventPayload,
     common: BlockCommonData
   ): Promise<void> {
-    // Calculate USD values
     await this._calculateTransactionUSDValues(transaction);
+    await this._updatePairReserves(state, payload, common);
 
-    // Update pair reserves
-    await this._updatePairReserves(payload, common);
-
-    // Update volume metrics for swaps
     if (
       transaction.type === TransactionType.SWAP ||
       transaction.type === TransactionType.ADD_LIQUIDITY
     ) {
       await this._updateTokenPrices(
+        state,
         common.blockTimestamp,
         BigInt(common.blockNumber)
       );
-      this._updatePairVolumeMetrics(transaction);
-      this._lastPriceAndVolumeUpdate = common.blockTimestamp;
-      this._isVolumeSnapshotsUpdated = true;
+      this._updatePairVolumeMetrics(state, transaction);
+      state.lastPriceAndVolumeUpdate = common.blockTimestamp;
+      state.isVolumeSnapshotsUpdated = true;
     }
 
-    // Store transaction
-    this._transactions.set(transaction.id, transaction);
-    this._isPairUpdated = true;
+    state.transactions.set(transaction.id, transaction);
+    state.isPairUpdated = true;
   }
 
-  /**
-   * Update pair reserves and totalSupply by querying current on-chain state
-   */
   private async _updatePairReserves(
-    payload: PairEventPayload,
+    state: PairState,
+    _payload: PairEventPayload,
     common: BlockCommonData
   ): Promise<void> {
+    if (!state.pair) {
+      return;
+    }
+
     try {
-      // Get current reserves and totalSupply from blockchain state via query
-      const pairProgram = new PairProgram(this._api, this._pairInfo.address);
+      const [reserve0, reserve1] = await state.pairProgram.pair.getReserves();
+      const totalSupply = await state.pairProgram.vft.totalSupply();
 
-      const [reserve0, reserve1] = await pairProgram.pair.getReserves();
-      const totalSupply = await pairProgram.vft.totalSupply();
-
-      // Update reserves and totalSupply with current on-chain values
-      this._pair.reserve0 = BigInt(reserve0);
-      this._pair.reserve1 = BigInt(reserve1);
-      this._pair.totalSupply = BigInt(totalSupply);
+      state.pair.reserve0 = BigInt(reserve0);
+      state.pair.reserve1 = BigInt(reserve1);
+      state.pair.totalSupply = BigInt(totalSupply);
 
       this._ctx.log.debug(
         {
-          pairId: this._pairInfo.address,
-          reserve0: this._pair.reserve0.toString(),
-          reserve1: this._pair.reserve1.toString(),
-          totalSupply: this._pair.totalSupply.toString(),
+          pairId: state.info.address,
+          reserve0: state.pair.reserve0.toString(),
+          reserve1: state.pair.reserve1.toString(),
+          totalSupply: state.pair.totalSupply.toString(),
         },
         "Updated pair reserves and totalSupply from on-chain query"
       );
     } catch (error) {
       this._ctx.log.error(
-        { error, pairId: this._pairInfo.address },
+        { error, pairId: state.info.address },
         "Failed to query current reserves and totalSupply, keeping previous values"
       );
     }
 
-    // Always update timestamp and mark as updated
-    this._pair.updatedAt = common.blockTimestamp;
+    state.pair.updatedAt = common.blockTimestamp;
   }
 
-  /**
-   * Calculate USD values for transaction
-   */
   private async _calculateTransactionUSDValues(
     transaction: Transaction
   ): Promise<void> {
-    if (transaction.amountA && transaction.amountB) {
-      const token0 = this._tokens.get(this._pair.token0);
-      const token1 = this._tokens.get(this._pair.token1);
-      const token0Price = this._tokenPrices.get(this._pair.token0);
-      const token1Price = this._tokenPrices.get(this._pair.token1);
+    if (transaction.amountA && transaction.amountB && transaction.pair?.id) {
+      const pair = this._pairs.get(transaction.pair.id)?.pair;
+      if (pair) {
+        const token0 = this._tokens.get(pair.token0);
+        const token1 = this._tokens.get(pair.token1);
+        const token0Price = this._tokenPrices.get(pair.token0);
+        const token1Price = this._tokenPrices.get(pair.token1);
 
-      if (token0 && token0Price) {
-        transaction.amountAUsd = PriceUtils.calculateUSDValue(
-          transaction.amountA,
-          token0.decimals,
-          token0Price
-        );
+        if (token0 && token0Price) {
+          transaction.amountAUsd = PriceUtils.calculateUSDValue(
+            transaction.amountA,
+            token0.decimals,
+            token0Price
+          );
+        }
+
+        if (token1 && token1Price) {
+          transaction.amountBUsd = PriceUtils.calculateUSDValue(
+            transaction.amountB,
+            token1.decimals,
+            token1Price
+          );
+        }
+
+        transaction.valueUsd =
+          (transaction.amountAUsd || 0) + (transaction.amountBUsd || 0);
       }
-
-      if (token1 && token1Price) {
-        transaction.amountBUsd = PriceUtils.calculateUSDValue(
-          transaction.amountB,
-          token1.decimals,
-          token1Price
-        );
-      }
-
-      transaction.valueUsd =
-        (transaction.amountAUsd || 0) + (transaction.amountBUsd || 0);
     }
 
     if (transaction.amountIn && transaction.tokenIn) {
@@ -546,143 +621,178 @@ export class PairHandler extends BaseHandler {
     }
 
     if (transaction.type === TransactionType.SWAP) {
-      // For swaps, only count the input amount to avoid double counting
       transaction.valueUsd = transaction.amountInUsd || 0;
     }
   }
 
-  /**
-   * Update token prices for both tokens in the pair
-   */
   private async _updateTokenPrices(
+    state: PairState,
     timestamp: Date,
     blockNumber: bigint
   ): Promise<void> {
-    const token0Snapshot =
-      await this._priceCalculator.prepareTokenPriceSnapshot(
-        this._tokens.get(this._pair.token0),
-        timestamp,
-        blockNumber
-      );
-
-    if (token0Snapshot.snapshot) {
-      this._tokenPrices.set(
-        this._pair.token0,
-        token0Snapshot.snapshot.priceUsd
-      );
-      this._priceSnapshots.set(
-        token0Snapshot.snapshot.id,
-        token0Snapshot.snapshot
-      );
+    if (!state.pair) {
+      return;
     }
 
-    const token1Snapshot =
-      await this._priceCalculator.prepareTokenPriceSnapshot(
-        this._tokens.get(this._pair.token1),
+    const token0 = this._tokens.get(state.pair.token0);
+    if (token0) {
+      const token0Snapshot = await this._priceCalculator.prepareTokenPriceSnapshot(
+        token0,
         timestamp,
-        blockNumber
+        blockNumber,
+        this._getPairsForToken(token0.id),
+        this._tokens
       );
 
-    if (token1Snapshot.snapshot) {
-      this._tokenPrices.set(
-        this._pair.token1,
-        token1Snapshot.snapshot.priceUsd
+      if (token0Snapshot.snapshot) {
+        this._tokenPrices.set(
+          state.pair.token0,
+          token0Snapshot.snapshot.priceUsd
+        );
+        this._priceSnapshots.set(
+          token0Snapshot.snapshot.id,
+          token0Snapshot.snapshot
+        );
+      }
+    }
+
+    const token1 = this._tokens.get(state.pair.token1);
+    if (token1) {
+      const token1Snapshot = await this._priceCalculator.prepareTokenPriceSnapshot(
+        token1,
+        timestamp,
+        blockNumber,
+        this._getPairsForToken(token1.id),
+        this._tokens
       );
-      this._priceSnapshots.set(
-        token1Snapshot.snapshot.id,
-        token1Snapshot.snapshot
-      );
+
+      if (token1Snapshot.snapshot) {
+        this._tokenPrices.set(
+          state.pair.token1,
+          token1Snapshot.snapshot.priceUsd
+        );
+        this._priceSnapshots.set(
+          token1Snapshot.snapshot.id,
+          token1Snapshot.snapshot
+        );
+      }
     }
   }
 
-  private _updatePairTVL(): void {
-    const token0Price = this._tokenPrices.get(this._pair.token0);
-    const token1Price = this._tokenPrices.get(this._pair.token1);
+  private _getPairsForToken(tokenId: string): Pair[] {
+    const pairs: Pair[] = [];
+    for (const state of this._pairs.values()) {
+      if (!state.pair) continue;
+      if (state.pair.token0 === tokenId || state.pair.token1 === tokenId) {
+        pairs.push(state.pair);
+      }
+    }
+    return pairs;
+  }
 
-    this._pair.tvlUsd = this._priceCalculator.calculatePairTVL(
-      this._pair,
-      this._tokens.get(this._pair.token0),
-      this._tokens.get(this._pair.token1),
+  private _updatePairTVL(state: PairState): void {
+    if (!state.pair) {
+      return;
+    }
+
+    const token0 = this._tokens.get(state.pair.token0);
+    const token1 = this._tokens.get(state.pair.token1);
+    const token0Price = this._tokenPrices.get(state.pair.token0);
+    const token1Price = this._tokenPrices.get(state.pair.token1);
+
+    state.pair.tvlUsd = this._priceCalculator.calculatePairTVL(
+      state.pair,
+      token0,
+      token1,
       token0Price,
       token1Price
     );
   }
 
-  private _updatePairVolumeMetrics(transaction: Transaction): void {
-    const newTradingVolume = transaction.valueUsd;
+  private _updatePairVolumeMetrics(
+    state: PairState,
+    transaction: Transaction
+  ): void {
+    if (!state.pair) {
+      return;
+    }
 
+    const newTradingVolume = transaction.valueUsd;
     if (newTradingVolume > 0) {
       const timestamp = transaction.timestamp;
 
-      // Create or update hourly snapshot
       const hourlySnapshot = VolumeCalculator.createOrUpdateHourlySnapshot(
-        this._volumeSnapshots,
-        this._pair.id,
+        state.volumeSnapshots,
+        state.pair.id,
         newTradingVolume,
         timestamp
       );
 
-      this._volumeSnapshots.set(hourlySnapshot.id, hourlySnapshot);
-      this._pair.volumeUsd = (this._pair.volumeUsd || 0) + newTradingVolume;
+      state.volumeSnapshots.set(hourlySnapshot.id, hourlySnapshot);
+      state.pair.volumeUsd = (state.pair.volumeUsd || 0) + newTradingVolume;
     }
   }
 
-  /**
-   * Check if hourly updates are needed for prices and volumes
-   */
-  private _shouldPerformHourlyUpdates(currentTime: Date): boolean {
+  private _shouldPerformHourlyUpdates(
+    state: PairState,
+    currentTime: Date
+  ): boolean {
     const oneHourMs = 60 * 60 * 1000;
-
-    const shouldPerformHourlyUpdate =
-      !this._lastPriceAndVolumeUpdate ||
-      currentTime.getTime() - this._lastPriceAndVolumeUpdate.getTime() >=
-        oneHourMs;
-
-    return shouldPerformHourlyUpdate;
+    return (
+      !state.lastPriceAndVolumeUpdate ||
+      currentTime.getTime() - state.lastPriceAndVolumeUpdate.getTime() >=
+        oneHourMs
+    );
   }
 
-  /**
-   * Perform hourly updates without requiring a swap transaction
-   */
   private async _performHourlyUpdates(
+    state: PairState,
     timestamp: Date,
     blockNumber: bigint
   ): Promise<void> {
-    await this._updateTokenPrices(timestamp, blockNumber);
+    await this._updateTokenPrices(state, timestamp, blockNumber);
+
+    if (!state.pair) {
+      return;
+    }
 
     const hourlySnapshot = VolumeCalculator.createEmptyHourlySnapshot(
-      this._pair.id,
+      state.pair.id,
       timestamp
     );
 
-    this._volumeSnapshots.set(hourlySnapshot.id, hourlySnapshot);
-
-    this._lastPriceAndVolumeUpdate = timestamp;
-    this._isVolumeSnapshotsUpdated = true;
-    this._isPairUpdated = true;
+    state.volumeSnapshots.set(hourlySnapshot.id, hourlySnapshot);
+    state.lastPriceAndVolumeUpdate = timestamp;
+    state.isVolumeSnapshotsUpdated = true;
+    state.isPairUpdated = true;
   }
 
-  /**
-   * Calculate current volume periods by combining database snapshots with pending ones
-   */
   private async _calculateCurrentVolumes(
+    state: PairState,
     currentTime: Date
   ): Promise<VolumePeriods> {
+    if (!state.pair) {
+      return {
+        volume1h: 0,
+        volume24h: 0,
+        volume7d: 0,
+        volume30d: 0,
+        volume1y: 0,
+      };
+    }
+
     const { oneYearAgo } = TimeUtils.getTimePeriods(currentTime);
 
-    // Get existing snapshots from database
     const dbSnapshots = await this._ctx.store.find(PairVolumeSnapshot, {
       where: {
-        pair: { id: this._pair.id },
+        pair: { id: state.pair.id },
         interval: VolumeInterval.HOURLY,
         timestamp: MoreThanOrEqual(oneYearAgo),
       },
       order: { timestamp: "DESC" },
     });
 
-    // Include pending snapshots from current processing
-    const pendingSnapshots = Array.from(this._volumeSnapshots.values());
-
+    const pendingSnapshots = Array.from(state.volumeSnapshots.values());
     const allSnapshots = [...dbSnapshots, ...pendingSnapshots];
 
     return VolumeCalculator.calculateVolumesFromSnapshots(
@@ -691,35 +801,45 @@ export class PairHandler extends BaseHandler {
     );
   }
 
-  private async _updatePairVolumes(timestamp: Date): Promise<void> {
-    const volumes = await this._calculateCurrentVolumes(timestamp);
-    this._pair.volume1h = volumes.volume1h;
-    this._pair.volume24h = volumes.volume24h;
-    this._pair.volume7d = volumes.volume7d;
-    this._pair.volume30d = volumes.volume30d;
-    this._pair.volume1y = volumes.volume1y;
+  private async _updatePairVolumes(
+    state: PairState,
+    timestamp: Date
+  ): Promise<void> {
+    if (!state.pair) {
+      return;
+    }
+
+    const volumes = await this._calculateCurrentVolumes(state, timestamp);
+    state.pair.volume1h = volumes.volume1h;
+    state.pair.volume24h = volumes.volume24h;
+    state.pair.volume7d = volumes.volume7d;
+    state.pair.volume30d = volumes.volume30d;
+    state.pair.volume1y = volumes.volume1y;
   }
 
-  private async _initSnapshots(timestamp: Date): Promise<void> {
-    if (this._volumeSnapshots.size > 0) {
+  private async _initSnapshots(
+    state: PairState,
+    timestamp: Date
+  ): Promise<void> {
+    if (!state.pair || state.volumeSnapshots.size > 0) {
       return;
     }
 
     const latestSnapshot = await this._ctx.store.findOne(PairVolumeSnapshot, {
-      where: { pair: { id: this._pair.id }, interval: VolumeInterval.HOURLY },
+      where: { pair: { id: state.pair.id }, interval: VolumeInterval.HOURLY },
       order: { timestamp: "DESC" },
     });
 
     if (latestSnapshot) {
-      this._volumeSnapshots.set(latestSnapshot.id, latestSnapshot);
-      this._lastPriceAndVolumeUpdate = latestSnapshot.timestamp;
+      state.volumeSnapshots.set(latestSnapshot.id, latestSnapshot);
+      state.lastPriceAndVolumeUpdate = latestSnapshot.timestamp;
     } else {
       const hourlySnapshot = VolumeCalculator.createEmptyHourlySnapshot(
-        this._pair.id,
+        state.pair.id,
         timestamp
       );
-      this._volumeSnapshots.set(hourlySnapshot.id, hourlySnapshot);
-      this._lastPriceAndVolumeUpdate = timestamp;
+      state.volumeSnapshots.set(hourlySnapshot.id, hourlySnapshot);
+      state.lastPriceAndVolumeUpdate = timestamp;
     }
   }
 }
