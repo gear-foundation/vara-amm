@@ -115,6 +115,8 @@ const usePairsTokens = (): UsePairsTokensResult => {
       return tokenDataMap;
     },
     enabled: !!pairs && pairs.length > 0 && !!api,
+    // keep previous data to avoid consumers remounting when data temporarily undefined
+    placeholderData: (prev) => prev,
   });
 
   const { pairsTokens } = useMemo(() => {

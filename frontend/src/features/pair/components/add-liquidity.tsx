@@ -150,7 +150,7 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
   const isPoolEmpty = reserves?.[0] === 0n && reserves?.[1] === 0n && totalSupply === 0n;
 
   const handleAmount0Change = (value: string) => {
-    if (!isPoolEmpty && reserves && isPairReverse !== undefined && token0 && token1) {
+    if (!isPoolEmpty && reserves?.[0] && reserves?.[1] && isPairReverse !== undefined && token0 && token1) {
       const newAmount1 = calculateProportionalAmount(
         value,
         token0.decimals,
@@ -164,7 +164,7 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
   };
 
   const handleAmount1Change = (value: string) => {
-    if (!isPoolEmpty && reserves && isPairReverse !== undefined && token0 && token1) {
+    if (!isPoolEmpty && reserves?.[0] && reserves?.[1] && isPairReverse !== undefined && token0 && token1) {
       const newAmount0 = calculateProportionalAmount(
         value,
         token1.decimals,
