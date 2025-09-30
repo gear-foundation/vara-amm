@@ -34,7 +34,7 @@ const alertVariants = cva(
     variants: {
       type: {
         info: 'bg-background text-foreground',
-        error: 'border-destructive/50 text-destructive dark:border-destructive [&>svg]:text-destructive',
+        error: 'bg-background border-destructive/50 text-destructive dark:border-destructive [&>svg]:text-destructive',
         loading: 'bg-background text-foreground',
         success: 'bg-background text-foreground',
       },

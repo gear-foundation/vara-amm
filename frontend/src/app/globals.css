@@ -26,6 +26,8 @@
     --muted-foreground: #666666;
     --accent: #00ff85;
     --accent-foreground: #000000;
+    --destructive: #832f2f;
+    --destructive-foreground: #fceded;
     --border: rgba(0, 0, 0, 0.1);
     --input: rgba(0, 0, 0, 0.05);
     --ring: #00ff85;
@@ -52,6 +54,8 @@
     --muted-foreground: #666666;
     --accent: #00ff85;
     --accent-foreground: #000000;
+    --destructive: #ff6b6b;
+    --destructive-foreground: #fceded;
     --border: rgba(255, 255, 255, 0.1);
     --input: rgba(0, 0, 0, 0.8);
     --ring: #00ff85;
