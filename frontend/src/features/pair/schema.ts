@@ -126,14 +126,20 @@ const createAddLiquidityValidationSchema = (tokens: TokenMap) => {
       message: 'Please select different tokens',
       path: ['token1Address'],
     })
-    .refine((data) => validateBalance(data.token0Address as HexString, data.amount0, tokens), {
-      message: 'Insufficient token 1 balance',
-      path: ['amount0'],
-    })
-    .refine((data) => validateBalance(data.token1Address as HexString, data.amount1, tokens), {
-      message: 'Insufficient token 2 balance',
-      path: ['amount1'],
-    });
+    .refine(
+      (data) => validateBalance(data.token0Address as HexString, data.amount0, tokens),
+      (data) => ({
+        message: `Insufficient ${tokens.get(data.token0Address as HexString)?.symbol} balance`,
+        path: ['amount0'],
+      }),
+    )
+    .refine(
+      (data) => validateBalance(data.token1Address as HexString, data.amount1, tokens),
+      (data) => ({
+        message: `Insufficient ${tokens.get(data.token1Address as HexString)?.symbol} balance`,
+        path: ['amount1'],
+      }),
+    );
 };
 
 const createSwapValidationSchema = (
