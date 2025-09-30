@@ -2,7 +2,6 @@ import { type HexString } from '@gear-js/api';
 import { useAlert } from '@gear-js/react-hooks';
 
 import { useCreatePairMessage, usePairsQuery } from '@/lib/sails';
-import { getErrorMessage } from '@/lib/utils';
 
 const useCreatePair = () => {
   const { createPairMessage, isPending } = useCreatePairMessage();
@@ -16,10 +15,6 @@ const useCreatePair = () => {
         onSuccess: () => {
           alert.success('Pair created successfully');
           void refetchPairs();
-        },
-        onError: (error) => {
-          alert.error(getErrorMessage(error));
-          console.error('Pair not created', error);
         },
       },
     );

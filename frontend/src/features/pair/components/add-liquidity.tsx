@@ -247,6 +247,7 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
     const deadline = (Math.floor(Date.now() / 1000) + 20 * SECONDS_IN_MINUTE) * 1000;
 
     console.log('Adding liquidity with params:', {
+      pairAddress,
       tokenA: `${token0.displaySymbol} (${token0.address})`,
       tokenB: `${token1.displaySymbol} (${token1.address})`,
       amountADesired,
