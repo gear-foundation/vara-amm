@@ -183,7 +183,16 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token0Address, token1Address, reserves]);
 
-  const { createPair } = useCreatePair();
+  useEffect(() => {
+    if (!pairAddress) {
+      setValue('amount0', '');
+      setValue('amount1', '');
+      void trigger();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pairAddress]);
+
+  const { createPair, isPending: isCreatePairPending } = useCreatePair();
   const { prices, isLowLiquidity } = useTokenPrices(amount0, amount1, token0, token1, isPoolEmpty);
 
   if (!token0 || !token1) {
@@ -209,7 +218,7 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
       ? calculatePoolShare(totalSupply, lpTokensToMint)
       : '0';
 
-  const isPending =
+  const isAddLiquidityPending =
     token0Approve.isPending ||
     token1Approve.isPending ||
     addLiquidity.isPending ||
@@ -217,16 +226,15 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
     isReservesFetching ||
     isSubmitting;
 
-  const isInitialLiquidity = isPoolEmpty || !pairAddress;
+  const isInitialLiquidity = isPoolEmpty;
+
+  const createPairHandler = async () => {
+    await createPair(token0.address, token1.address);
+  };
 
   const onSubmit = async (data: AddLiquidityFormData) => {
-    if (!api || !account?.decodedAddress) {
-      throw new Error('API or account is not ready');
-    }
-
-    if (!pairAddress) {
-      await createPair(token0.address, token1.address);
-      return;
+    if (!api || !account?.decodedAddress || !pairAddress) {
+      throw new Error('API, pair address or account is not ready');
     }
 
     const amountADesired = parseUnits(data.amount0, token0.decimals);
@@ -329,6 +337,7 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
                     onChange: (e: React.ChangeEvent<HTMLInputElement>) => handleAmount0Change(e.target.value),
                   })}
                   value={amount0}
+                  disabled={!pairAddress}
                   type="number"
                   inputMode="decimal"
                   placeholder="0.0"
@@ -363,6 +372,7 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
                     onChange: (e: React.ChangeEvent<HTMLInputElement>) => handleAmount1Change(e.target.value),
                   })}
                   value={amount1}
+                  disabled={!pairAddress}
                   type="number"
                   inputMode="decimal"
                   placeholder="0.0"
@@ -379,6 +389,18 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
                 </Button>
               </div>
             </div>
+            {!pairAddress && (
+              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
+                <div className="flex items-start space-x-2">
+                  <div className="text-yellow-400 mt-0.5">⚠️</div>
+                  <div className="text-sm text-yellow-400">
+                    The selected token pair does not exist yet. Click Create Pair to set it up and add liquidity in the
+                    next step.
+                  </div>
+                </div>
+              </div>
+            )}
+
             {isInitialLiquidity && (
               <InitialLiquidityInfo token0={token0} token1={token1} prices={prices} isLowLiquidity={isLowLiquidity} />
             )}
@@ -413,9 +435,24 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
               </div>
             </div>
             {account ? (
-              <Button type="submit" disabled={isPending || !isFormValid} className="btn-primary w-full py-4 text-lg">
-                {pairAddress ? 'ADD LIQUIDITY' : 'CREATE PAIR'}
-              </Button>
+              <>
+                {pairAddress ? (
+                  <Button
+                    type="submit"
+                    disabled={isAddLiquidityPending || !isFormValid}
+                    className="btn-primary w-full py-4 text-lg">
+                    ADD LIQUIDITY
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={createPairHandler}
+                    type="button"
+                    disabled={isCreatePairPending || !!formError}
+                    className="btn-primary w-full py-4 text-lg">
+                    CREATE PAIR
+                  </Button>
+                )}
+              </>
             ) : (
               <Wallet />
             )}

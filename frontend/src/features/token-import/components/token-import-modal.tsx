@@ -26,6 +26,7 @@ const TokenImportModal = ({ customToken, isOpen, onClose, onAddNewToken }: Props
   const handleImportToken = () => {
     if (customToken && importRisksAccepted) {
       onAddNewToken(customToken);
+      setImportRisksAccepted(false);
     }
   };
 

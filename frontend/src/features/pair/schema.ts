@@ -54,7 +54,8 @@ const validateLiquidity = (
 
 const validateBalance = (tokenAddress: HexString, amount: string, tokens: TokenMap) => {
   const token0 = tokens.get(tokenAddress);
-  if (!token0?.balance || !amount) return true;
+  if (!amount) return true;
+  if (!token0?.balance) return false;
 
   try {
     const amountWei = parseUnits(amount, token0.decimals);
