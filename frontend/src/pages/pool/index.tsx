@@ -15,7 +15,7 @@ import {
 import { calculateExistingPoolShare } from '@/features/pair/utils';
 import { usePairsQuery } from '@/lib/sails';
 
-import { YourPositions } from './components/your-positions';
+import { UserPosition, YourPositions } from './components/your-positions';
 
 type Tab = 'positions' | 'new-position';
 
@@ -50,7 +50,7 @@ function Pool() {
     const token0 = pairsTokens.tokens.get(pair[0][0]);
     const token1 = pairsTokens.tokens.get(pair[0][1]);
 
-    if (!token0 || !token1) throw new Error('Token not found');
+    if (!token0 || !token1) return null;
 
     const userLpBalance = (pairAddress && pairBalances?.[pairAddress]) || 0n;
     const totalSupply = (pairTotalSupplies && pairTotalSupplies[index]) || 0n;
@@ -68,7 +68,8 @@ function Pool() {
     };
   });
 
-  const userPositions = pairsWithUserLiquidity?.filter((pair) => pair?.liquidity !== 0n);
+  const userPositions = (pairsWithUserLiquidity?.filter((pair) => pair && pair.liquidity !== 0n) ||
+    []) as UserPosition[];
 
   return (
     <div className="max-w-4xl mx-auto">

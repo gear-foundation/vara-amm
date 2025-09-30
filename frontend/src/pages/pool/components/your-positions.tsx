@@ -6,7 +6,7 @@ import { RemoveLiquidity } from '@/features/pair';
 import type { Token } from '@/features/pair/types';
 import { formatUnitsTrimmed } from '@/features/pair/utils';
 
-type UserPosition = {
+export type UserPosition = {
   pool: string;
   token0: Token;
   token1: Token;
@@ -18,7 +18,7 @@ type UserPosition = {
 };
 
 type YourPositionsProps = {
-  userPositions?: UserPosition[];
+  userPositions: UserPosition[];
   account?: unknown;
   onAddMore: (token0: Token, token1: Token) => void;
   onCreateFirst: () => void;
