@@ -10,16 +10,15 @@ import { PairsHandler } from "./pair";
 
 export class FactoryHandler extends BaseHandler {
   private _factoryDecoder: SailsDecoder;
-  private _factoryProgramId: string;
-  private _pairsHandler: PairsHandler;
   private _existingPairsLoaded: boolean;
 
-  constructor(factoryProgramId: string, pairsHandler: PairsHandler) {
+  constructor(
+    private _factoryProgramId: string,
+    private _pairsHandler: PairsHandler
+  ) {
     super();
-    this._factoryProgramId = factoryProgramId;
-    this._pairsHandler = pairsHandler;
     this._existingPairsLoaded = false;
-    this.userMessageSentProgramIds = [factoryProgramId];
+    this.userMessageSentProgramIds = [_factoryProgramId];
     this.events = [];
     this.messageQueuedProgramIds = [];
   }
