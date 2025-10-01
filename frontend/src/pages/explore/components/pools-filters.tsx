@@ -32,7 +32,7 @@ export function ExplorePagePoolsFilters({
         </SelectTrigger>
         <SelectContent className="card">
           <SelectItem value="all">All networks</SelectItem>
-          <SelectItem value="Ethereum">Ethereum</SelectItem>
+          {/* <SelectItem value="Ethereum">Ethereum</SelectItem> */}
           <SelectItem value="Vara Network">Vara Network</SelectItem>
         </SelectContent>
       </Select>

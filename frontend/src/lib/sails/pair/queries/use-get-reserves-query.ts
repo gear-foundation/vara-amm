@@ -1,5 +1,6 @@
 import type { HexString } from '@gear-js/api';
 import { useProgramQuery } from '@gear-js/react-hooks';
+import { useMemo } from 'react';
 
 import { usePairProgram } from '@/lib/sails/sails';
 
@@ -13,5 +14,9 @@ export const useGetReservesQuery = (pairAddress?: HexString) => {
     args: [],
   });
 
-  return { reserves: data ? [BigInt(data[0]), BigInt(data[1])] : undefined, isFetching, refetch, error };
+  const reserves = useMemo(() => {
+    return data ? [BigInt(data[0]), BigInt(data[1])] : undefined;
+  }, [data]);
+
+  return { reserves, isFetching, refetch, error };
 };

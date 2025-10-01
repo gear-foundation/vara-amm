@@ -1,17 +1,18 @@
+import type { HexString } from '@gear-js/api';
+
 import { LOGO_URI_BY_SYMBOL } from '@/consts';
-import { toNumber } from '@/utils';
+import { toNumber } from '@/lib/utils/index';
 
-import type { PairData } from '../pair';
+import type { PairData, TokenMap } from '../pair';
 
-import type { TokenData } from './queries';
+import type { TokenWithPricesData } from './queries';
 
-function transformTokenDataForTable(
-  tokens: TokenData[],
-  pairs: PairData[],
-): Array<{
+export type TokenDataForTable = {
   name: string;
   symbol: string;
   logoURI: string;
+  displaySymbol: string;
+  address: HexString;
   price: number;
   change1h: number;
   change1d: number;
@@ -22,8 +23,14 @@ function transformTokenDataForTable(
   volume1m: number;
   volume1y: number;
   network: string;
-}> {
-  if (pairs && pairs.length === 0) {
+};
+
+function transformTokenDataForTable(
+  tokens: TokenWithPricesData[],
+  pairs: PairData[],
+  tokensDataMap?: TokenMap,
+): Array<TokenDataForTable> {
+  if ((pairs && pairs.length === 0) || !tokensDataMap) {
     return [];
   }
 
@@ -31,11 +38,15 @@ function transformTokenDataForTable(
     const latestSnapshot = token.tokenPriceSnapshotsByTokenId?.nodes[0];
 
     const calculatedVolumes = calculateTokenTradingVolumeBySymbol(token.symbol, pairs);
+    const tokenData = tokensDataMap.get(token.id as HexString);
+    const displaySymbol = tokenData?.displaySymbol || token.symbol;
 
     return {
-      name: token.name || token.symbol,
-      symbol: token.symbol,
-      logoURI: LOGO_URI_BY_SYMBOL[token.symbol] || '/placeholder.svg',
+      name: tokenData?.isVaraNative ? 'Vara Network Token' : token.name || displaySymbol,
+      symbol: displaySymbol,
+      address: token.id as HexString,
+      logoURI: LOGO_URI_BY_SYMBOL[token.symbol] || '',
+      displaySymbol: displaySymbol,
       price: toNumber(latestSnapshot?.priceUsd) || 0,
       change1h: toNumber(latestSnapshot?.change1H) || 0,
       change1d: toNumber(latestSnapshot?.change24H) || 0,
@@ -45,6 +56,7 @@ function transformTokenDataForTable(
       volume1w: calculatedVolumes.volume7d,
       volume1m: calculatedVolumes.volume30d,
       volume1y: calculatedVolumes.volume1y,
+      isVerified: tokenData?.isVerified || false,
       network: 'Vara Network', // Default network
     };
   });

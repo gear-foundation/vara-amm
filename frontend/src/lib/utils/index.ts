@@ -1,3 +1,7 @@
+export { formatCurrency, formatPrice, getVolumeByTimeframe } from './currency';
+export { shortenAddress, openBlockExplorer, getBlockExplorerUrl } from './address';
+export { fetchTokenData } from './fetch-token-data';
+
 import { type AlertContainerFactory } from '@gear-js/react-hooks';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -79,4 +83,9 @@ const getErrorMessage = (error: unknown): string => {
   return String(error) || 'Unknown error';
 };
 
-export { cn, copyToClipboard, getErrorMessage };
+const toNumber = (value: string | number | null | undefined): number => {
+  if (value === null || value === undefined) return 0;
+  return typeof value === 'string' ? parseFloat(value) || 0 : Number(value) || 0;
+};
+
+export { cn, copyToClipboard, getErrorMessage, toNumber };

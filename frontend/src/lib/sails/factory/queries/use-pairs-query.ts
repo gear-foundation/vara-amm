@@ -10,6 +10,7 @@ export const usePairsQuery = () => {
     serviceName: 'factory',
     functionName: 'pairs',
     args: [],
+    query: { placeholderData: (prev) => prev },
   });
 
   return { pairs: data, isFetching, refetch, error };

@@ -1,14 +1,12 @@
 import type { HexString } from '@gear-js/api';
 import { Plus } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Wallet } from '@/components/wallet';
+import { Button, TokenIcon, Wallet, Card, CardContent, CardHeader, CardTitle } from '@/components';
 import { RemoveLiquidity } from '@/features/pair';
 import type { Token } from '@/features/pair/types';
-import { formatUnits } from '@/features/pair/utils';
+import { formatUnitsTrimmed } from '@/features/pair/utils';
 
-type UserPosition = {
+export type UserPosition = {
   pool: string;
   token0: Token;
   token1: Token;
@@ -20,7 +18,7 @@ type UserPosition = {
 };
 
 type YourPositionsProps = {
-  userPositions?: UserPosition[];
+  userPositions: UserPosition[];
   account?: unknown;
   onAddMore: (token0: Token, token1: Token) => void;
   onCreateFirst: () => void;
@@ -42,16 +40,8 @@ export function YourPositions({
             <CardHeader className="flex flex-col items-start justify-between sm:flex-row sm:items-center">
               <div className="flex items-center space-x-3">
                 <div className="flex -space-x-2">
-                  <img
-                    src={position?.token0.logoURI || '/placeholder.svg'}
-                    alt={position?.token0.symbol}
-                    className="w-8 h-8 rounded-full border-2 border-gray-500/20"
-                  />
-                  <img
-                    src={position?.token1.logoURI || '/placeholder.svg'}
-                    alt={position?.token1.symbol}
-                    className="w-8 h-8 rounded-full border-2 border-gray-500/20"
-                  />
+                  <TokenIcon token={position?.token0} size="md" withBorder />
+                  <TokenIcon token={position?.token1} size="md" withBorder />
                 </div>
                 <CardTitle className="mono theme-text">{position?.pool}</CardTitle>
               </div>
@@ -77,13 +67,13 @@ export function YourPositions({
                 <div>
                   <div className="text-sm text-gray-400 uppercase">LIQUIDITY</div>
                   <div className="text-sm font-medium mono theme-text">
-                    {formatUnits(position.liquidity, position.decimals)} LP
+                    {formatUnitsTrimmed(position.liquidity, position.decimals)} LP
                   </div>
                 </div>
                 <div>
                   <div className="text-sm text-gray-400 uppercase">REWARDS</div>
                   <div className="text-sm font-medium mono theme-text">
-                    {formatUnits(position.rewards, position.decimals)} LP
+                    {formatUnitsTrimmed(position.rewards, position.decimals)} LP
                   </div>
                 </div>
                 <div>

@@ -26,6 +26,7 @@ export const useCreatePairMessage = () => {
 
     const { transaction } = await prepareTransactionAsync({
       args: [token0, token1],
+      value: 1_000_000_000_000n,
     });
 
     await transaction.signAndSend();
@@ -38,5 +39,5 @@ export const useCreatePairMessage = () => {
     },
   });
 
-  return { createPairMessage, isPending };
+  return { createPairMessage, isPending, program };
 };
