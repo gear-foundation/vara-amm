@@ -58,14 +58,9 @@ impl ExtendedService {
 
 impl ExtendedService {
     pub fn mint(&mut self, to: ActorId, value: U256) -> bool {
-        let mutated = services::utils::panicking(|| {
+        services::utils::panicking(|| {
             funcs::mint(Storage::balances(), Storage::total_supply(), to, value)
-        });
-        if mutated {
-            self.emit_event(Event::Minted { to, value })
-                .expect("Notification Error");
-        }
-        mutated
+        })
     }
 
     pub fn burn(&mut self, from: ActorId, value: U256) -> bool {

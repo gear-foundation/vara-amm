@@ -3,12 +3,22 @@
 use sails_rs::{gstd::msg, prelude::*};
 mod amm_math;
 mod funcs;
+mod msg_tracker;
+use msg_tracker::{MessageStatus, msg_tracker_ref};
+use sails_rs::gstd::services::Service as Svc;
+
 mod token_operations;
 use crate::services::lp_token::ExtendedService as VftService;
-pub struct PairService(());
+use gstd::static_mut;
+type VftExposure = <VftService as Svc>::Exposure;
+type PairExposure = <PairService as Svc>::Exposure;
+
+pub struct PairService {
+    vft_exposure: VftExposure,
+}
 
 #[derive(Debug, Default)]
-struct State {
+pub struct State {
     token0: ActorId,
     token1: ActorId,
     reserve0: U256,
@@ -17,18 +27,26 @@ struct State {
     factory_id: ActorId,
     k_last: U256,
     config: Config,
+    lock: bool,
 }
 static mut STATE: Option<State> = None;
 
-#[derive(Debug)]
+#[derive(Debug, Encode, Decode, TypeInfo)]
 pub enum PairEvent {
     LiquidityAdded {
+        user_id: ActorId,
         amount_a: U256,
         amount_b: U256,
         liquidity: U256,
     },
-    Swap,
+    Swap {
+        user_id: ActorId,
+        amount_in: U256,
+        amount_out: U256,
+        is_token0_to_token1: bool,
+    },
     LiquidityRemoved {
+        user_id: ActorId,
         amount_a: U256,
         amount_b: U256,
         liquidity: U256,
@@ -37,6 +55,7 @@ pub enum PairEvent {
 
 #[derive(Debug)]
 pub enum PairError {
+    NotEnoghAttachedGas,
     InsufficientLiquidity,
     Overflow,
     DeadlineExpired,
@@ -49,6 +68,12 @@ pub enum PairError {
     InsufficientAmount,
     InvariantViolation,
     ExcessiveInputAmount,
+    AnotherTxInProgress,
+    MessageNotFound,
+    InvalidMessageStatus,
+    TokenTransferFailed,
+    ReplyHook,
+    ZeroLiquidity,
 }
 
 /// Config that will be used to send messages to the other programs.
@@ -64,10 +89,11 @@ pub struct Config {
     /// Timeout in blocks that current program will wait for reply from
     /// the other programs such as VFT
     reply_timeout: u32,
+    gas_for_full_tx: u64,
 }
 
 impl PairService {
-    pub fn init(config: Config, token0: ActorId, token1: ActorId, fee_to: ActorId) -> Self {
+    pub fn init(config: Config, token0: ActorId, token1: ActorId, fee_to: ActorId, pair_exposure: PairExposure) {
         unsafe {
             STATE = Some(State {
                 token0,
@@ -78,7 +104,8 @@ impl PairService {
                 ..Default::default()
             })
         }
-        Self(())
+        msg_tracker::init();
+
     }
     fn get_mut(&mut self) -> &'static mut State {
         unsafe { STATE.as_mut().expect("State is not initialized") }
@@ -88,10 +115,23 @@ impl PairService {
     }
 }
 
-#[sails_rs::service]
+pub fn state_mut() -> &'static mut State {
+    unsafe { static_mut!(STATE).as_mut() }.expect("State is not initialized")
+}
+macro_rules! event_or_panic_async {
+    ($expr:expr) => {{
+        match $expr.await {
+            Ok(value) => value,
+            Err(e) => {
+                panic!("Message processing failed with error: {:?}", e)
+            }
+        }
+    }};
+}
+#[sails_rs::service(events = PairEvent)]
 impl PairService {
-    pub fn new() -> Self {
-        Self(())
+    pub fn new(vft_exposure: VftExposure) -> Self {
+        Self { vft_exposure }
     }
 
     pub async fn add_liquidity(
@@ -102,18 +142,16 @@ impl PairService {
         amount_b_min: U256,
         deadline: u64,
     ) {
-        let result = funcs::add_liquidity(
+        let event = event_or_panic_async!(funcs::add_liquidity(
             self.get_mut(),
             amount_a_desired,
             amount_b_desired,
             amount_a_min,
             amount_b_min,
             deadline,
-        )
-        .await;
-        if result.is_err() {
-            panic!("Error {:?}", result);
-        }
+            &mut self.vft_exposure
+        ));
+        self.emit_event(event).expect("Event emission error");
     }
 
     /// Removes liquidity from the AMM pool
@@ -138,17 +176,15 @@ impl PairService {
         amount_b_min: U256,
         deadline: u64,
     ) {
-        let result = funcs::remove_liquidity(
+        let event = event_or_panic_async!(funcs::remove_liquidity(
             self.get_mut(),
             liquidity,
             amount_a_min,
             amount_b_min,
             deadline,
-        )
-        .await;
-        if result.is_err() {
-            panic!("Error {:?}", result);
-        }
+            &mut self.vft_exposure
+        ));
+        self.emit_event(event).expect("Event emission error");
     }
 
     /// Swaps an exact amount of input tokens for as many output tokens as possible in a single pair.
@@ -166,17 +202,14 @@ impl PairService {
         is_token0_to_token1: bool,
         deadline: u64,
     ) {
-        let result = funcs::swap_exact_tokens_for_tokens(
+        let event = event_or_panic_async!(funcs::swap_exact_tokens_for_tokens(
             self.get_mut(),
             amount_in,
             amount_out_min,
             is_token0_to_token1,
             deadline,
-        )
-        .await;
-        if result.is_err() {
-            panic!("Error {:?}", result);
-        }
+        ));
+        self.emit_event(event).expect("Event emission error");
     }
 
     /// Swaps as few input tokens as possible for an exact amount of output tokens in a single pair.
@@ -194,17 +227,14 @@ impl PairService {
         is_token0_to_token1: bool,
         deadline: u64,
     ) {
-        let result = funcs::swap_tokens_for_exact_tokens(
+        let event = event_or_panic_async!(funcs::swap_tokens_for_exact_tokens(
             self.get_mut(),
             amount_out,
             amount_in_max,
             is_token0_to_token1,
             deadline,
-        )
-        .await;
-        if result.is_err() {
-            panic!("Error {:?}", result);
-        }
+        ));
+        self.emit_event(event).expect("Event emission error");
     }
 
     /// Calculates protocol fees for the liquidity pool, similar to Uniswap V2, without minting.
@@ -218,7 +248,7 @@ impl PairService {
     ///
     /// Can be called for estimation or off-chain calculations. Does not modify state.
     pub fn calculate_protocol_fee(&self) -> U256 {
-        funcs::calculate_protocol_fee(&self.get()).unwrap_or_default()
+        funcs::calculate_protocol_fee(self.get()).unwrap_or_default()
     }
 
     /// Calculates accumulated swap fees for a specific LP provider.
@@ -236,8 +266,8 @@ impl PairService {
     /// It accounts for protocol fees (by simulating mint_fee dilution), calculates pro-rata shares
     /// based on reserves (assuming they include swap fees), and sorts amounts by token_a/token_b.
     /// Does not modify state or perform any transactions.
-    pub fn calculate_remove_liquidity(&self, liquidity: U256) {
-        funcs::calculate_remove_liquidity(self.get(), liquidity).unwrap_or_default();
+    pub fn calculate_remove_liquidity(&self, liquidity: U256) -> (U256, U256) {
+        funcs::calculate_remove_liquidity(self.get(), liquidity).unwrap_or_default()
     }
 
     /// Calculates the maximum output amount of the other asset given an input amount and pair reserves.
@@ -274,7 +304,29 @@ impl PairService {
         amm_math::get_amount_in(amount_out, reserve_in, reserve_out).unwrap_or_default()
     }
 
+    pub fn change_fee_to(&mut self, new_fee_to: ActorId) {
+        let state = self.get_mut();
+        if msg::source() == state.factory_id {
+            state.fee_to = new_fee_to;
+        } else {
+            panic!("Not factory")
+        }
+    }
+
     pub fn get_reserves(&self) -> (U256, U256) {
         (self.get().reserve0, self.get().reserve1)
+    }
+
+    pub fn msgs_in_msg_tracker(&self) -> Vec<(MessageId, MessageStatus)> {
+        msg_tracker_ref().message_info.clone().into_iter().collect()
+    }
+
+    pub fn lock(&self) -> bool {
+        self.get().lock
+    }
+
+    pub fn get_tokens(&self) -> (ActorId, ActorId) {
+        let state = self.get();
+        (state.token0, state.token1)
     }
 }

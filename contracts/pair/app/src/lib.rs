@@ -11,14 +11,13 @@ pub struct PairProgram(());
 impl PairProgram {
     // Program's constructor
     pub fn new(config: Config, token0: ActorId, token1: ActorId, fee_to: ActorId) -> Self {
-        PairService::init(config, token0, token1, fee_to);
         ExtendedService::seed("LP".to_string(), "LP".to_string(), 18);
+        PairService::init(config, token0, token1, fee_to, self.pair());
         Self(())
     }
 
-    // Exposed service
     pub fn pair(&self) -> PairService {
-        PairService::new()
+        PairService::new(self.vft())
     }
 
     pub fn vft(&self) -> ExtendedService {

@@ -29,7 +29,9 @@ pub struct Config {
     /// Timeout in blocks that current program will wait for reply from
     /// the other programs such as VFT
     reply_timeout: u32,
+    gas_for_full_tx: u64,
     gas_for_pair_creation: u64,
+    gas_to_change_fee_to: u64,
 }
 static mut STATE: Option<State> = None;
 
@@ -83,6 +85,7 @@ impl FactoryService {
             gas_for_token_ops: state.config.gas_for_token_ops,
             gas_for_reply_deposit: state.config.gas_for_reply_deposit,
             reply_timeout: state.config.reply_timeout,
+            gas_for_full_tx: state.config.gas_for_full_tx,
         };
 
         let payload = pair_client::pair_factory::io::New::encode_call(
@@ -96,7 +99,7 @@ impl FactoryService {
             state.pair_id,
             payload,
             state.config.gas_for_pair_creation,
-            ONE_VARA,
+            0,
             0,
         )
         .unwrap_or_else(|e| panic!("{:?}", e));
@@ -116,11 +119,16 @@ impl FactoryService {
     }
 
     pub fn change_fee_to(&mut self, fee_to: ActorId) {
-        if msg::source() != self.get().admin {
+        let state = self.get();
+        if msg::source() != state.admin {
             panic!("Not admin")
         }
 
         self.get_mut().fee_to = fee_to;
+        for &pair_id in state.pairs.values() {
+            let payload = pair_client::pair::io::ChangeFeeTo::encode_call(fee_to);
+            msg::send_bytes_with_gas(pair_id, payload, state.config.gas_to_change_fee_to, 0).expect("Error during sending message");
+        }
     }
 
     pub fn fee_to(&self) -> ActorId {
