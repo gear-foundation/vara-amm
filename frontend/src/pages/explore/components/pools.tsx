@@ -3,6 +3,7 @@ import type React from 'react';
 import { useState } from 'react';
 
 import { TokenIcon } from '@/components';
+import { MIN_VISIBLE_TVL_USD } from '@/consts';
 import { type PoolData } from '@/features/pair';
 import { formatCurrency, getVolumeByTimeframe } from '@/lib/utils/index';
 
@@ -77,7 +78,7 @@ export function ExplorePagePools({
   const filteredPools = (poolsData || []).filter((pool: PoolData) => {
     if (poolNetworkFilter !== 'all' && pool.network !== poolNetworkFilter) return false;
     if (showMyPools && !pool.isMyPool) return false;
-    if (pool.tvl === 0) return false;
+    if (pool.tvl < MIN_VISIBLE_TVL_USD) return false;
     return true;
   });
 
