@@ -47,7 +47,6 @@ interface PairState {
   isPairUpdated: boolean;
   isVolumeSnapshotsUpdated: boolean;
   lastPriceAndVolumeUpdate: Date | null;
-  fromDatabase: boolean;
 }
 
 export class PairsHandler extends BaseHandler {
@@ -80,18 +79,45 @@ export class PairsHandler extends BaseHandler {
     this._pairDecoder = await SailsDecoder.new("assets/pair.idl");
   }
 
-  public registerExistingPair(pair: Pair): void {
-    const info: PairInfo = {
-      address: pair.id as HexString,
-      tokens: [pair.token0 as HexString, pair.token1 as HexString],
-    };
+  public async loadExistingPairs(ctx: ProcessorContext): Promise<void> {
+    const existingPairs = await ctx.store.find(Pair);
 
-    const state = this._getOrCreateState(info, true);
-    state.pair = pair;
+    ctx.log.info(
+      { count: existingPairs.length },
+      "Loading existing pairs from database"
+    );
+
+    for (const pair of existingPairs) {
+      ctx.log.info({ pair }, "Registering existing pair");
+
+      const info: PairInfo = {
+        address: pair.id as HexString,
+        tokens: [pair.token0 as HexString, pair.token1 as HexString],
+      };
+
+      const state = this._getOrCreateState(info);
+      state.pair = pair;
+    }
+
+    ctx.log.info(
+      { totalPairs: existingPairs.length },
+      "Successfully loaded existing pairs into memory"
+    );
   }
 
   public registerPair(pairInfo: PairInfo): void {
-    this._getOrCreateState(pairInfo, false);
+    this._getOrCreateState(pairInfo);
+  }
+
+  public getPairsToSave(): Pair[] {
+    const pairsToSave: Pair[] = [];
+    for (const state of this._pairs.values()) {
+      if (state.isPairUpdated && state.pair) {
+        pairsToSave.push(state.pair);
+      }
+    }
+
+    return pairsToSave;
   }
 
   public async clear(): Promise<void> {
@@ -107,11 +133,6 @@ export class PairsHandler extends BaseHandler {
 
   public async save(): Promise<void> {
     for (const state of this._pairs.values()) {
-      if (state.isPairUpdated && state.pair) {
-        this._ctx.log.info({ pair: state.pair }, "Saving pair");
-        await this._ctx.store.save(state.pair);
-      }
-
       if (state.isVolumeSnapshotsUpdated) {
         const volumeSnapshots = Array.from(state.volumeSnapshots.values());
         if (volumeSnapshots.length > 0) {
@@ -220,7 +241,7 @@ export class PairsHandler extends BaseHandler {
     }
   }
 
-  private _getOrCreateState(info: PairInfo, fromDatabase: boolean): PairState {
+  private _getOrCreateState(info: PairInfo): PairState {
     let state = this._pairs.get(info.address);
 
     if (!state) {
@@ -233,14 +254,8 @@ export class PairsHandler extends BaseHandler {
         isPairUpdated: false,
         isVolumeSnapshotsUpdated: false,
         lastPriceAndVolumeUpdate: null,
-        fromDatabase,
       };
       this._pairs.set(info.address, state);
-    } else {
-      state.info = info;
-      if (fromDatabase) {
-        state.fromDatabase = true;
-      }
     }
 
     return state;
@@ -249,16 +264,6 @@ export class PairsHandler extends BaseHandler {
   private async _ensurePair(state: PairState): Promise<void> {
     if (state.pair) {
       return;
-    }
-
-    if (state.fromDatabase) {
-      const existingPair = await this._ctx.store.get(Pair, state.info.address);
-      if (existingPair) {
-        state.pair = existingPair;
-        return;
-      }
-
-      state.fromDatabase = false;
     }
 
     const token0Program = this._vftCache.getOrCreate(state.info.tokens[0]);

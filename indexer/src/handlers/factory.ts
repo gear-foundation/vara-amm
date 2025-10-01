@@ -1,6 +1,4 @@
-import { HexString } from "@gear-js/api";
 import { isSailsEvent, isUserMessageSentEvent } from "../helpers";
-import { Pair } from "../model";
 import { ProcessorContext } from "../processor";
 import { FactoryEventPayload, PairCreatedEventPayload } from "../services";
 import { SailsDecoder } from "../sails-decoder";
@@ -27,55 +25,16 @@ export class FactoryHandler extends BaseHandler {
     this._factoryDecoder = await SailsDecoder.new("assets/factory.idl");
   }
 
-  /**
-   * Load existing pairs from database and create handlers for them
-   * This should be called after the context is available (during first process call)
-   */
-  private async _loadExistingPairs(): Promise<void> {
-    if (!this._ctx) {
-      throw new Error(
-        "Context not available. This method should be called during processing."
-      );
-    }
-
-    const existingPairs = await this._ctx.store.find(Pair);
-
-    this._ctx.log.info(
-      { count: existingPairs.length },
-      "Loading existing pairs from database"
-    );
-
-    for (const pair of existingPairs) {
-      const pairInfo: PairInfo = {
-        address: pair.id as HexString,
-        tokens: [pair.token0 as HexString, pair.token1 as HexString],
-      };
-
-      this._ctx.log.info(
-        {
-          pairAddress: pair.id,
-          token0: pair.token0,
-          token1: pair.token1,
-          symbols: `${pair.token0Symbol || "Unknown"} / ${
-            pair.token1Symbol || "Unknown"
-          }`,
-        },
-        "Registering existing pair"
-      );
-
-      this._pairsHandler.registerExistingPair(pair);
-      this._pairsHandler.registerPair(pairInfo);
-    }
-
-    this._ctx.log.info(
-      { totalPairs: existingPairs.length },
-      "Successfully loaded existing pairs into memory"
-    );
-  }
-
   public async clear(): Promise<void> {}
 
-  public async save(): Promise<void> {}
+  public async save(): Promise<void> {
+    const pairsToSave = this._pairsHandler.getPairsToSave();
+
+    if (pairsToSave.length > 0) {
+      this._ctx.log.info({ count: pairsToSave.length }, "Factory saving pairs");
+      await this._ctx.store.save(pairsToSave);
+    }
+  }
 
   public async process(ctx: ProcessorContext): Promise<void> {
     // Always call super.process(ctx) first
@@ -83,7 +42,7 @@ export class FactoryHandler extends BaseHandler {
 
     // Load existing pairs from database on first run
     if (!this._existingPairsLoaded) {
-      await this._loadExistingPairs();
+      await this._pairsHandler.loadExistingPairs(ctx);
       this._existingPairsLoaded = true;
     }
 
