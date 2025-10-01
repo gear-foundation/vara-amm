@@ -2,6 +2,7 @@ import { TrendingUp, TrendingDown, ChevronUp, ChevronDown, ExternalLink } from '
 import { useState, type ReactNode } from 'react';
 
 import { Address, TokenIcon } from '@/components';
+import { MIN_VISIBLE_TVL_USD } from '@/consts';
 import type { TokenMap } from '@/features/pair';
 import { formatCurrency, formatPrice, getVolumeByTimeframe } from '@/lib/utils/index';
 
@@ -129,7 +130,7 @@ export function ExplorePageTokens({
     tokensData?.filter((token) => {
       if (tokenNetworkFilter !== 'all' && token.network !== tokenNetworkFilter) return false;
       if (tokenFilter !== 'all' && !token.symbol.toLowerCase().includes(tokenFilter.toLowerCase())) return false;
-      if (token.fdv === 0) return false;
+      if (token.fdv < MIN_VISIBLE_TVL_USD) return false;
       return true;
     }) || [];
 
