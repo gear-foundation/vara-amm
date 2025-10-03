@@ -8,14 +8,12 @@ import { PairsHandler } from "./pair";
 
 export class FactoryHandler extends BaseHandler {
   private _factoryDecoder: SailsDecoder;
-  private _existingPairsLoaded: boolean;
 
   constructor(
     private _factoryProgramId: string,
     private _pairsHandler: PairsHandler
   ) {
     super();
-    this._existingPairsLoaded = false;
     this.userMessageSentProgramIds = [_factoryProgramId];
     this.events = [];
     this.messageQueuedProgramIds = [];
@@ -39,12 +37,6 @@ export class FactoryHandler extends BaseHandler {
   public async process(ctx: ProcessorContext): Promise<void> {
     // Always call super.process(ctx) first
     await super.process(ctx);
-
-    // Load existing pairs from database on first run
-    if (!this._existingPairsLoaded) {
-      await this._pairsHandler.loadExistingPairs(ctx);
-      this._existingPairsLoaded = true;
-    }
 
     for (const block of ctx.blocks) {
       for (const event of block.events) {

@@ -60,6 +60,7 @@ export class PairsHandler extends BaseHandler {
   private _tokensToSave: Set<string>;
   private _priceSnapshots: Map<string, TokenPriceSnapshot>;
   private _api: GearApi;
+  private _existingPairsLoaded: boolean;
 
   constructor() {
     super();
@@ -68,6 +69,7 @@ export class PairsHandler extends BaseHandler {
     this._tokenPrices = new Map();
     this._tokensToSave = new Set();
     this._priceSnapshots = new Map();
+    this._existingPairsLoaded = false;
     this.userMessageSentProgramIds = [];
     this.events = [];
     this.messageQueuedProgramIds = [];
@@ -177,6 +179,12 @@ export class PairsHandler extends BaseHandler {
 
   public async process(ctx: ProcessorContext): Promise<void> {
     await super.process(ctx);
+
+    // Load existing pairs from database on first run
+    if (!this._existingPairsLoaded) {
+      await this.loadExistingPairs(ctx);
+      this._existingPairsLoaded = true;
+    }
 
     if (!this._pairs.size) {
       return;
@@ -319,8 +327,7 @@ export class PairsHandler extends BaseHandler {
       }
     };
 
-    await ensureToken(pair.token0);
-    await ensureToken(pair.token1);
+    await Promise.all([ensureToken(pair.token0), ensureToken(pair.token1)]);
   }
 
   private async _initTokenPrices(token: Token): Promise<void> {
