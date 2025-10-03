@@ -313,21 +313,24 @@ export class PairsHandler extends BaseHandler {
       return;
     }
 
-    const ensureToken = async (tokenId: string) => {
-      const token = this._tokens.get(tokenId);
+    await Promise.all([
+      this._ensureToken(pair.token0),
+      this._ensureToken(pair.token1),
+    ]);
+  }
 
-      if (!token) {
-        const token = await this._tokenManager.createTokenFromContract(tokenId);
-        this._tokens.set(token.id, token);
-        this._tokensToSave.add(token.id);
-      }
+  private async _ensureToken(tokenId: string): Promise<void> {
+    const token = this._tokens.get(tokenId);
 
-      if (token && !this._tokenPrices.has(tokenId)) {
-        await this._initTokenPrices(token);
-      }
-    };
+    if (!token) {
+      const token = await this._tokenManager.createTokenFromContract(tokenId);
+      this._tokens.set(token.id, token);
+      this._tokensToSave.add(token.id);
+    }
 
-    await Promise.all([ensureToken(pair.token0), ensureToken(pair.token1)]);
+    if (token && !this._tokenPrices.has(tokenId)) {
+      await this._initTokenPrices(token);
+    }
   }
 
   private async _initTokenPrices(token: Token): Promise<void> {
