@@ -12,27 +12,9 @@ export class TokenManager {
   }
 
   /**
-   * Get or create a token entity
-   * Returns the token and whether it was newly created
-   */
-  async getOrCreateToken(
-    tokenAddress: string
-  ): Promise<{ token: Token; isNew: boolean }> {
-    let token = await this.ctx.store.get(Token, tokenAddress);
-
-    if (!token) {
-      // Create new token by querying the contract
-      token = await this.createTokenFromContract(tokenAddress);
-      return { token, isNew: true };
-    }
-
-    return { token, isNew: false };
-  }
-
-  /**
    * Create a new token entity by querying the contract
    */
-  private async createTokenFromContract(tokenAddress: string): Promise<Token> {
+  async createTokenFromContract(tokenAddress: string): Promise<Token> {
     const vftProgram = this.vftCache.getOrCreate(tokenAddress);
 
     try {

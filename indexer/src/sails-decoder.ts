@@ -98,7 +98,7 @@ export class SailsDecoder {
     const method = this.method(payload);
 
     const _payload =
-      this._program.services[service].events[method].decode(payload);
+      this._program.services[service].events[method]?.decode(payload);
 
     return {
       service,

@@ -1,7 +1,7 @@
 import { TypeormDatabase } from "@subsquid/typeorm-store";
 
 import { BaseHandler } from "./handlers/base";
-import { FactoryHandler } from "./handlers";
+import { FactoryHandler, PairsHandler } from "./handlers";
 import { config } from "./config";
 import { processor } from "./processor";
 import { GearApi } from "@gear-js/api";
@@ -72,10 +72,15 @@ async function main() {
   const processor = new GearProcessor();
 
   // Create and register factory handler
-  // Factory handler will load existing pairs from database during initialization
-  const factoryHandler = new FactoryHandler(config.factoryProgramId);
-  await factoryHandler.init(api);
+  const pairsHandler = new PairsHandler();
+  const factoryHandler = new FactoryHandler(
+    config.factoryProgramId,
+    pairsHandler
+  );
+  await factoryHandler.init();
+  await pairsHandler.init(api);
   processor.registerHandler(factoryHandler);
+  processor.registerHandler(pairsHandler);
 
   await processor.run();
 }
