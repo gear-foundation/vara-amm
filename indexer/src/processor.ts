@@ -11,7 +11,6 @@ import { Store } from "@subsquid/typeorm-store";
 import { hostname } from "node:os";
 
 import { config } from "./config";
-import { GearApi } from "@gear-js/api";
 
 export const processor = new SubstrateBatchProcessor()
   .setGateway(config.archiveUrl)
