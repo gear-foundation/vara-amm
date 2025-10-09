@@ -14,11 +14,11 @@ export class PriceCalculator {
    * Calculate token price in USD based on pair reserves
    * Uses liquidity-weighted average price from all stablecoin pairs
    */
-  async calculateTokenPrice(
+  calculateTokenPrice(
     token: Token,
     pairs: Pair[],
     tokens: Map<string, Token>
-  ): Promise<number | null> {
+  ): number | null {
     if (!pairs.length) {
       return null;
     }
@@ -141,7 +141,7 @@ export class PriceCalculator {
     snapshot: TokenPriceSnapshot | null;
   }> {
     // Calculate current price
-    const currentPrice = await this.calculateTokenPrice(token, pairs, tokens);
+    const currentPrice = this.calculateTokenPrice(token, pairs, tokens);
     if (!currentPrice) return { snapshot: null };
 
     // Calculate price changes
