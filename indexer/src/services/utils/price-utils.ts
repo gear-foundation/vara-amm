@@ -4,9 +4,22 @@
 export class PriceUtils {
   /**
    * Convert token amount to human readable format using decimals
+   * Uses BigInt arithmetic to avoid precision loss
    */
   static toHumanAmount(amount: bigint, decimals: number): number {
-    return Number(amount) / Math.pow(10, decimals);
+    if (decimals === 0) {
+      return Number(amount);
+    }
+    
+    const divisor = BigInt(10 ** decimals);
+    const wholePart = amount / divisor;
+    const fractionalPart = amount % divisor;
+    
+    // Convert to number safely
+    const wholeNumber = Number(wholePart);
+    const fractionalNumber = Number(fractionalPart) / (10 ** decimals);
+    
+    return wholeNumber + fractionalNumber;
   }
 
   /**
