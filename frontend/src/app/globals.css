@@ -26,6 +26,8 @@
     --muted-foreground: #666666;
     --accent: #00ff85;
     --accent-foreground: #000000;
+    --destructive: #832f2f;
+    --destructive-foreground: #fceded;
     --border: rgba(0, 0, 0, 0.1);
     --input: rgba(0, 0, 0, 0.05);
     --ring: #00ff85;
@@ -52,6 +54,8 @@
     --muted-foreground: #666666;
     --accent: #00ff85;
     --accent-foreground: #000000;
+    --destructive: #ff6b6b;
+    --destructive-foreground: #fceded;
     --border: rgba(255, 255, 255, 0.1);
     --input: rgba(0, 0, 0, 0.8);
     --ring: #00ff85;
@@ -109,6 +113,48 @@
     box-shadow: 0 10px 15px -3px rgba(0, 255, 133, 0.2);
   }
 
+  /* Bridge Assets Button */
+  .bridge-btn {
+    @apply rounded-xl px-4 py-2 font-medium uppercase tracking-wide transition-all duration-200;
+    background-color: transparent;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .dark .bridge-btn {
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(0, 255, 133, 0.05);
+  }
+
+  .light .bridge-btn {
+    color: #000000;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    background: rgba(0, 255, 133, 0.05);
+  }
+
+  .bridge-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(0, 255, 133, 0.2), transparent);
+    transition: left 0.5s ease;
+  }
+
+  .bridge-btn:hover::before {
+    left: 100%;
+  }
+
+  .bridge-btn:hover {
+    border-color: #00ff85 !important;
+    color: #00ff85 !important;
+    box-shadow: 0 0 20px rgba(0, 255, 133, 0.3);
+    background: rgba(0, 255, 133, 0.1) !important;
+  }
+
   .input-field {
     @apply rounded-xl px-4 py-3 placeholder-gray-400 transition-all duration-200;
   }
@@ -159,6 +205,12 @@
     -moz-appearance: textfield;
   }
 
+  input[type='checkbox'] {
+    -webkit-appearance: checkbox;
+    -moz-appearance: checkbox;
+    appearance: checkbox;
+  }
+
   .card {
     @apply rounded-xl backdrop-blur-sm;
   }
@@ -185,6 +237,10 @@
 
   .light .table-row {
     border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  }
+
+  .text-xxs {
+    font-size: 8px;
   }
 
   .dark .table-row:hover {

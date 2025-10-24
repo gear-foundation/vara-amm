@@ -1,9 +1,8 @@
 import type { HexString } from '@gear-js/api';
-import { useAccount, useAlert, usePrepareProgramTransaction } from '@gear-js/react-hooks';
+import { useAccount, usePrepareProgramTransaction } from '@gear-js/react-hooks';
 import { useMutation } from '@tanstack/react-query';
 
 import { useVftProgram } from '@/lib/sails/sails';
-import { getErrorMessage } from '@/lib/utils';
 
 type Params = {
   spender: HexString;
@@ -14,7 +13,6 @@ export const useApproveMessage = (vftAddress: HexString) => {
   const program = useVftProgram(vftAddress);
   const { account } = useAccount();
 
-  const alert = useAlert();
   const { prepareTransactionAsync } = usePrepareProgramTransaction({
     program,
     serviceName: 'vft',
@@ -22,9 +20,7 @@ export const useApproveMessage = (vftAddress: HexString) => {
   });
 
   const tx = async ({ spender, value }: Params) => {
-    if (!program || !account) return;
-    console.log('🚀 ~ tx ~ value:', value);
-    console.log('🚀 ~ tx ~ spender:', spender);
+    if (!program || !account) throw new Error('Program or account is not found');
 
     const { transaction } = await prepareTransactionAsync({
       args: [spender, value],
@@ -33,12 +29,7 @@ export const useApproveMessage = (vftAddress: HexString) => {
     return transaction;
   };
 
-  const { mutateAsync: approveMessage, isPending } = useMutation({
-    mutationFn: tx,
-    onError: (error) => {
-      alert.error(getErrorMessage(error));
-    },
-  });
+  const { mutateAsync, isPending } = useMutation({ mutationFn: tx });
 
-  return { approveMessage, isPending };
+  return { mutateAsync, isPending, program };
 };

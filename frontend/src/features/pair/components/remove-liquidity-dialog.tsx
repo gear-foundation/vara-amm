@@ -1,17 +1,22 @@
 import type { HexString } from '@gear-js/api';
+import { useAccount, useAlert, useApi } from '@gear-js/react-hooks';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { INPUT_PERCENTAGES, SECONDS_IN_MINUTE, SLIPPAGE } from '@/consts';
+import { useSignAndSend } from '@/hooks/use-sign-and-send';
 import {
+  useBurnMessage,
   useCalculateRemoveLiquidityQuery,
   useRemoveLiquidityMessage,
   useVftBalanceOfQuery,
   useVftDecimalsQuery,
 } from '@/lib/sails';
+import { getErrorMessage } from '@/lib/utils';
 
+import { useVaraTokenAddress } from '../hooks';
 import type { Token } from '../types';
 import { calculatePercentage, formatUnits, parseUnits } from '../utils';
 
@@ -34,9 +39,17 @@ const RemoveLiquidityDialog = ({
 }: RemoveLiquidityDialogProps) => {
   const [error, setError] = useState<string | null>(null);
   const [userInput, setUserInput] = useState<string>('');
-  const { removeLiquidityMessage, isPending: isRemoveLiquidityPending } = useRemoveLiquidityMessage(pairAddress);
+  const [loading, setLoading] = useState(false);
+  const { api } = useApi();
+  const alert = useAlert();
+  const { account } = useAccount();
+
+  const removeLiquidity = useRemoveLiquidityMessage(pairAddress);
   const { balance: userLpBalance, isFetching: isUserLpBalanceFetching } = useVftBalanceOfQuery(pairAddress);
   const { decimals: lpDecimals, isFetching: isLpDecimalsFetching } = useVftDecimalsQuery(pairAddress);
+  const varaTokenAddress = useVaraTokenAddress();
+  const burn = useBurnMessage(varaTokenAddress);
+  const signAndSend = useSignAndSend({ programs: [removeLiquidity.program, burn.program] });
 
   const lpInput = lpDecimals && userInput ? parseUnits(userInput, lpDecimals) : 0n;
   const { removeLiquidityAmounts, isFetching: isRemoveLiquidityAmountsFetching } = useCalculateRemoveLiquidityQuery(
@@ -45,10 +58,19 @@ const RemoveLiquidityDialog = ({
   ); // or manually: liquidity * reserve_a / total_supply
 
   const isFetching =
-    isUserLpBalanceFetching || isLpDecimalsFetching || isRemoveLiquidityAmountsFetching || isRemoveLiquidityPending;
+    isUserLpBalanceFetching ||
+    isLpDecimalsFetching ||
+    isRemoveLiquidityAmountsFetching ||
+    removeLiquidity.isPending ||
+    loading;
 
-  const removeLiquidity = async () => {
+  const removeLiquidityHandler = async () => {
     setError(null);
+    if (!api) {
+      setError('API is not ready');
+      return;
+    }
+
     if (!lpDecimals) {
       setError('Failed to get LP token decimals');
       return;
@@ -61,6 +83,11 @@ const RemoveLiquidityDialog = ({
 
     if (!removeLiquidityAmounts) {
       setError('Failed to calculate expected amounts');
+      return;
+    }
+
+    if (!account?.decodedAddress) {
+      setError('Wallet not connected');
       return;
     }
 
@@ -77,9 +104,36 @@ const RemoveLiquidityDialog = ({
     };
     console.log('🚀 ~ removeLiquidity ~ params:', params);
 
-    await removeLiquidityMessage(params);
-    refetchBalances();
-    onClose();
+    try {
+      const removeLiquidityTx = await removeLiquidity.mutateAsync(params);
+      const transactions = [removeLiquidityTx.extrinsic];
+
+      setLoading(true);
+
+      if (token0.isVaraNative) {
+        const burnTx0 = await burn.mutateAsync({ value: BigInt(removeLiquidityAmounts[0]) });
+        if (burnTx0) {
+          transactions.push(burnTx0.extrinsic);
+        }
+      }
+      if (token1.isVaraNative) {
+        const burnTx1 = await burn.mutateAsync({ value: BigInt(removeLiquidityAmounts[1]) });
+        if (burnTx1) {
+          transactions.push(burnTx1.extrinsic);
+        }
+      }
+
+      const extrinsic = api.tx.utility.batchAll(transactions);
+      await signAndSend.mutateAsync({ extrinsic });
+      refetchBalances();
+      onClose();
+      alert.success('Liquidity removed successfully');
+    } catch (_error) {
+      console.error('Error removing liquidity:', _error);
+      alert.error(getErrorMessage(_error));
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -117,18 +171,18 @@ const RemoveLiquidityDialog = ({
         </div>
 
         <div className="flex justify-between text-sm text-gray-400">
-          <span>{token0.symbol}</span>
+          <span>{token0.displaySymbol}</span>
           <span>Expected amount: {formatUnits(BigInt(removeLiquidityAmounts?.[0] || 0), token0.decimals)}</span>
         </div>
 
         <div className="flex justify-between text-sm text-gray-400">
-          <span>{token1.symbol}</span>
+          <span>{token1.displaySymbol}</span>
           <span>Expected amount: {formatUnits(BigInt(removeLiquidityAmounts?.[1] || 0), token1.decimals)}</span>
         </div>
 
         {error && <p className="text-red-500">{error}</p>}
 
-        <Button onClick={removeLiquidity} disabled={isFetching} className="btn-primary w-full py-4 text-lg">
+        <Button onClick={removeLiquidityHandler} disabled={isFetching} className="btn-primary w-full py-4 text-lg">
           REMOVE LIQUIDITY
         </Button>
       </DialogContent>

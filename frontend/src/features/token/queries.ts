@@ -27,7 +27,7 @@ export const GET_TOKENS_WITH_PRICES = gql`
 // Types for the responses
 export interface TokenPriceSnapshot {
   id: string;
-  priceUsd: number | null;
+  priceUsd: string | null;
   fdv?: number | null;
   change1H?: number | null;
   change24H?: number | null;
@@ -35,7 +35,7 @@ export interface TokenPriceSnapshot {
   blockNumber: string;
 }
 
-export interface TokenData {
+export interface TokenWithPricesData {
   id: string;
   symbol: string;
   name?: string | null;
@@ -50,6 +50,6 @@ export interface TokenData {
 
 export interface GetTokensWithPricesResponse {
   allTokens: {
-    nodes: TokenData[];
+    nodes: TokenWithPricesData[];
   };
 }

@@ -6,6 +6,7 @@ import { ENV } from '@/consts';
 import { SailsProgram as VftProgram } from './extended-vft';
 import { SailsProgram as FactoryProgram } from './factory';
 import { SailsProgram as PairProgram } from './pair';
+import { SailsProgram as VftVaraProgram } from './vft-vara';
 
 const useFactoryProgram = () => {
   const { data: program } = useGearJsProgram({
@@ -34,4 +35,13 @@ const useVftProgram = (vftAddress?: HexString) => {
   return program;
 };
 
-export { useFactoryProgram, usePairProgram, useVftProgram };
+const useVftVaraProgram = (vftAddress?: HexString) => {
+  const { data: program } = useGearJsProgram({
+    library: VftVaraProgram,
+    id: vftAddress,
+  });
+
+  return program;
+};
+
+export { useFactoryProgram, usePairProgram, useVftProgram, useVftVaraProgram };

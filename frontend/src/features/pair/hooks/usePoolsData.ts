@@ -1,17 +1,18 @@
-import { useAccount } from '@gear-js/react-hooks';
 import { useMemo } from 'react';
 
 import { LOGO_URI_BY_SYMBOL } from '@/consts';
-import { usePairsTokens } from '@/features/pair/hooks';
+import { usePairsBalances, usePairsTokens } from '@/features/pair/hooks';
 import { GetPairsQuery, type PairData } from '@/features/pair/queries';
 import { useGraphQLQuery } from '@/hooks/useGraphQLQuery';
-import { toNumber } from '@/utils';
+import { toNumber } from '@/lib/utils/index';
+
+import type { Token, TokenMap } from '../types';
 
 export type PoolData = {
   id: string;
   name: string;
-  token0: { symbol: string; logoURI: string };
-  token1: { symbol: string; logoURI: string };
+  token0: Pick<Token, 'logoURI' | 'name' | 'isVerified' | 'displaySymbol'>;
+  token1: Pick<Token, 'logoURI' | 'name' | 'isVerified' | 'displaySymbol'>;
   feeTier: number;
   tvl: number;
   volume1h: number;
@@ -30,9 +31,9 @@ export type PoolsMetrics = {
   volumeChange24h: number; // Percentage change
 };
 
-export const usePoolsData = () => {
-  const { account } = useAccount();
+export const usePoolsData = (tokenMap?: TokenMap) => {
   const { pairsTokens } = usePairsTokens();
+  const { pairBalances } = usePairsBalances();
 
   const {
     data: pairsResult,
@@ -46,7 +47,7 @@ export const usePoolsData = () => {
 
   const { poolsData, metrics } = useMemo(() => {
     const pairs = pairsResult?.allPairs?.nodes || [];
-    if (!pairs.length || !pairsTokens) {
+    if (!pairs.length || !pairsTokens || !tokenMap) {
       return {
         poolsData: [],
         metrics: {
@@ -63,10 +64,12 @@ export const usePoolsData = () => {
 
     const _poolsData: PoolData[] = pairs.map((pair) => {
       // Find matching tokens from pairsTokens
-      const matchingPair = pairsTokens.find((p) => p.pairAddress === pair.id);
+      const matchingPair = pairsTokens.pairsByAddress.get(pair.id);
 
-      const token0Symbol = pair.token0Symbol || 'Unknown';
-      const token1Symbol = pair.token1Symbol || 'Unknown';
+      const token0 = tokenMap.get(pair.token0);
+      const token1 = tokenMap.get(pair.token1);
+      const token0Symbol = token0?.displaySymbol || pair.token0Symbol || 'Unknown';
+      const token1Symbol = token1?.displaySymbol || pair.token1Symbol || 'Unknown';
 
       const tvl = toNumber(pair.tvlUsd);
       const volume24h = toNumber(pair.volume24H);
@@ -75,23 +78,21 @@ export const usePoolsData = () => {
       totalTVL += tvl;
       total24hVolume += volume24h;
 
-      // Check if it's user's pool (simplified - checking if user has any balance)
-      const isMyPool = Boolean(
-        account?.decodedAddress &&
-          ((matchingPair?.token0?.balance && matchingPair.token0.balance > 0n) ||
-            (matchingPair?.token1?.balance && matchingPair.token1.balance > 0n)),
-      );
+      const userLpBalance = (matchingPair && pairBalances?.[matchingPair.pairAddress]) || 0n;
+      const isMyPool = Boolean(userLpBalance);
 
       const poolData: PoolData = {
         id: pair.id,
         name: `${token0Symbol}/${token1Symbol}`,
         token0: {
-          symbol: token0Symbol,
-          logoURI: LOGO_URI_BY_SYMBOL[token0Symbol] || '/placeholder.svg',
+          displaySymbol: token0Symbol,
+          logoURI: (token0?.isVerified && LOGO_URI_BY_SYMBOL[token0Symbol]) || '',
+          name: token0?.name || 'Unknown',
         },
         token1: {
-          symbol: token1Symbol,
-          logoURI: LOGO_URI_BY_SYMBOL[token1Symbol] || '/placeholder.svg',
+          displaySymbol: token1Symbol,
+          logoURI: (token1?.isVerified && LOGO_URI_BY_SYMBOL[token1Symbol]) || '',
+          name: token1?.name || 'Unknown',
         },
         feeTier: 0.3, // Default fee tier
         tvl,
@@ -115,7 +116,7 @@ export const usePoolsData = () => {
     };
 
     return { poolsData: _poolsData, metrics: _metrics };
-  }, [pairsResult?.allPairs?.nodes, pairsTokens, account?.decodedAddress]);
+  }, [pairsResult?.allPairs?.nodes, pairsTokens, tokenMap, pairBalances]);
 
   return {
     poolsData,

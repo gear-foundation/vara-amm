@@ -96,7 +96,6 @@ export class SailsDecoder {
   }: UserMessageSentEvent): EventMessage<T> {
     const service = this.service(payload);
     const method = this.method(payload);
-
     const _payload =
       this._program.services[service].events[method]?.decode(payload);
 

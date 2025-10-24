@@ -2,13 +2,11 @@ import type { HexString } from '@gear-js/api';
 import { useAccount, useApi } from '@gear-js/react-hooks';
 import { useQuery } from '@tanstack/react-query';
 
+import { usePairsQuery } from '@/lib/sails';
 import { SailsProgram as PairProgram } from '@/lib/sails/pair';
 
-type UsePairsBalancesProps = {
-  pairs?: [[HexString, HexString], HexString][];
-};
-
-const usePairsBalances = ({ pairs }: UsePairsBalancesProps) => {
+const usePairsBalances = () => {
+  const { pairs } = usePairsQuery();
   const { api } = useApi();
   const { account } = useAccount();
 
@@ -28,10 +26,20 @@ const usePairsBalances = ({ pairs }: UsePairsBalancesProps) => {
     refetch: refetchPairBalances,
   } = useQuery({
     queryKey: ['pair-balances', !!pairPrograms],
-    queryFn: () => {
-      if (!pairPrograms || !account?.decodedAddress) return [];
+    queryFn: async () => {
+      if (!pairPrograms || !account?.decodedAddress) return null;
 
-      return Promise.all(pairPrograms.map((pair) => pair.vft.balanceOf(account.decodedAddress)));
+      const balances = await Promise.all(pairPrograms.map((pair) => pair.vft.balanceOf(account.decodedAddress)));
+
+      const balancesMap = pairs?.reduce(
+        (acc, pair, index) => {
+          const pairAddress = pair[1];
+          acc[pairAddress] = balances[index];
+          return acc;
+        },
+        {} as Record<HexString, bigint>,
+      );
+      return balancesMap;
     },
     enabled: !!account?.decodedAddress && !!pairPrograms,
   });
