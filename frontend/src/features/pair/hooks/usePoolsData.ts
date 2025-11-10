@@ -11,8 +11,8 @@ import type { Token, TokenMap } from '../types';
 export type PoolData = {
   id: string;
   name: string;
-  token0: Pick<Token, 'logoURI' | 'name' | 'isVerified' | 'displaySymbol'>;
-  token1: Pick<Token, 'logoURI' | 'name' | 'isVerified' | 'displaySymbol'>;
+  token0: Pick<Token, 'logoURI' | 'name' | 'isVerified' | 'displaySymbol'> & { address: string };
+  token1: Pick<Token, 'logoURI' | 'name' | 'isVerified' | 'displaySymbol'> & { address: string };
   feeTier: number;
   tvl: number;
   volume1h: number;
@@ -39,6 +39,7 @@ export const usePoolsData = (tokenMap?: TokenMap) => {
     data: pairsResult,
     isFetching: isPairsFetching,
     error: pairsError,
+    refetch: refetchPairs,
   } = useGraphQLQuery<{
     allPairs: {
       nodes: PairData[];
@@ -88,11 +89,13 @@ export const usePoolsData = (tokenMap?: TokenMap) => {
           displaySymbol: token0Symbol,
           logoURI: (token0?.isVerified && LOGO_URI_BY_SYMBOL[token0Symbol]) || '',
           name: token0?.name || 'Unknown',
+          address: pair.token0,
         },
         token1: {
           displaySymbol: token1Symbol,
           logoURI: (token1?.isVerified && LOGO_URI_BY_SYMBOL[token1Symbol]) || '',
           name: token1?.name || 'Unknown',
+          address: pair.token1,
         },
         feeTier: 0.3, // Default fee tier
         tvl,
@@ -123,5 +126,6 @@ export const usePoolsData = (tokenMap?: TokenMap) => {
     metrics,
     isFetching: isPairsFetching,
     error: pairsError,
+    refetch: refetchPairs,
   };
 };

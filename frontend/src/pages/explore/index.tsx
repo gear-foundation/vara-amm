@@ -14,7 +14,13 @@ import { ExplorePageTransactionsFilters } from './components/transactions-filter
 function ExplorePage() {
   const { pairsTokens } = usePairsTokens();
 
-  const { poolsData, metrics, isFetching: isPoolsLoading, error: poolsError } = usePoolsData(pairsTokens?.tokens);
+  const {
+    poolsData,
+    metrics,
+    isFetching: isPoolsLoading,
+    error: poolsError,
+    refetch: refetchPoolsData,
+  } = usePoolsData(pairsTokens?.tokens);
   const [tokenNetworkFilter, setTokenNetworkFilter] = useState('all');
   const [tokenFilter, setTokenFilter] = useState('all');
   const [tokenVolumeFilter, setTokenVolumeFilter] = useState('1d');
@@ -149,6 +155,7 @@ function ExplorePage() {
             poolsData={poolsData}
             isLoading={isPoolsLoading}
             error={poolsError}
+            refetchPoolsData={refetchPoolsData}
           />
         </TabsContent>
 

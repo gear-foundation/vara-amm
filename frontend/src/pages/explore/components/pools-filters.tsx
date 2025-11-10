@@ -15,8 +15,8 @@ type ExplorePagePoolsFiltersProps = {
 };
 
 export function ExplorePagePoolsFilters({
-  poolNetworkFilter,
-  setPoolNetworkFilter,
+  // poolNetworkFilter,
+  // setPoolNetworkFilter,
   poolVolumeFilter,
   setPoolVolumeFilter,
   showMyPools,
@@ -26,16 +26,17 @@ export function ExplorePagePoolsFilters({
 
   return (
     <div className="flex flex-wrap items-center gap-4">
-      <Select value={poolNetworkFilter} onValueChange={setPoolNetworkFilter}>
+      {/* TODO: Disabled while we don't have another networks */}
+      {/* <Select value={poolNetworkFilter} onValueChange={setPoolNetworkFilter}>
         <SelectTrigger className="w-48 input-field">
           <SelectValue placeholder="All networks" />
         </SelectTrigger>
         <SelectContent className="card">
           <SelectItem value="all">All networks</SelectItem>
-          {/* <SelectItem value="Ethereum">Ethereum</SelectItem> */}
+          <SelectItem value="Ethereum">Ethereum</SelectItem>
           <SelectItem value="Vara Network">Vara Network</SelectItem>
         </SelectContent>
-      </Select>
+      </Select> */}
 
       <Select value={poolVolumeFilter} onValueChange={setPoolVolumeFilter}>
         <SelectTrigger className="w-32 input-field">
