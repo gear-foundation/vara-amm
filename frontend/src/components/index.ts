@@ -5,3 +5,4 @@ export * from './token-icon';
 export * from './wallet';
 export * from './navigation';
 export * from './address';
+export * from './add-liquidity-dialog';

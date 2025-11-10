@@ -1,16 +1,18 @@
+import type { HexString } from '@gear-js/api';
 import { ChevronUp, ChevronDown } from 'lucide-react';
 import type React from 'react';
 import { useState } from 'react';
 
-import { TokenIcon } from '@/components';
+import { TokenIcon, AddLiquidityDialog } from '@/components';
 import { MIN_VISIBLE_TVL_USD } from '@/consts';
-import { type PoolData } from '@/features/pair';
+import { type PoolData, usePairsTokens } from '@/features/pair';
 import { formatCurrency, getVolumeByTimeframe } from '@/lib/utils/index';
 
 type SortField = string;
 type SortDirection = 'asc' | 'desc';
 
 type ExplorePagePoolsProps = {
+  refetchPoolsData: () => void;
   poolNetworkFilter: string;
   poolVolumeFilter: string;
   showMyPools: boolean;
@@ -20,6 +22,7 @@ type ExplorePagePoolsProps = {
 };
 
 export function ExplorePagePools({
+  refetchPoolsData,
   poolNetworkFilter,
   poolVolumeFilter,
   showMyPools,
@@ -27,10 +30,29 @@ export function ExplorePagePools({
   isLoading,
   error,
 }: ExplorePagePoolsProps) {
+  const { pairsTokens, refetchBalances } = usePairsTokens();
   const [poolSort, setPoolSort] = useState<{ field: SortField; direction: SortDirection }>({
     field: '',
     direction: 'desc',
   });
+
+  const [showAddLiquidityDialog, setShowAddLiquidityDialog] = useState(false);
+  const [selectedToken0, setSelectedToken0] = useState<HexString | null>(null);
+  const [selectedToken1, setSelectedToken1] = useState<HexString | null>(null);
+
+  const handlePoolClick = (token0Address: HexString, token1Address: HexString) => {
+    setSelectedToken0(token0Address);
+    setSelectedToken1(token1Address);
+    setShowAddLiquidityDialog(true);
+  };
+
+  const handleAddLiquiditySuccess = () => {
+    setShowAddLiquidityDialog(false);
+    setSelectedToken0(null);
+    setSelectedToken1(null);
+    void refetchBalances();
+    void refetchPoolsData();
+  };
 
   const handleSort = (
     field: SortField,
@@ -221,7 +243,10 @@ export function ExplorePagePools({
               </tr>
             ) : (
               sortedPools.map((pool) => (
-                <tr key={pool.id} className="table-row">
+                <tr
+                  key={pool.id}
+                  className="table-row cursor-pointer hover:bg-gray-800/50 transition-colors"
+                  onClick={() => handlePoolClick(pool.token0.address as HexString, pool.token1.address as HexString)}>
                   <td className="py-4 px-6">
                     <div className="flex items-center space-x-3">
                       <div className="flex -space-x-2 min-w-10">
@@ -243,6 +268,17 @@ export function ExplorePagePools({
           </tbody>
         </table>
       </div>
+
+      {pairsTokens && (
+        <AddLiquidityDialog
+          isOpen={showAddLiquidityDialog}
+          onClose={() => setShowAddLiquidityDialog(false)}
+          pairsTokens={pairsTokens}
+          defaultToken0={selectedToken0}
+          defaultToken1={selectedToken1}
+          onSuccess={handleAddLiquiditySuccess}
+        />
+      )}
     </div>
   );
 }

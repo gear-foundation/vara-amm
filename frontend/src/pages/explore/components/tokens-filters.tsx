@@ -10,8 +10,8 @@ type ExplorePageTokensFiltersProps = {
 };
 
 export function ExplorePageTokensFilters({
-  tokenNetworkFilter,
-  setTokenNetworkFilter,
+  // tokenNetworkFilter,
+  // setTokenNetworkFilter,
   tokenFilter,
   setTokenFilter,
   tokenVolumeFilter,
@@ -19,16 +19,17 @@ export function ExplorePageTokensFilters({
 }: ExplorePageTokensFiltersProps) {
   return (
     <div className="flex flex-wrap gap-4">
-      <Select value={tokenNetworkFilter} onValueChange={setTokenNetworkFilter}>
+      {/* TODO: Disabled while we don't have another networks */}
+      {/* <Select value={tokenNetworkFilter} onValueChange={setTokenNetworkFilter}>
         <SelectTrigger className="w-48 input-field">
           <SelectValue placeholder="All networks" />
         </SelectTrigger>
         <SelectContent className="card">
           <SelectItem value="all">All networks</SelectItem>
-          {/* <SelectItem value="Ethereum">Ethereum</SelectItem> */}
+          <SelectItem value="Ethereum">Ethereum</SelectItem>
           <SelectItem value="Vara Network">Vara Network</SelectItem>
         </SelectContent>
-      </Select>
+      </Select> */}
 
       <Select value={tokenFilter} onValueChange={setTokenFilter}>
         <SelectTrigger className="w-48 input-field">
