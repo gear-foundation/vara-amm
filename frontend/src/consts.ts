@@ -21,6 +21,7 @@ export const LOGO_URI_BY_SYMBOL: Record<string, string> = {
   WETH: '/tokens/eth.png',
   WUSDT: '/tokens/usdt.png',
   WUSDC: '/tokens/usdc.png',
+  WBTC: '/tokens/wrapped-btc.svg',
   // Ethereum
   WVARA: '/tokens/vara.png',
   ETH: '/tokens/eth.png',
@@ -33,6 +34,7 @@ export const VERIFIED_TOKENS = [
   '0xba764e2836b28806be10fe6f674d89d1e0c86898d25728f776588f03bddc6f58', // WETH
   '0x9f332e61589e0850dce6d8e6070ea5618de33d9f134a4a35d6d1164dc9002f48', // WUSDC
   '0x464511231a1afe9108a689ed3dbbb047ca308d6f5dfb86453e4df5612a2d668a', // WUSDT
+  '0xc1ec06d99efcffd863f9c2ad2bc76f656aff861acf06f438046c64e5b41e3fd9', // WBTC
 ];
 
 export const SECONDS_IN_MINUTE = 60;
