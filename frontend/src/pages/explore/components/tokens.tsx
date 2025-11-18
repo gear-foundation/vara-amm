@@ -2,7 +2,7 @@ import { TrendingUp, TrendingDown, ChevronUp, ChevronDown, ExternalLink } from '
 import { useState, type ReactNode } from 'react';
 
 import { Address, TokenIcon } from '@/components';
-import { MIN_VISIBLE_TVL_USD } from '@/consts';
+import { MIN_VISIBLE_TVL_USD, PRIORITY_TOKEN_SYMBOLS } from '@/consts';
 import type { TokenMap } from '@/features/pair';
 import { formatCurrency, formatPrice, getVolumeByTimeframe } from '@/lib/utils/index';
 
@@ -77,8 +77,8 @@ export function ExplorePageTokens({
     if (!sortConfig.field || !data?.length) return data;
 
     return [...data].sort((a, b) => {
-      let aVal: string | number;
-      let bVal: string | number;
+      let aVal: string | number | boolean;
+      let bVal: string | number | boolean;
 
       // Handle volume fields with dynamic timeframe
       if (sortConfig.field === 'volume') {
@@ -110,6 +110,22 @@ export function ExplorePageTokens({
       if (numericFields.includes(sortConfig.field) || sortConfig.field === 'volume') {
         aVal = Number(aVal) || 0;
         bVal = Number(bVal) || 0;
+
+        if (aVal === bVal) {
+          const aIsVerified = a.isVerified ?? false;
+          const bIsVerified = b.isVerified ?? false;
+          const aPriorityIndex = PRIORITY_TOKEN_SYMBOLS.indexOf(a.symbol.toLowerCase());
+          const bPriorityIndex = PRIORITY_TOKEN_SYMBOLS.indexOf(b.symbol.toLowerCase());
+
+          // Priority verified tokens come first, sorted by priority order
+          if (aIsVerified && bIsVerified && aPriorityIndex !== -1 && bPriorityIndex !== -1) {
+            return aPriorityIndex - bPriorityIndex;
+          }
+          // Any verified token comes before unverified
+          if (aIsVerified && !bIsVerified) return -1;
+          if (!aIsVerified && bIsVerified) return 1;
+        }
+
         return sortConfig.direction === 'asc' ? aVal - bVal : bVal - aVal;
       }
 
