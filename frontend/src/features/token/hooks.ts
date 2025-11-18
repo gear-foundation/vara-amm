@@ -21,7 +21,7 @@ export function useTokensWithPrices(
 
       return graphqlClient.request<GetTokensWithPricesResponse>(GET_TOKENS_WITH_PRICES, {
         first,
-        orderBy: ['CREATED_AT_DESC'], // Simple default ordering by creation time
+        orderBy: ['CREATED_AT_ASC'], // Simple default ordering by creation time
         filter,
       });
     },

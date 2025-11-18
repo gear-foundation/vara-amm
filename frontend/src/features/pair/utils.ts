@@ -1,7 +1,35 @@
 import type { HexString } from '@gear-js/api';
 import { formatBalance } from '@polkadot/util';
 
+import { PRIORITY_TOKEN_SYMBOLS } from '@/consts';
+
 import type { Network, PairsTokens, SelectedPairResult, Token } from './types';
+
+const sortTokensByPriorityWithBalance = (tokens: Token[]): Token[] => {
+  return tokens.sort((a, b) => {
+    const aIsVerified = a.isVerified ?? false;
+    const bIsVerified = b.isVerified ?? false;
+    const aPriorityIndex = PRIORITY_TOKEN_SYMBOLS.indexOf(a.symbol);
+    const bPriorityIndex = PRIORITY_TOKEN_SYMBOLS.indexOf(b.symbol);
+
+    // Priority verified tokens come first, sorted by priority order
+    if (aIsVerified && bIsVerified && aPriorityIndex !== -1 && bPriorityIndex !== -1) {
+      return aPriorityIndex - bPriorityIndex;
+    }
+
+    // Any verified token comes before unverified
+    if (aIsVerified && !bIsVerified) return -1;
+    if (!aIsVerified && bIsVerified) return 1;
+
+    // Within same verification status, use provided comparator
+    const balanceA = a.balance ?? 0n;
+    const balanceB = b.balance ?? 0n;
+    // Sort by balance descending (highest first)
+    if (balanceA > balanceB) return -1;
+    if (balanceA < balanceB) return 1;
+    return a.symbol.localeCompare(b.symbol);
+  });
+};
 
 const getNetworks = (
   pairsTokens: PairsTokens,
@@ -14,13 +42,15 @@ const getNetworks = (
   );
   const customTokens = customTokensMap ? Array.from(customTokensMap.values()) : [];
 
+  const sortedBaseTokens = sortTokensByPriorityWithBalance(baseTokens);
+
   return [
     {
       id: 'vara',
       name: 'Vara Network',
       chainId: 1,
       logoURI: '/tokens/vara.png',
-      tokens: baseTokens.concat(customTokens),
+      tokens: sortedBaseTokens.concat(customTokens),
     },
     // TODO: add other networks
     // {
@@ -351,6 +381,7 @@ const calculatePriceImpact = (
 };
 
 export {
+  sortTokensByPriorityWithBalance,
   getNetworks,
   getFormattedBalance,
   parseUnits,

@@ -17,7 +17,7 @@ import {
   Tooltip,
   TokenIcon,
 } from '@/components';
-import { SECONDS_IN_MINUTE } from '@/consts';
+import { SECONDS_IN_MINUTE, VERIFIED_TOKENS } from '@/consts';
 import { TokenImportModal, useTokenImport } from '@/features/token-import';
 import { useSignAndSend } from '@/hooks/use-sign-and-send';
 import {
@@ -65,8 +65,8 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
   const [showToken1Selector, setShowToken1Selector] = useState(false);
 
   const defaultValues: AddLiquidityFormData = {
-    token0Address: defaultToken0 || pairsTokens.pairsArray[0].token0.address,
-    token1Address: defaultToken1 || pairsTokens.pairsArray[0].token1.address,
+    token0Address: defaultToken0 || VERIFIED_TOKENS[0] || pairsTokens.pairsArray[0].token0.address,
+    token1Address: defaultToken1 || VERIFIED_TOKENS[1] || pairsTokens.pairsArray[0].token1.address,
     amount0: '',
     amount1: '',
   };

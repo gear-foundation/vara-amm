@@ -23,6 +23,7 @@ export type TokenDataForTable = {
   volume1m: number;
   volume1y: number;
   network: string;
+  isVerified: boolean;
 };
 
 function transformTokenDataForTable(

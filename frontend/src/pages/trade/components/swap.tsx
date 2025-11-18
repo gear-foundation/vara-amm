@@ -8,7 +8,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 
 import { TokenIcon, TokenSelector, Button, Input, Card, CardContent, CardHeader, Wallet } from '@/components';
-import { INPUT_PERCENTAGES, SECONDS_IN_MINUTE, SLIPPAGE } from '@/consts';
+import { INPUT_PERCENTAGES, SECONDS_IN_MINUTE, SLIPPAGE, VERIFIED_TOKENS } from '@/consts';
 import { usePairsBalances, usePairsReserves } from '@/features/pair';
 import { useVaraTokenAddress } from '@/features/pair/hooks';
 import { createSwapValidationSchema, SwapFormData } from '@/features/pair/schema';
@@ -54,8 +54,8 @@ export function Swap({ pairsTokens, refetchBalances }: TradePageProps) {
     defaultValues: {
       fromAmount: '',
       toAmount: '',
-      fromTokenAddress: pairsTokens.pairsArray[0].token0.address,
-      toTokenAddress: pairsTokens.pairsArray[0].token1.address,
+      fromTokenAddress: VERIFIED_TOKENS[0] || pairsTokens.pairsArray[0].token0.address,
+      toTokenAddress: VERIFIED_TOKENS[1] || pairsTokens.pairsArray[0].token1.address,
     },
   });
 
