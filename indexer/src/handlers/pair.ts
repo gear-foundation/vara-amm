@@ -47,6 +47,7 @@ interface PairState {
   isPairUpdated: boolean;
   isVolumeSnapshotsUpdated: boolean;
   lastPriceAndVolumeUpdate: Date | null;
+  isActive: boolean;
 }
 
 export class PairsHandler extends BaseHandler {
@@ -115,6 +116,9 @@ export class PairsHandler extends BaseHandler {
     const pairsToSave: Pair[] = [];
     for (const state of this._pairs.values()) {
       if (state.isPairUpdated && state.pair) {
+        if (!state.isActive) {
+          state.pair.isActive = false;
+        }
         pairsToSave.push(state.pair);
       }
     }
@@ -130,6 +134,13 @@ export class PairsHandler extends BaseHandler {
       state.transactions.clear();
       state.isPairUpdated = false;
       state.isVolumeSnapshotsUpdated = false;
+      if (!state.isActive) {
+        this._pairs.delete(state.info.address);
+        this._ctx.log.info(
+          { pairId: state.info.address },
+          "Removed inactive pair from memory"
+        );
+      }
     }
   }
 
@@ -210,6 +221,7 @@ export class PairsHandler extends BaseHandler {
       for (const state of this._pairs.values()) {
         if (
           state.pair &&
+          state.isActive &&
           this._shouldPerformHourlyUpdates(state, blockTimestamp)
         ) {
           await this._performHourlyUpdates(
@@ -225,7 +237,7 @@ export class PairsHandler extends BaseHandler {
           const source = event.args.message.source;
           const state = this._pairs.get(source);
 
-          if (state) {
+          if (state && state.pair && state.isActive) {
             await this._handleUserMessageSentEvent(state, event, common);
           }
         }
@@ -233,7 +245,7 @@ export class PairsHandler extends BaseHandler {
     }
 
     for (const state of this._pairs.values()) {
-      if (state.isVolumeSnapshotsUpdated && state.pair) {
+      if (state.isVolumeSnapshotsUpdated && state.pair && state.isActive) {
         const lastBlock = ctx.blocks[ctx.blocks.length - 1];
         const { blockTimestamp } = getBlockCommonData(lastBlock);
         await this._updatePairVolumes(state, blockTimestamp);
@@ -243,7 +255,7 @@ export class PairsHandler extends BaseHandler {
         );
       }
 
-      if (state.pair) {
+      if (state.pair && state.isActive) {
         this._updatePairTVL(state);
       }
     }
@@ -262,6 +274,7 @@ export class PairsHandler extends BaseHandler {
         isPairUpdated: false,
         isVolumeSnapshotsUpdated: false,
         lastPriceAndVolumeUpdate: null,
+        isActive: true,
       };
       this._pairs.set(info.address, state);
     }
@@ -274,42 +287,59 @@ export class PairsHandler extends BaseHandler {
       return;
     }
 
-    const token0Program = this._vftCache.getOrCreate(state.info.tokens[0]);
-    const token1Program = this._vftCache.getOrCreate(state.info.tokens[1]);
+    try {
+      // Ensure tokens are active
+      await this._api.programStorage.getProgram(state.info.tokens[0]);
+      await this._api.programStorage.getProgram(state.info.tokens[1]);
 
-    const token0Symbol = await token0Program.vft.symbol();
-    const token1Symbol = await token1Program.vft.symbol();
-    const [reserve0, reserve1] = await state.pairProgram.pair.getReserves();
-    const totalSupply = await state.pairProgram.vft.totalSupply();
+      const token0Program = this._vftCache.getOrCreate(state.info.tokens[0]);
+      const token1Program = this._vftCache.getOrCreate(state.info.tokens[1]);
+      const token0Symbol = await token0Program.vft.symbol();
+      const token1Symbol = await token1Program.vft.symbol();
+      const [reserve0, reserve1] = await state.pairProgram.pair.getReserves();
+      const totalSupply = await state.pairProgram.vft.totalSupply();
 
-    const pair = new Pair({
-      id: state.info.address,
-      token0: state.info.tokens[0],
-      token1: state.info.tokens[1],
-      token0Symbol,
-      token1Symbol,
-      reserve0: BigInt(reserve0),
-      reserve1: BigInt(reserve1),
-      totalSupply: BigInt(totalSupply),
-      volumeUsd: 0,
-      volume24h: 0,
-      volume7d: 0,
-      volume30d: 0,
-      volume1y: 0,
-      tvlUsd: 0,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
+      const pair = new Pair({
+        id: state.info.address,
+        token0: state.info.tokens[0],
+        token1: state.info.tokens[1],
+        token0Symbol,
+        token1Symbol,
+        reserve0: BigInt(reserve0),
+        reserve1: BigInt(reserve1),
+        totalSupply: BigInt(totalSupply),
+        volumeUsd: 0,
+        volume24h: 0,
+        volume7d: 0,
+        volume30d: 0,
+        volume1y: 0,
+        tvlUsd: 0,
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
 
-    this._ctx.log.info({ pair }, "Created new pair");
+      this._ctx.log.info({ pair }, "Created new pair");
 
-    state.pair = pair;
-    state.isPairUpdated = true;
+      state.pair = pair;
+      state.isPairUpdated = true;
+    } catch (error) {
+      this._ctx.log.error(
+        { error, pairId: state.info.address },
+        "Failed to initialize pair from contract, skipping"
+      );
+
+      // Mark pair as inactive in state
+      state.isActive = false;
+      state.isPairUpdated = true;
+
+      return;
+    }
   }
 
   private async _initTokens(state: PairState): Promise<void> {
     const pair = state.pair;
-    if (!pair) {
+    if (!pair || !state.isActive) {
       return;
     }
 
@@ -320,12 +350,24 @@ export class PairsHandler extends BaseHandler {
   }
 
   private async _ensureToken(tokenId: string): Promise<void> {
-    const token = this._tokens.get(tokenId);
+    let token: Token | undefined = this._tokens.get(tokenId);
 
     if (!token) {
-      const token = await this._tokenManager.createTokenFromContract(tokenId);
+      // First try to load from database
+      token = await this._ctx.store.findOneBy(Token, { id: tokenId });
+      console.log({ tokenId, token }, "Loaded existing token from database");
+    }
+
+    if (!token) {
+      // Not in database, create from contract
+      token = await this._tokenManager.createTokenFromContract(tokenId);
+    }
+
+    if (token) {
       this._tokens.set(token.id, token);
       this._tokensToSave.add(token.id);
+    } else {
+      throw new Error("Failed to ensure token, skipping price initialization");
     }
 
     if (token && !this._tokenPrices.has(tokenId)) {
@@ -819,7 +861,7 @@ export class PairsHandler extends BaseHandler {
     state: PairState,
     timestamp: Date
   ): Promise<void> {
-    if (!state.pair || state.volumeSnapshots.size > 0) {
+    if (!state.pair || state.volumeSnapshots.size > 0 || !state.isActive) {
       return;
     }
 

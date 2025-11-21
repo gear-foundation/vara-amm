@@ -36,6 +36,7 @@ type Pair @entity {
   volume30d: Float # 30d volume in USD
   volume1y: Float # 1y volume in USD
   tvlUsd: Float # total value locked in USD
+  isActive: Boolean! @index # whether the pair is active or has failed
   createdAt: DateTime! @index
   updatedAt: DateTime! @index
   transactions: [Transaction!] @derivedFrom(field: "pair")
