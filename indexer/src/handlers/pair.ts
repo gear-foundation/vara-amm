@@ -100,6 +100,7 @@ export class PairsHandler extends BaseHandler {
 
       const state = this._getOrCreateState(info);
       state.pair = pair;
+      state.isActive = pair.isActive;
     }
 
     ctx.log.info(
