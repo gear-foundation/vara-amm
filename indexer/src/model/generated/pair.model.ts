@@ -1,4 +1,4 @@
-import {Entity as Entity_, Column as Column_, PrimaryColumn as PrimaryColumn_, StringColumn as StringColumn_, Index as Index_, BigIntColumn as BigIntColumn_, FloatColumn as FloatColumn_, DateTimeColumn as DateTimeColumn_, OneToMany as OneToMany_} from "@subsquid/typeorm-store"
+import {Entity as Entity_, Column as Column_, PrimaryColumn as PrimaryColumn_, StringColumn as StringColumn_, Index as Index_, BigIntColumn as BigIntColumn_, FloatColumn as FloatColumn_, DateTimeColumn as DateTimeColumn_, BooleanColumn as BooleanColumn_, OneToMany as OneToMany_} from "@subsquid/typeorm-store"
 import {Transaction} from "./transaction.model"
 import {PairVolumeSnapshot} from "./pairVolumeSnapshot.model"
 
@@ -54,6 +54,10 @@ export class Pair {
 
     @FloatColumn_({nullable: true})
     tvlUsd!: number | undefined | null
+
+    @Index_()
+    @BooleanColumn_({nullable: false})
+    isActive!: boolean
 
     @Index_()
     @DateTimeColumn_({nullable: false})
