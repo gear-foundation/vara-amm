@@ -1,7 +1,7 @@
 import type { HexString } from '@gear-js/api';
 import { useAccount, useApi, useDeriveBalancesAll } from '@gear-js/react-hooks';
 import { useQuery } from '@tanstack/react-query';
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useTokensWithPrices } from '@/features/token/hooks';
 import { useVaraSymbol } from '@/hooks/use-vara-symbol';
@@ -36,6 +36,7 @@ const usePairsTokens = (): UsePairsTokensResult => {
   }, [tokensResponse]);
 
   const vftProgramsRef = useRef<Map<HexString, VftProgram>>(new Map());
+  const [vftPrograms, setVftPrograms] = useState<{ address: HexString; program: VftProgram }[]>([]);
 
   const vftAddresses = useMemo(() => {
     if (!pairs) return [];
@@ -47,21 +48,34 @@ const usePairsTokens = (): UsePairsTokensResult => {
     return Array.from(addresses);
   }, [pairs]);
 
-  const getVftPrograms = useCallback(() => {
-    if (!api) return [];
+  useEffect(() => {
+    const getVftPrograms = async () => {
+      if (!api) return [];
 
-    return vftAddresses.map((address) => {
-      let program = vftProgramsRef.current.get(address);
+      // check if token programs are active
+      const tokenProgramsResults = await Promise.allSettled(
+        vftAddresses.map((address) => api.programStorage.getProgram(address)),
+      );
+      const activeTokenProgramsFlags = tokenProgramsResults.map(({ status }) => status === 'fulfilled');
+      const activeVftAddresses = vftAddresses.filter((_, index) => activeTokenProgramsFlags[index]);
 
-      if (!program) {
-        program = new VftProgram(api, address);
-        vftProgramsRef.current.set(address, program);
-      }
+      return activeVftAddresses.map((address) => {
+        let program = vftProgramsRef.current.get(address);
 
-      return {
-        address,
-        program,
-      };
+        if (!program) {
+          program = new VftProgram(api, address);
+          vftProgramsRef.current.set(address, program);
+        }
+
+        return {
+          address,
+          program,
+        };
+      });
+    };
+
+    void getVftPrograms().then((programs) => {
+      setVftPrograms(programs);
     });
   }, [api, vftAddresses]);
 
@@ -71,7 +85,7 @@ const usePairsTokens = (): UsePairsTokensResult => {
     isFetching,
     error,
   } = useQuery<TokenMap, Error>({
-    queryKey: ['pairsTokensData', vftAddresses, account?.decodedAddress, nativeBalance],
+    queryKey: ['pairsTokensData', vftAddresses, vftPrograms.length, account?.decodedAddress, nativeBalance],
     queryFn: async ({ client }) => {
       const cachedData: TokenMap | undefined = client.getQueryData([
         'pairsTokensData',
@@ -83,8 +97,7 @@ const usePairsTokens = (): UsePairsTokensResult => {
       // if has cachedData - refetch only balances
       if (cachedData && account) {
         const tokenDataMap = new Map(cachedData) as TokenMap;
-        const tokenPrograms = getVftPrograms();
-        const tokenBalancesPromises = tokenPrograms.map(({ program }) => program.vft.balanceOf(account.decodedAddress));
+        const tokenBalancesPromises = vftPrograms.map(({ program }) => program.vft.balanceOf(account.decodedAddress));
 
         const tokenBalances = await Promise.all(tokenBalancesPromises);
         tokenBalances.forEach((balance, index) => {
@@ -99,9 +112,7 @@ const usePairsTokens = (): UsePairsTokensResult => {
         throw new Error('No pairs or api');
       }
 
-      const tokenPrograms = getVftPrograms();
-
-      const tokenDataPromises = tokenPrograms.map(({ address, program }) =>
+      const tokenDataPromises = vftPrograms.map(({ address, program }) =>
         fetchTokenData(program, address, account?.decodedAddress, varaSymbol, nativeBalance?.transferable?.toBigInt()),
       );
 
