@@ -65,19 +65,21 @@ const transformTransactions = (
   pairsTokens: PairsTokens,
   userAddress?: HexString,
 ): DisplayTransaction[] => {
-  return transactions.map((tx) => ({
-    type:
-      tx.type === 'ADD_LIQUIDITY'
-        ? 'Add'
-        : tx.type === 'REMOVE_LIQUIDITY'
-          ? 'Remove'
-          : tx.type.charAt(0).toUpperCase() + tx.type.slice(1).toLowerCase(),
-    amount: formatAmount(tx, pairsTokens),
-    wallet: formatWallet(tx.user),
-    time: formatTime(tx.timestamp),
-    timeSort: new Date(tx.timestamp).getTime(),
-    isMyTx: tx.user === userAddress,
-  }));
+  return transactions
+    .filter((tx) => !!pairsTokens.pairsByAddress.get(tx.pairId))
+    .map((tx) => ({
+      type:
+        tx.type === 'ADD_LIQUIDITY'
+          ? 'Add'
+          : tx.type === 'REMOVE_LIQUIDITY'
+            ? 'Remove'
+            : tx.type.charAt(0).toUpperCase() + tx.type.slice(1).toLowerCase(),
+      amount: formatAmount(tx, pairsTokens),
+      wallet: formatWallet(tx.user),
+      time: formatTime(tx.timestamp),
+      timeSort: new Date(tx.timestamp).getTime(),
+      isMyTx: tx.user === userAddress,
+    }));
 };
 
 type SortField = 'type' | 'wallet' | 'timeSort' | null;

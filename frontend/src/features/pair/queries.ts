@@ -98,6 +98,7 @@ export const GetPairsQuery = gql`
         volume1Y
         tvlUsd
         createdAt
+        isActive
       }
     }
   }
