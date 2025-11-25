@@ -101,7 +101,8 @@ const usePairsTokens = (): UsePairsTokensResult => {
 
         const tokenBalances = await Promise.all(tokenBalancesPromises);
         tokenBalances.forEach((balance, index) => {
-          const token = tokenDataMap.get(vftAddresses[index]);
+          const activeAddress = vftPrograms[index].address;
+          const token = tokenDataMap.get(activeAddress);
           if (!token) return;
           tokenDataMap.set(token.address, { ...token, balance });
         });
