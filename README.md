@@ -5,7 +5,7 @@
 <h1 align="center">Overview</h1>
 
 <p align="center">
-A decentralized Automated Market Maker (AMM) built on the Vara Network. This project provides a complete DeFi trading platform with liquidity provision, token swapping, and automated fee distribution powered by Gear Protocol smart contracts.
+A decentralized Automated Market Maker (AMM) reference implementation for Vara Network. This project provides a complete DeFi trading platform with liquidity provision, token swapping, and automated fee distribution powered by Gear Protocol smart contracts. Ready to deploy by anyone on Vara Network.
 </p>
 
 ## 🏗 Architecture
