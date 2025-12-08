@@ -1,69 +1,83 @@
-# React + TypeScript + Vite
+# Vara AMM Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Modern React-based web interface for the Vara AMM decentralized exchange, providing intuitive trading and liquidity management tools.
 
-Currently, two official plugins are available:
+## 🚀 Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+### 💱 **Trading Interface**
+- **Token Swapping**: Seamless token-to-token exchanges with real-time price updates
+- **Multiple Trading Modes**: Swap, Buy, and Sell interfaces
+- **Slippage Protection**: Configurable slippage tolerance and deadline settings
+- **Price Impact Calculation**: Real-time price impact display for informed trading
 
-## Expanding the ESLint configuration
+### 💰 **Liquidity Management**
+- **Add/Remove Liquidity**: Easy liquidity provision with automatic ratio calculations
+- **LP Token Management**: View and manage your liquidity provider positions
+- **Pool Statistics**: Real-time pool reserves, volume, and TVL data
+- **Fee Earnings**: Track your accumulated trading fees (0.3% fee tier)
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### 📊 **Analytics & Monitoring**
+- **Pool Explorer**: Browse all available trading pairs and statistics
+- **Transaction History**: Complete audit trail of your DEX activities
+- **Price Charts**: Historical price data and volume analytics
+- **Portfolio Tracking**: Monitor your positions and earnings
 
-```js
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+### 🔗 **Vara Network Integration**
+- **Wallet Connection**: Seamless integration with Vara-compatible wallets
+- **Native VARA Support**: Direct integration with Vara's native token
+- **VFT Compatibility**: Support for all Vara Fungible Tokens
+- **Real-time Updates**: Live synchronization with blockchain state
 
-      // Remove tseslint.configs.recommended and replace with this
-      ...tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      ...tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      ...tseslint.configs.stylisticTypeChecked,
+## 🛠 Tech Stack
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+- **React 19** + **TypeScript** for modern, type-safe development
+- **Vite** for fast development and optimized builds
+- **Tailwind CSS** + **Radix UI** for beautiful, accessible components
+- **React Hook Form** + **Zod** for robust form validation
+- **TanStack Query** for efficient data fetching and caching
+- **Gear-JS SDK** for seamless blockchain integration
+- **GraphQL** for efficient data querying from indexer
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- **Node.js** 18+ and **Yarn**
+- **Vara-compatible wallet** (SubWallet, Polkadot.js, etc.)
+
+### Installation
+
+```bash
+# Install dependencies
+yarn install
+
+# Start development server
+yarn start
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+The application will be available at `http://localhost:3000`
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### Build for Production
 
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+# Build optimized production bundle
+yarn build
+
+# Preview production build locally
+yarn preview
 ```
+
+## 🔧 Configuration
+
+### Environment Variables
+
+Copy the example environment file and configure as needed:
+
+```bash
+cp .env.example .env.local
+```
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](../LICENSE) file for details.
+
