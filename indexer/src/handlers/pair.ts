@@ -384,7 +384,7 @@ export class PairsHandler extends BaseHandler {
       order: { timestamp: "DESC" },
     });
 
-    if (latestSnapshot) {
+    if (latestSnapshot && latestSnapshot.priceUsd > 0) {
       this._tokenPrices.set(token.id, latestSnapshot.priceUsd);
       this._ctx.log.debug(
         {
