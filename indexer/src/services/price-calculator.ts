@@ -17,17 +17,6 @@ export class PriceCalculator {
    * Tier 1: Direct pairs with stablecoins (most reliable)
    * Tier 2: Pairs with whitelisted base tokens (BTC, ETH, WVARA)
    * Tier 3: Derived pricing from any token with known price
-   *
-   * Example: TST/BTC pair where BTC price is known
-   * - Reserve ratio gives: 1 TST = 0.00001 BTC
-   * - BTC price: $100,000
-   * - TST price: 0.00001 × $100,000 = $1
-   *
-   * @param token - Token to calculate price for
-   * @param pairs - All pairs involving this token
-   * @param tokens - Map of all tokens with their metadata
-   * @param tokenPrices - Map of known token prices (from priceSnapshot)
-   * @returns Token price in USD or null if cannot be determined
    */
   calculateTokenPrice(
     token: Token,
@@ -82,8 +71,6 @@ export class PriceCalculator {
   /**
    * Calculate liquidity-weighted average price from a set of pairs
    * Supports derived pricing: uses known prices of paired tokens
-   *
-   * @private
    */
   private calculatePriceFromPairs(
     token: Token,
