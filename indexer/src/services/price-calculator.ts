@@ -12,12 +12,84 @@ export class PriceCalculator {
 
   /**
    * Calculate token price in USD based on pair reserves
-   * Uses liquidity-weighted average price from all stablecoin pairs
+   * Uses multi-tier pricing strategy with liquidity-weighted average:
+   *
+   * Tier 1: Direct pairs with stablecoins (most reliable)
+   * Tier 2: Pairs with whitelisted base tokens (BTC, ETH, WVARA)
+   * Tier 3: Derived pricing from any token with known price
+   *
+   * Example: TST/BTC pair where BTC price is known
+   * - Reserve ratio gives: 1 TST = 0.00001 BTC
+   * - BTC price: $100,000
+   * - TST price: 0.00001 × $100,000 = $1
+   *
+   * @param token - Token to calculate price for
+   * @param pairs - All pairs involving this token
+   * @param tokens - Map of all tokens with their metadata
+   * @param tokenPrices - Map of known token prices (from priceSnapshot)
+   * @returns Token price in USD or null if cannot be determined
    */
   calculateTokenPrice(
     token: Token,
     pairs: Pair[],
-    tokens: Map<string, Token>
+    tokens: Map<string, Token>,
+    tokenPrices: Map<string, number>
+  ): number | null {
+    if (!pairs.length) {
+      return null;
+    }
+
+    // Tier 1: Direct stablecoin pairs (highest priority)
+    const tier1Price = this.calculatePriceFromPairs(
+      token,
+      pairs.filter((p) => {
+        const otherSymbol =
+          p.token0 === token.id ? p.token1Symbol : p.token0Symbol;
+        return otherSymbol && PriceUtils.isStablecoin(otherSymbol);
+      }),
+      tokens,
+      tokenPrices
+    );
+    if (tier1Price !== null) return tier1Price;
+
+    // Tier 2: Whitelisted base token pairs (high liquidity tokens)
+    const tier2Price = this.calculatePriceFromPairs(
+      token,
+      pairs.filter((p) => {
+        const otherSymbol =
+          p.token0 === token.id ? p.token1Symbol : p.token0Symbol;
+        return otherSymbol && PriceUtils.isWhitelistedBaseToken(otherSymbol);
+      }),
+      tokens,
+      tokenPrices
+    );
+    if (tier2Price !== null) return tier2Price;
+
+    // Tier 3: Any pair with a token that has a known price
+    const tier3Price = this.calculatePriceFromPairs(
+      token,
+      pairs.filter((p) => {
+        const otherTokenId = p.token0 === token.id ? p.token1 : p.token0;
+        return tokenPrices.has(otherTokenId);
+      }),
+      tokens,
+      tokenPrices
+    );
+
+    return tier3Price;
+  }
+
+  /**
+   * Calculate liquidity-weighted average price from a set of pairs
+   * Supports derived pricing: uses known prices of paired tokens
+   *
+   * @private
+   */
+  private calculatePriceFromPairs(
+    token: Token,
+    pairs: Pair[],
+    tokens: Map<string, Token>,
+    tokenPrices: Map<string, number>
   ): number | null {
     if (!pairs.length) {
       return null;
@@ -26,35 +98,49 @@ export class PriceCalculator {
     let totalWeightedPrice = 0;
     let totalWeight = 0;
 
-    // Collect all stablecoin pairs and calculate weighted average
     for (const pair of pairs) {
       const isToken0 = pair.token0 === token.id;
+      const otherTokenId = isToken0 ? pair.token1 : pair.token0;
+      const otherToken = tokens.get(otherTokenId);
+
+      if (!otherToken) continue;
+
+      const tokenReserve = isToken0 ? pair.reserve0 : pair.reserve1;
+      const otherTokenReserve = isToken0 ? pair.reserve1 : pair.reserve0;
+
+      if (tokenReserve === 0n || otherTokenReserve === 0n) continue;
+
+      // Calculate price ratio from reserves (in terms of other token)
+      const priceInOtherToken = PriceUtils.calculatePriceFromReserves(
+        tokenReserve,
+        otherTokenReserve,
+        token.decimals,
+        otherToken.decimals
+      );
+
+      // Get USD price of the other token
+      let otherTokenPriceUSD: number;
+
       const otherTokenSymbol = isToken0 ? pair.token1Symbol : pair.token0Symbol;
-
       if (otherTokenSymbol && PriceUtils.isStablecoin(otherTokenSymbol)) {
-        const tokenReserve = isToken0 ? pair.reserve0 : pair.reserve1;
-        const stablecoinReserve = isToken0 ? pair.reserve1 : pair.reserve0;
-
-        if (tokenReserve > 0n && stablecoinReserve > 0n) {
-          const otherTokenId = isToken0 ? pair.token1 : pair.token0;
-          const otherToken = tokens.get(otherTokenId);
-
-          if (!otherToken) continue;
-
-          const pairPrice = PriceUtils.calculatePriceFromReserves(
-            tokenReserve,
-            stablecoinReserve,
-            token.decimals,
-            otherToken.decimals
-          );
-
-          // Use TVL as weight for the price calculation
-          const weight = pair.tvlUsd || 1;
-
-          totalWeightedPrice += pairPrice * weight;
-          totalWeight += weight;
-        }
+        // Stablecoins are assumed to be $1
+        otherTokenPriceUSD = 1.0;
+      } else if (tokenPrices.has(otherTokenId)) {
+        // Use known price from priceSnapshot
+        otherTokenPriceUSD = tokenPrices.get(otherTokenId)!;
+      } else {
+        // No price available for the paired token
+        continue;
       }
+
+      const derivedPriceUSD = priceInOtherToken * otherTokenPriceUSD;
+
+      // Use liquidity (TVL) as weight for more accurate pricing
+      // High liquidity pairs have more influence on the final price
+      const weight = pair.tvlUsd || 1;
+
+      totalWeightedPrice += derivedPriceUSD * weight;
+      totalWeight += weight;
     }
 
     if (totalWeight === 0) {
@@ -136,12 +222,18 @@ export class PriceCalculator {
     timestamp: Date,
     blockNumber: bigint,
     pairs: Pair[],
-    tokens: Map<string, Token>
+    tokens: Map<string, Token>,
+    tokenPrices: Map<string, number>
   ): Promise<{
     snapshot: TokenPriceSnapshot | null;
   }> {
-    // Calculate current price
-    const currentPrice = this.calculateTokenPrice(token, pairs, tokens);
+    // Calculate current price using multi-tier pricing strategy
+    const currentPrice = this.calculateTokenPrice(
+      token,
+      pairs,
+      tokens,
+      tokenPrices
+    );
     if (!currentPrice) return { snapshot: null };
 
     // Calculate price changes

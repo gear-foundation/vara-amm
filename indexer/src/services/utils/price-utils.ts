@@ -86,6 +86,20 @@ export class PriceUtils {
   }
 
   /**
+   * Check if a token symbol is a whitelisted base token for derived pricing
+   * These are high-liquidity, trusted tokens used as price reference
+   */
+  static isWhitelistedBaseToken(symbol: string): boolean {
+    const baseTokens = [
+      "WVARA", "VARA",  // Native token
+      "WETH", "ETH",     // Ethereum
+      "WBTC", "BTC",     // Bitcoin
+      "WUSDC", "WUSDT", "USDC", "USDT"  // Stablecoins
+    ];
+    return baseTokens.includes(symbol.toUpperCase());
+  }
+
+  /**
    * Calculate percentage change
    */
   static calculatePercentageChange(

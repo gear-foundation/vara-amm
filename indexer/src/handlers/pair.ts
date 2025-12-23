@@ -681,7 +681,8 @@ export class PairsHandler extends BaseHandler {
           timestamp,
           blockNumber,
           this._getPairsForToken(token0.id),
-          this._tokens
+          this._tokens,
+          this._tokenPrices
         );
 
       if (token0Snapshot.snapshot) {
@@ -704,7 +705,8 @@ export class PairsHandler extends BaseHandler {
           timestamp,
           blockNumber,
           this._getPairsForToken(token1.id),
-          this._tokens
+          this._tokens,
+          this._tokenPrices
         );
 
       if (token1Snapshot.snapshot) {
