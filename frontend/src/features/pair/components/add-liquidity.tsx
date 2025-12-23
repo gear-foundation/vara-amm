@@ -440,7 +440,7 @@ const AddLiquidity = ({ pairsTokens, onSuccess, defaultToken0, defaultToken1 }: 
                 {pairAddress ? (
                   <Button
                     type="submit"
-                    disabled={isAddLiquidityPending || !isFormValid}
+                    disabled={isAddLiquidityPending || !isFormValid || isLowLiquidity}
                     className="btn-primary w-full py-4 text-lg">
                     ADD LIQUIDITY
                   </Button>
