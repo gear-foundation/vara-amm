@@ -35,10 +35,9 @@ export class PriceUtils {
   }
 
   /**
-   * Calculate price from reserves (for AMM pairs)
-   * Uses the same formula as GetAmountOut with 0.3% fee (997/1000 multiplier)
-   * Formula: amount_out = (amount_in * 997 * reserve_out) / (reserve_in * 1000 + amount_in * 997)
-   * For price calculation, we use 1 unit of input token to get the price
+   * Calculate mid/spot price from reserves (for Uniswap V2 pairs)
+   * Returns the real pool price without fees or price impact
+   * Formula: price = (otherTokenReserve / tokenReserve) * 10^(tokenDecimals - otherTokenDecimals)
    */
   static calculatePriceFromReserves(
     tokenReserve: bigint,
@@ -50,18 +49,29 @@ export class PriceUtils {
       return 0;
     }
 
-    const amountIn = BigInt(Math.pow(10, tokenDecimals));
-    const numerator = amountIn * 997n * otherTokenReserve;
-    const denominator = tokenReserve * 1000n + amountIn * 997n;
-
-    if (denominator === 0n) {
-      return 0;
+    // Use fixed-point precision Q = 10^18 for accurate division
+    const Q = 10n ** 18n;
+    
+    // Calculate price with Q precision: (otherTokenReserve * Q) / tokenReserve
+    const priceQ = (otherTokenReserve * Q) / tokenReserve;
+    
+    // Adjust for decimal differences
+    const decimalsDiff = tokenDecimals - otherTokenDecimals;
+    let adjustedPriceQ: bigint;
+    
+    if (decimalsDiff > 0) {
+      // tokenDecimals > otherTokenDecimals, multiply by 10^decimalsDiff
+      adjustedPriceQ = priceQ * (10n ** BigInt(decimalsDiff));
+    } else if (decimalsDiff < 0) {
+      // tokenDecimals < otherTokenDecimals, divide by 10^|decimalsDiff|
+      adjustedPriceQ = priceQ / (10n ** BigInt(-decimalsDiff));
+    } else {
+      // Same decimals, no adjustment needed
+      adjustedPriceQ = priceQ;
     }
-
-    const amountOut = numerator / denominator;
-    const priceInOtherToken = this.toHumanAmount(amountOut, otherTokenDecimals);
-
-    return priceInOtherToken;
+    
+    // Convert from Q-precision to number
+    return Number(adjustedPriceQ) / Number(Q);
   }
 
   /**
