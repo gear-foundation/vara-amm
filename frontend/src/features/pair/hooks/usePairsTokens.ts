@@ -21,19 +21,19 @@ const usePairsTokens = (): UsePairsTokensResult => {
   const { pairs } = usePairsQuery();
   const varaSymbol = useVaraSymbol();
   const { account } = useAccount();
-  const { data: tokensResponse } = useTokensWithPrices();
+  const { data: tokensWithPrices, refetch: refetchTokensWithPrices } = useTokensWithPrices();
   const { data: nativeBalance, refetch: refetchNativeBalance } = useDeriveBalancesAll({ address: account?.address });
   const { api } = useApi();
 
   const tokensFdvMap = useMemo(() => {
     const map = new Map<HexString, number>();
 
-    tokensResponse?.allTokens.nodes.forEach((token) => {
+    tokensWithPrices?.allTokens.nodes.forEach((token) => {
       map.set(token.id as HexString, token.tokenPriceSnapshotsByTokenId?.nodes[0]?.fdv ?? 0);
     });
 
     return map;
-  }, [tokensResponse]);
+  }, [tokensWithPrices]);
 
   const vftProgramsRef = useRef<Map<HexString, VftProgram>>(new Map());
   const [vftPrograms, setVftPrograms] = useState<{ address: HexString; program: VftProgram }[]>([]);
@@ -188,7 +188,11 @@ const usePairsTokens = (): UsePairsTokensResult => {
   const refetchBalances = useCallback(() => {
     void refetchTokensData();
     void refetchNativeBalance();
-  }, [refetchTokensData, refetchNativeBalance]);
+    // wait for indexer to update prices
+    setTimeout(() => {
+      void refetchTokensWithPrices();
+    }, 3000);
+  }, [refetchNativeBalance, refetchTokensData, refetchTokensWithPrices]);
 
   return {
     pairsTokens,
