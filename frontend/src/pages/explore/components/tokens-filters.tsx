@@ -37,6 +37,7 @@ export function ExplorePageTokensFilters({
         </SelectTrigger>
         <SelectContent className="card">
           <SelectItem value="all">All tokens</SelectItem>
+          <SelectItem value="usdt">BTC</SelectItem>
           <SelectItem value="eth">ETH</SelectItem>
           <SelectItem value="vara">VARA</SelectItem>
           <SelectItem value="usdc">USDC</SelectItem>
