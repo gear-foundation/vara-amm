@@ -9,9 +9,7 @@ pair-app = { path = "app" }
 extended-vft = { git = "https://github.com/gear-foundation/standards/"}
 
 [build-dependencies]
-pair-app = { path = "app" }
 sails-rs = { workspace = true, features = ["wasm-builder"] }
-sails-idl-gen.workspace = true
 
 [dev-dependencies]
 pair = { path = ".", features = ["wasm-binary"] }

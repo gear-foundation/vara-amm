@@ -41,9 +41,18 @@ impl TestEnv {
         fee_to: ActorId,
         treasury_id: ActorId,
     ) -> (ActorId, ActorId, ActorId) {
+        let release_path = "../target/wasm32-gear/release/extended_vft.opt.wasm";
+        let debug_path = "../target/wasm32-gear/debug/extended_vft.opt.wasm";
+
+        let wasm_path = if std::path::Path::new(release_path).exists() {
+            release_path
+        } else {
+            debug_path
+        };
+
         let token_code_id = remoting
             .system()
-            .submit_code_file("../target/wasm32-gear/release/extended_vft.opt.wasm");
+            .submit_code_file(wasm_path);
 
         let token_factory = extended_vft_client::ExtendedVftFactory::new(remoting.clone());
 
