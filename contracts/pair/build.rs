@@ -1,3 +1,8 @@
 fn main() {
-    sails_rs::build_wasm();
+    if let Some((_, wasm_path)) = sails_rs::build_wasm() {
+        sails_rs::ClientBuilder::<pair_app::PairProgram>::from_wasm_path(
+            wasm_path.with_extension(""),
+        )
+        .build_idl();
+    }
 }

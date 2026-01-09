@@ -1422,9 +1422,9 @@ dependencies = [
 [[package]]
 name = "extended-vft"
 version = "1.1.0"
-source = "git+https://github.com/gear-foundation/standards/#004dfba2ff3ac1ef12cb16b7f6f20a57605a5f28"
+source = "git+https://github.com/gear-foundation/standards/?rev=004dfba2ff3ac1ef12cb16b7f6f20a57605a5f28#004dfba2ff3ac1ef12cb16b7f6f20a57605a5f28"
 dependencies = [
- "extended-vft-app 0.1.0 (git+https://github.com/gear-foundation/standards/)",
+ "extended-vft-app",
  "sails-idl-gen",
  "sails-rs",
 ]
@@ -1436,17 +1436,7 @@ source = "git+https://github.com/gear-foundation/standards/?rev=004dfba2ff3ac1ef
 dependencies = [
  "gstd",
  "sails-rs",
- "vft-service 1.1.0 (git+https://github.com/gear-foundation/standards/?rev=004dfba2ff3ac1ef12cb16b7f6f20a57605a5f28)",
-]
-
-[[package]]
-name = "extended-vft-app"
-version = "0.1.0"
-source = "git+https://github.com/gear-foundation/standards/#004dfba2ff3ac1ef12cb16b7f6f20a57605a5f28"
-dependencies = [
- "gstd",
- "sails-rs",
- "vft-service 1.1.0 (git+https://github.com/gear-foundation/standards/)",
+ "vft-service",
 ]
 
 [[package]]
@@ -1454,18 +1444,7 @@ name = "extended-vft-client"
 version = "0.1.0"
 source = "git+https://github.com/gear-foundation/standards/?rev=004dfba2ff3ac1ef12cb16b7f6f20a57605a5f28#004dfba2ff3ac1ef12cb16b7f6f20a57605a5f28"
 dependencies = [
- "extended-vft-app 0.1.0 (git+https://github.com/gear-foundation/standards/?rev=004dfba2ff3ac1ef12cb16b7f6f20a57605a5f28)",
- "sails-client-gen",
- "sails-idl-gen",
- "sails-rs",
-]
-
-[[package]]
-name = "extended-vft-client"
-version = "0.1.0"
-source = "git+https://github.com/gear-foundation/standards/#004dfba2ff3ac1ef12cb16b7f6f20a57605a5f28"
-dependencies = [
- "extended-vft-app 0.1.0 (git+https://github.com/gear-foundation/standards/)",
+ "extended-vft-app",
  "sails-client-gen",
  "sails-idl-gen",
  "sails-rs",
@@ -1499,8 +1478,6 @@ version = "0.1.0"
 dependencies = [
  "factory-app",
  "mockall",
- "sails-client-gen",
- "sails-idl-gen",
  "sails-rs",
 ]
 
@@ -3547,7 +3524,7 @@ name = "pair"
 version = "1.1.0"
 dependencies = [
  "extended-vft",
- "extended-vft-client 0.1.0 (git+https://github.com/gear-foundation/standards/)",
+ "extended-vft-client",
  "pair",
  "pair-app",
  "pair-client",
@@ -3560,12 +3537,12 @@ dependencies = [
 name = "pair-app"
 version = "0.1.0"
 dependencies = [
- "extended-vft-client 0.1.0 (git+https://github.com/gear-foundation/standards/?rev=004dfba2ff3ac1ef12cb16b7f6f20a57605a5f28)",
+ "extended-vft-client",
  "gstd",
  "parity-scale-codec",
  "sails-rs",
  "scale-info",
- "vft-service 1.1.0 (git+https://github.com/gear-foundation/standards/?rev=004dfba2ff3ac1ef12cb16b7f6f20a57605a5f28)",
+ "vft-service",
 ]
 
 [[package]]
@@ -3574,8 +3551,6 @@ version = "0.1.0"
 dependencies = [
  "mockall",
  "pair-app",
- "sails-client-gen",
- "sails-idl-gen",
  "sails-rs",
 ]
 
@@ -4410,6 +4385,7 @@ version = "0.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5d51878ab518a818da2fe78a080f1c01946b884ae2897cd8f569bc3334dea9a9"
 dependencies = [
+ "convert_case 0.7.1",
  "futures",
  "gcore",
  "gear-core",
@@ -4425,6 +4401,8 @@ dependencies = [
  "parity-scale-codec",
  "paste",
  "pin-project-lite",
+ "sails-client-gen",
+ "sails-idl-gen",
  "sails-idl-meta",
  "sails-macros",
  "scale-info",
@@ -5959,18 +5937,6 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 name = "vft-service"
 version = "1.1.0"
 source = "git+https://github.com/gear-foundation/standards/?rev=004dfba2ff3ac1ef12cb16b7f6f20a57605a5f28#004dfba2ff3ac1ef12cb16b7f6f20a57605a5f28"
-dependencies = [
- "gstd",
- "log",
- "parity-scale-codec",
- "sails-rs",
- "scale-info",
-]
-
-[[package]]
-name = "vft-service"
-version = "1.1.0"
-source = "git+https://github.com/gear-foundation/standards/#004dfba2ff3ac1ef12cb16b7f6f20a57605a5f28"
 dependencies = [
  "gstd",
  "log",

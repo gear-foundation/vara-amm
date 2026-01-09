@@ -201,7 +201,7 @@ pub async fn remove_liquidity(
 pub async fn migrate_all_liquidity(
     state: &mut State,
     target: ActorId,
-) -> Result<PairEvent, PairError>  {
+) -> Result<PairEvent, PairError> {
     if state.migrated {
         return Err(PairError::PoolMigrated);
     }
@@ -219,18 +219,8 @@ pub async fn migrate_all_liquidity(
     state.lock = true;
     let program_id = exec::program_id();
 
-    let balance0 = token_operations::balance_of(
-        state.token0,
-        program_id,
-        &state.config,
-    )
-    .await?;
-    let balance1 = token_operations::balance_of(
-        state.token1,
-        program_id,
-        &state.config,
-    )
-    .await?;
+    let balance0 = token_operations::balance_of(state.token0, program_id, &state.config).await?;
+    let balance1 = token_operations::balance_of(state.token1, program_id, &state.config).await?;
 
     if balance0.is_zero() && balance1.is_zero() {
         return Err(PairError::NoLiquidityToMigrate);
@@ -633,7 +623,6 @@ async fn return_tokens_from_pool(
     amount_a: U256,
     amount_b: U256,
 ) -> Result<(), PairError> {
-    
     let msg_id = msg::id();
 
     msg_tracker_mut().insert_msg_status(msg_id, MessageStatus::SendingMsgToUnlockTokenA);
