@@ -36,6 +36,7 @@ pub struct Config {
 }
 static mut STATE: Option<State> = None;
 
+#[event]
 #[derive(Debug, Decode, Encode, TypeInfo)]
 pub enum FactoryEvent {
     PairCreated {
@@ -73,12 +74,14 @@ impl FactoryService {
     }
 }
 
-#[sails_rs::service(events = FactoryEvent)]
 impl FactoryService {
     pub fn new() -> Self {
         Self(())
     }
-
+}
+#[sails_rs::service(events = FactoryEvent)]
+impl FactoryService {
+    #[export]
     pub async fn create_pair(&mut self, token0: ActorId, token1: ActorId) {
         let state = self.get_mut();
         let (token0, token1) = sort_tokens(token0, token1);
@@ -128,6 +131,7 @@ impl FactoryService {
         .expect("Error during event emission");
     }
 
+    #[export]
     pub fn change_fee_to(&mut self, fee_to: ActorId) {
         let state = self.get();
         if msg::source() != state.admin {
@@ -142,6 +146,7 @@ impl FactoryService {
         }
     }
 
+    #[export]
     pub fn add_pair(&mut self, token0: ActorId, token1: ActorId, pair_address: ActorId) {
         let state = self.get_mut();
         if msg::source() != state.admin {
@@ -157,6 +162,8 @@ impl FactoryService {
         })
         .expect("Error during event emission");
     }
+
+    #[export]
     pub fn change_treasury_id(&mut self, new_treasury_id: ActorId) {
         let state = self.get();
         if msg::source() != state.admin {
@@ -166,18 +173,22 @@ impl FactoryService {
         self.get_mut().treasury_id = new_treasury_id;
     }
 
+    #[export]
     pub fn fee_to(&self) -> ActorId {
         self.get().fee_to
     }
 
+    #[export]
     pub fn treasury_id(&self) -> ActorId {
         self.get().treasury_id
     }
 
+    #[export]
     pub fn pairs(&self) -> Vec<((ActorId, ActorId), ActorId)> {
         self.get().pairs.iter().map(|(k, v)| (*k, *v)).collect()
     }
 
+    #[export]
     pub fn get_pair(&self, token0: ActorId, token1: ActorId) -> ActorId {
         let (token0, token1) = sort_tokens(token0, token1);
         *(self

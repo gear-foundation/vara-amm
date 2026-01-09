@@ -14,7 +14,7 @@ impl TestEnv {
     pub async fn new(treasury_id: ActorId) -> Self {
         let system = System::new();
         system.init_logger();
-        system.mint_to(ACTOR_ID, 100_000_000_000_000);
+        system.mint_to(ACTOR_ID, 1_000_000_000_000_000);
 
         let remoting = GTestRemoting::new(system, ACTOR_ID.into());
 
@@ -86,7 +86,7 @@ impl TestEnv {
     }
 
     pub async fn setup_user(&self, user_id: u64, token_amount: U256) {
-        self.remoting.system().mint_to(user_id, 100_000_000_000_000);
+        self.remoting.system().mint_to(user_id, 1_000_000_000_000_000);
         self.mint_and_approve_tokens(user_id.into(), token_amount)
             .await;
     }

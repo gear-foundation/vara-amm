@@ -35,6 +35,7 @@ pub struct State {
 }
 static mut STATE: Option<State> = None;
 
+#[event]
 #[derive(Debug, Encode, Decode, TypeInfo)]
 pub enum PairEvent {
     LiquidityAdded {
@@ -156,12 +157,16 @@ macro_rules! event_or_panic_async {
         }
     }};
 }
-#[sails_rs::service(events = PairEvent)]
+
 impl PairService {
     pub fn new(vft_exposure: VftExposure) -> Self {
         Self { vft_exposure }
     }
+}
+#[sails_rs::service(events = PairEvent)]
+impl PairService {
 
+    #[export]
     pub async fn add_liquidity(
         &mut self,
         amount_a_desired: U256,
@@ -197,6 +202,7 @@ impl PairService {
     /// 4. Validates amounts against minimum thresholds
     /// 5. Burns user's LP tokens and transfers underlying tokens back
     /// 6. Updates pool reserves
+    #[export]
     pub async fn remove_liquidity(
         &mut self,
         liquidity: U256,
@@ -224,6 +230,7 @@ impl PairService {
     /// NOTE:
     /// - Intended for final pool shutdown / migration to a new contract.
     /// - Should be callable only by an admin
+    #[export]
     pub async fn migrate_all_liquidity(&mut self,target: ActorId) {
         let event = event_or_panic_async!(funcs::migrate_all_liquidity(
             self.get_mut(),
@@ -240,6 +247,7 @@ impl PairService {
     /// * `amount_out_min` - Minimum amount of output token expected (slippage protection)
     /// * `is_token0_to_token1` - Direction of swap (true: token0 to token1, false: token1 to token0)
     /// * `deadline` - Unix timestamp after which the transaction will revert
+    #[export]
     pub async fn swap_exact_tokens_for_tokens(
         &mut self,
         amount_in: U256,
@@ -265,6 +273,7 @@ impl PairService {
     /// * `amount_in_max` - Maximum amount of input token willing to pay (slippage protection)
     /// * `is_token0_to_token1` - Direction of swap (true: token0 to token1, false: token1 to token0)
     /// * `deadline` - Unix timestamp after which the transaction will revert
+    #[export]
     pub async fn swap_tokens_for_exact_tokens(
         &mut self,
         amount_out: U256,
@@ -282,11 +291,13 @@ impl PairService {
         self.emit_event(event).expect("Event emission error");
     }
 
+    #[export]
     pub async fn send_treasury_fees(&mut self) {
         let event = event_or_panic_async!(funcs::send_treasury_fees_from_pool(self.get_mut(),));
         self.emit_event(event).expect("Event emission error");
     }
 
+    #[export]
     pub async fn set_lock(&mut self, lock: bool) {
         let state = self.get_mut();
         if msg::source() == state.admin_id {
@@ -305,6 +316,7 @@ impl PairService {
     /// returns 0.
     ///
     /// Can be called for estimation or off-chain calculations. Does not modify state.
+    #[export]
     pub fn calculate_protocol_fee(&self) -> U256 {
         funcs::calculate_protocol_fee(self.get()).unwrap_or_default()
     }
@@ -313,6 +325,7 @@ impl PairService {
     ///
     /// Similar to calculate_lp_fee, but returns the share of LP fees for a user with a given
     /// LP token balance (pro-rata based on `user_lp_balance / total_supply`). Returns 0 if no growth.
+    #[export]
     pub fn calculate_lp_user_fee(&self, user: ActorId) -> U256 {
         let user_lp_balance = VftService::balance_of(user);
         funcs::calculate_lp_user_fee(self.get(), user_lp_balance).unwrap_or_default()
@@ -324,6 +337,7 @@ impl PairService {
     /// It accounts for protocol fees (by simulating mint_fee dilution), calculates pro-rata shares
     /// based on reserves (assuming they include swap fees), and sorts amounts by token_a/token_b.
     /// Does not modify state or perform any transactions.
+    #[export]
     pub fn calculate_remove_liquidity(&self, liquidity: U256) -> (U256, U256) {
         funcs::calculate_remove_liquidity(self.get(), liquidity).unwrap_or_default()
     }
@@ -343,6 +357,7 @@ impl PairService {
     /// # Arguments
     /// * `amount_in` - Amount of input asset being swapped
     /// * `is_token0_to_token1` - Direction of swap (true: token0 to token1, false: token1 to token0)
+    #[export]
     pub fn get_amount_out(&self, amount_in: U256, is_token0_to_token1: bool) -> U256 {
         let state = self.get();
         let (reserve_in, reserve_out) = if is_token0_to_token1 {
@@ -376,6 +391,7 @@ impl PairService {
     /// # Arguments
     /// * `amount_out` - Desired amount of output asset
     /// * `is_token0_to_token1` - Direction of swap (true: token0 to token1, false: token1 to token0)
+    #[export]
     pub fn get_amount_in(&self, amount_out: U256, is_token0_to_token1: bool) -> U256 {
         let state = self.get();
         let (reserve_in, reserve_out) = if is_token0_to_token1 {
@@ -394,6 +410,7 @@ impl PairService {
             .unwrap_or_default()
     }
 
+    #[export]
     pub fn change_fee_to(&mut self, new_fee_to: ActorId) {
         let state = self.get_mut();
         if msg::source() == state.factory_id {
@@ -403,6 +420,7 @@ impl PairService {
         }
     }
 
+    #[export]
     pub fn change_treasury_id(&mut self, new_treasury_id: ActorId) {
         let state = self.get_mut();
         if msg::source() == state.admin_id {
@@ -412,26 +430,32 @@ impl PairService {
         }
     }
 
+    #[export]
     pub fn treasury_id(&self) -> ActorId {
         self.get().treasury_id
     }
+
+    #[export]
     pub fn get_reserves(&self) -> (U256, U256) {
         (self.get().reserve0, self.get().reserve1)
     }
 
+    #[export]
     pub fn msgs_in_msg_tracker(&self) -> Vec<(MessageId, MessageStatus)> {
         msg_tracker_ref().message_info.clone().into_iter().collect()
     }
 
+    #[export]
     pub fn lock(&self) -> bool {
         self.get().lock
     }
 
+    #[export]
     pub fn migrated(&self) -> bool {
         self.get().migrated
     }
 
-
+    #[export]
     pub fn get_tokens(&self) -> (ActorId, ActorId) {
         let state = self.get();
         (state.token0, state.token1)
@@ -441,6 +465,7 @@ impl PairService {
     /// - treasury address,
     /// - accrued fee in token0,
     /// - accrued fee in token1.
+    #[export]
     pub fn get_treasury_info(&self) -> (ActorId, U256, U256) {
         let state = self.get();
         (
