@@ -11,7 +11,6 @@ mod token_operations;
 use crate::services::lp_token::ExtendedService as VftService;
 use gstd::static_mut;
 type VftExposure = <VftService as Svc>::Exposure;
-type PairExposure = <PairService as Svc>::Exposure;
 
 pub struct PairService {
     vft_exposure: VftExposure,
@@ -28,6 +27,11 @@ pub struct State {
     k_last: U256,
     config: Config,
     lock: bool,
+    treasury_id: ActorId,
+    admin_id: ActorId,
+    migrated: bool,
+    accrued_treasury_fee0: U256,
+    accrued_treasury_fee1: U256,
 }
 static mut STATE: Option<State> = None;
 
@@ -50,6 +54,16 @@ pub enum PairEvent {
         amount_a: U256,
         amount_b: U256,
         liquidity: U256,
+    },
+    TreasuryFeesCollected {
+        treasury_id: ActorId,
+        amount_a: U256,
+        amount_b: U256,
+    },
+    LiquidityMigrated {
+        to: ActorId,
+        amount0: U256,
+        amount1: U256,
     },
 }
 
@@ -74,6 +88,12 @@ pub enum PairError {
     TokenTransferFailed,
     ReplyHook,
     ZeroLiquidity,
+    Unauthorized,
+    NoTreasuryFees,
+    NotTreasuryId,
+    NoLiquidityToMigrate,
+    PoolMigrated,
+    UnableToDecode,
 }
 
 /// Config that will be used to send messages to the other programs.
@@ -93,7 +113,14 @@ pub struct Config {
 }
 
 impl PairService {
-    pub fn init(config: Config, token0: ActorId, token1: ActorId, fee_to: ActorId, pair_exposure: PairExposure) {
+    pub fn init(
+        config: Config,
+        token0: ActorId,
+        token1: ActorId,
+        fee_to: ActorId,
+        treasury_id: ActorId,
+        admin_id: ActorId,
+    ) {
         unsafe {
             STATE = Some(State {
                 token0,
@@ -101,11 +128,12 @@ impl PairService {
                 config,
                 fee_to,
                 factory_id: msg::source(),
+                treasury_id,
+                admin_id,
                 ..Default::default()
             })
         }
         msg_tracker::init();
-
     }
     fn get_mut(&mut self) -> &'static mut State {
         unsafe { STATE.as_mut().expect("State is not initialized") }
@@ -187,6 +215,23 @@ impl PairService {
         self.emit_event(event).expect("Event emission error");
     }
 
+    /// Migrates all pool liquidity and accrued treasury fees to a target address.
+    ///
+    /// After migration:
+    /// - `reserve0`, `reserve1`, `k_last`,
+    ///   `accrued_treasury_fee0`, `accrued_treasury_fee1` are reset to zero.
+    ///
+    /// NOTE:
+    /// - Intended for final pool shutdown / migration to a new contract.
+    /// - Should be callable only by an admin
+    pub async fn migrate_all_liquidity(&mut self,target: ActorId) {
+        let event = event_or_panic_async!(funcs::migrate_all_liquidity(
+            self.get_mut(),
+            target
+        ));
+        self.emit_event(event).expect("Event emission error");
+    }
+
     /// Swaps an exact amount of input tokens for as many output tokens as possible in a single pair.
     /// Direction is specified by is_token0_to_token1 (true for token0 -> token1, false for token1 -> token0).
     /// Combines high-level swap logic with low-level swap execution for a single-contract setup.
@@ -237,6 +282,19 @@ impl PairService {
         self.emit_event(event).expect("Event emission error");
     }
 
+    pub async fn send_treasury_fees(&mut self) {
+        let event = event_or_panic_async!(funcs::send_treasury_fees_from_pool(self.get_mut(),));
+        self.emit_event(event).expect("Event emission error");
+    }
+
+    pub async fn set_lock(&mut self, lock: bool) {
+        let state = self.get_mut();
+        if msg::source() == state.admin_id {
+            state.lock = lock;
+        } else {
+            panic!("Not admin")
+        }
+    }
     /// Calculates protocol fees for the liquidity pool, similar to Uniswap V2, without minting.
     ///
     /// This function checks if protocol fees are enabled (via `fee_to` address) and calculates
@@ -270,10 +328,18 @@ impl PairService {
         funcs::calculate_remove_liquidity(self.get(), liquidity).unwrap_or_default()
     }
 
-    /// Calculates the maximum output amount of the other asset given an input amount and pair reserves.
-    /// This accounts for a 0.3% fee (997/1000 multiplier).
-    /// Formula: amount_out = (amount_in * 997 * reserve_out) / (reserve_in * 1000 + amount_in * 997)
+    /// Calculates the expected output amount for a swap, given the input amount and
+    /// current reserves, including both the internal 0.3% swap fee (Uniswap-style)
+    /// and the optional treasury fee in the input token.
     /// Uses floor division
+    ///
+    /// - If `treasury` is configured (non-zero address), the input is split into:
+    ///     * a small part reserved as treasury fee (e.g. 0.05%), and
+    ///     * the remaining part that actually enters the pool and is priced
+    ///       with the Uniswap V2 formula (0.3% fee via 997/1000 multiplier).
+    /// - If `treasury` is not configured (zero address), the behavior matches
+    ///   the classic Uniswap V2 `getAmountOut` with 0.3% fee.
+    ///
     /// # Arguments
     /// * `amount_in` - Amount of input asset being swapped
     /// * `is_token0_to_token1` - Direction of swap (true: token0 to token1, false: token1 to token0)
@@ -284,13 +350,29 @@ impl PairService {
         } else {
             (state.reserve1, state.reserve0)
         };
-        amm_math::get_amount_out(amount_in, reserve_in, reserve_out).unwrap_or_default()
+        let treasury_fee_bps = if state.treasury_id.is_zero() {
+            0
+        } else {
+            amm_math::TREASURY_FEE_BPS
+        };
+        amm_math::get_amount_out_with_treasury(amount_in, reserve_in, reserve_out, treasury_fee_bps)
+            .map(|(_, amount_out, _)| amount_out)
+            .unwrap_or_default()
     }
 
-    /// Calculates the required input amount of an asset given a desired output amount and pair reserves.
-    /// This accounts for a 0.3% fee (997/1000 multiplier).
-    /// Formula: amount_in = (reserve_in * amount_out * 1000) / (reserve_out - amount_out) * 997) + 1
-    /// Uses floor division and adds 1 to ensure sufficient input (ceiling effect).
+    /// Calculates the required input amount for a desired output, given current reserves,
+    /// including both the internal 0.3% swap fee (Uniswap-style) and the optional
+    /// treasury fee in the input token.
+    ///
+    /// - First, the function determines how much must actually enter the pool
+    ///   (`amount_in_for_pool`) using the standard Uniswap 0.3% math.
+    /// - Then, if treasury fee is enabled, it computes a higher total input
+    ///   `amount_in_total` such that:
+    ///       amount_in_for_pool = amount_in_total * (1 - treasury_fee_bps / 10_000)
+    ///   and the difference `amount_in_total - amount_in_for_pool` is the treasury fee.
+    /// - If treasury is disabled, the result matches classic Uniswap V2
+    ///   `getAmountIn` with 0.3% fee.
+    ///
     /// # Arguments
     /// * `amount_out` - Desired amount of output asset
     /// * `is_token0_to_token1` - Direction of swap (true: token0 to token1, false: token1 to token0)
@@ -301,7 +383,15 @@ impl PairService {
         } else {
             (state.reserve1, state.reserve0)
         };
-        amm_math::get_amount_in(amount_out, reserve_in, reserve_out).unwrap_or_default()
+        let treasury_fee_bps = if state.treasury_id.is_zero() {
+            0
+        } else {
+            amm_math::TREASURY_FEE_BPS
+        };
+
+        amm_math::get_amount_in_with_treasury(amount_out, reserve_in, reserve_out, treasury_fee_bps)
+            .map(|(_, amount_in_total, _)| amount_in_total)
+            .unwrap_or_default()
     }
 
     pub fn change_fee_to(&mut self, new_fee_to: ActorId) {
@@ -313,6 +403,18 @@ impl PairService {
         }
     }
 
+    pub fn change_treasury_id(&mut self, new_treasury_id: ActorId) {
+        let state = self.get_mut();
+        if msg::source() == state.admin_id {
+            state.treasury_id = new_treasury_id;
+        } else {
+            panic!("Not admin")
+        }
+    }
+
+    pub fn treasury_id(&self) -> ActorId {
+        self.get().treasury_id
+    }
     pub fn get_reserves(&self) -> (U256, U256) {
         (self.get().reserve0, self.get().reserve1)
     }
@@ -325,8 +427,26 @@ impl PairService {
         self.get().lock
     }
 
+    pub fn migrated(&self) -> bool {
+        self.get().migrated
+    }
+
+
     pub fn get_tokens(&self) -> (ActorId, ActorId) {
         let state = self.get();
         (state.token0, state.token1)
+    }
+
+    /// Returns basic treasury info:
+    /// - treasury address,
+    /// - accrued fee in token0,
+    /// - accrued fee in token1.
+    pub fn get_treasury_info(&self) -> (ActorId, U256, U256) {
+        let state = self.get();
+        (
+            state.treasury_id,
+            state.accrued_treasury_fee0,
+            state.accrued_treasury_fee1,
+        )
     }
 }

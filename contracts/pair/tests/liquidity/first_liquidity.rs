@@ -2,7 +2,8 @@ use crate::*;
 
 #[tokio::test]
 async fn test_first_liquidity_balanced_amounts() {
-    let mut env = TestEnv::new().await;
+    let treasury_id = ActorId::zero();
+    let mut env = TestEnv::new(treasury_id).await;
     let user = ACTOR_ID.into();
 
     let amount_a = U256::from(10) * U256::exp10(18); // 10 tokens
@@ -66,7 +67,8 @@ async fn test_first_liquidity_balanced_amounts() {
 
 #[tokio::test]
 async fn test_first_liquidity_minimum_amounts() {
-    let mut env = TestEnv::new().await;
+    let treasury_id = ActorId::zero();
+    let mut env = TestEnv::new(treasury_id).await;
     let user = ACTOR_ID.into();
 
     // Test with very small amounts
@@ -92,7 +94,8 @@ async fn test_first_liquidity_minimum_amounts() {
 
 #[tokio::test]
 async fn test_first_liquidity_maximum_amounts() {
-    let mut env = TestEnv::new().await;
+    let treasury_id = ActorId::zero();
+    let mut env = TestEnv::new(treasury_id).await;
     let user = ACTOR_ID.into();
 
     // Test with very large amounts

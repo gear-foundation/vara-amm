@@ -11,7 +11,7 @@ pub struct TestEnv {
 }
 
 impl TestEnv {
-    pub async fn new() -> Self {
+    pub async fn new(treasury_id: ActorId) -> Self {
         let system = System::new();
         system.init_logger();
         system.mint_to(ACTOR_ID, 100_000_000_000_000);
@@ -19,7 +19,7 @@ impl TestEnv {
         let remoting = GTestRemoting::new(system, ACTOR_ID.into());
 
         let (token_a, token_b, pair_id) =
-            TestEnv::setup_tokens_and_pair(&remoting, FEE_TO.into()).await;
+            TestEnv::setup_tokens_and_pair(&remoting, FEE_TO.into(), treasury_id).await;
 
         let pair_client = pair_client::Pair::new(remoting.clone());
         let lp_vft_client = pair_client::Vft::new(remoting.clone());
@@ -39,6 +39,7 @@ impl TestEnv {
     pub async fn setup_tokens_and_pair(
         remoting: &GTestRemoting,
         fee_to: ActorId,
+        treasury_id: ActorId,
     ) -> (ActorId, ActorId, ActorId) {
         let token_code_id = remoting
             .system()
@@ -47,13 +48,13 @@ impl TestEnv {
         let token_factory = extended_vft_client::ExtendedVftFactory::new(remoting.clone());
 
         let token_a = token_factory
-            .new("TokenA".to_string(), "TokenA".to_string(), 18)
+            .new("TokenA".to_string(), "TokenA".to_string(), 6)
             .send_recv(token_code_id, b"salt1")
             .await
             .unwrap();
 
         let token_b = token_factory
-            .new("TokenB".to_string(), "TokenB".to_string(), 18)
+            .new("TokenB".to_string(), "TokenB".to_string(), 12)
             .send_recv(token_code_id, b"salt2")
             .await
             .unwrap();
@@ -69,7 +70,14 @@ impl TestEnv {
         };
 
         let pair_id = program_factory
-            .new(config, token_a, token_b, fee_to)
+            .new(
+                config,
+                token_a,
+                token_b,
+                fee_to,
+                treasury_id,
+                ACTOR_ID.into(),
+            )
             .send_recv(program_code_id, b"salt")
             .await
             .unwrap();

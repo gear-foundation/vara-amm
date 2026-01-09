@@ -2,7 +2,8 @@ use crate::*;
 
 #[tokio::test]
 async fn test_exact_output_swap_with_fee() {
-    let mut env = TestEnv::new().await;
+    let treasury_id = ActorId::zero();
+    let mut env = TestEnv::new(treasury_id).await;
     let user = ActorId::from(ACTOR_ID);
 
     // Setup liquidity with 1:1 ratio for simplicity
@@ -118,11 +119,12 @@ async fn test_exact_output_swap_with_fee() {
 #[tokio::test]
 async fn test_exact_output_swap_property_based_swap_invariants() {
     let mut rng = StdRng::seed_from_u64(12345);
+    let treasury_id = ActorId::zero();
 
     for iteration in 0..50 {
         println!("Property test iteration {}", iteration + 1);
 
-        let mut env = TestEnv::new().await;
+        let mut env = TestEnv::new(treasury_id).await;
         let user = ActorId::from(100);
 
         // Generate random but reasonable liquidity amounts
@@ -239,7 +241,8 @@ async fn test_exact_output_swap_property_based_swap_invariants() {
 // Edge cases: very large amounts (near liquidity limits)
 #[tokio::test]
 async fn test_exact_output_swap_edge_case_very_large_amounts() {
-    let mut env = TestEnv::new().await;
+    let treasury_id = ActorId::zero();
+    let mut env = TestEnv::new(treasury_id).await;
     let user = ActorId::from(ACTOR_ID);
 
     // Setup with large liquidity
@@ -309,7 +312,8 @@ async fn test_exact_output_swap_edge_case_very_large_amounts() {
 // Edge cases: very small amounts
 #[tokio::test]
 async fn test_exact_output_swap_edge_case_very_small_amounts() {
-    let mut env = TestEnv::new().await;
+    let treasury_id = ActorId::zero();
+    let mut env = TestEnv::new(treasury_id).await;
     let user = ActorId::from(ACTOR_ID);
 
     // Setup with normal liquidity
@@ -382,7 +386,8 @@ async fn test_exact_output_swap_edge_case_very_small_amounts() {
 // Edge cases: extreme price ratios
 #[tokio::test]
 async fn test_edge_case_extreme_price_ratios() {
-    let mut env = TestEnv::new().await;
+    let treasury_id = ActorId::zero();
+    let mut env = TestEnv::new(treasury_id).await;
 
     // Test 1: Very expensive token B (1:1000 ratio)
     let liquidity_a = U256::from(1000000) * U256::exp10(18);
@@ -451,7 +456,8 @@ async fn test_edge_case_extreme_price_ratios() {
 // Test insufficient liquidity scenarios
 #[tokio::test]
 async fn test_exact_output_swap_edge_case_insufficient_liquidity() {
-    let mut env = TestEnv::new().await;
+    let treasury_id = ActorId::zero();
+    let mut env = TestEnv::new(treasury_id).await;
     let user = ActorId::from(42);
 
     // Setup minimal liquidity

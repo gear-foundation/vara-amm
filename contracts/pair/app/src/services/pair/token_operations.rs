@@ -3,7 +3,7 @@ use crate::services::pair::{
     msg_tracker::{MessageStatus, MessageTracker, msg_tracker_mut},
     state_mut,
 };
-use extended_vft_client::vft::io::{Transfer, TransferFrom};
+use extended_vft_client::vft::io::{Transfer, TransferFrom, BalanceOf};
 use sails_rs::{U256, calls::ActionIo, gstd::msg, prelude::*};
 
 pub async fn transfer_from(
@@ -46,6 +46,7 @@ pub async fn transfer(
     )
     .await
 }
+
 /// Configure parameters for message sending and send message
 /// asyncronously waiting for the reply.
 ///
@@ -76,6 +77,7 @@ async fn send_message_with_gas_for_reply(
 
     fetch_transfer_result(&*msg_tracker_mut(), &msg_id)
 }
+
 
 /// Handle reply received from `VFT` program.
 ///
@@ -130,6 +132,15 @@ fn handle_reply_hook(msg_id: MessageId) {
             let reply = decode_transfer_reply(&reply_bytes);
             msg_tracker.update_msg_status(msg_id, MessageStatus::TokenBUnlocked(reply));
         }
+        MessageStatus::SendingTreasuryTokenA => {
+            let reply = decode_transfer_reply(&reply_bytes);
+            msg_tracker.update_msg_status(msg_id, MessageStatus::TreasuryTokenASent(reply));
+        }
+
+        MessageStatus::SendingTreasuryTokenB => {
+            let reply = decode_transfer_reply(&reply_bytes);
+            msg_tracker.update_msg_status(msg_id, MessageStatus::TreasuryTokenBSent(reply));
+        }
         _ => {}
     };
 }
@@ -156,6 +167,8 @@ fn fetch_transfer_result(
         | MessageStatus::TokenOutTransfered(success)
         | MessageStatus::TokenInReturnComplete(success)
         | MessageStatus::TokenAUnlocked(success)
+        | MessageStatus::TreasuryTokenASent(success)
+        | MessageStatus::TreasuryTokenBSent(success)
         | MessageStatus::TokenBUnlocked(success) => *success,
         _ => return Err(PairError::InvalidMessageStatus),
     };
@@ -164,6 +177,29 @@ fn fetch_transfer_result(
     } else {
         Err(PairError::TokenTransferFailed)
     }
+}
+
+pub async fn balance_of(
+    token_id: ActorId,
+    account_id: ActorId,
+    config: &Config,
+) -> Result<U256, PairError> {
+    let bytes: Vec<u8> = BalanceOf::encode_call(account_id);
+
+    let reply_bytes = sails_rs::gstd::msg::send_bytes_with_gas_for_reply(
+        token_id,
+        bytes,
+        config.gas_for_token_ops,
+        0,
+        config.gas_for_reply_deposit,
+    )
+    .map_err(|_| PairError::SendFailure)?
+    .up_to(Some(config.reply_timeout))
+    .map_err(|_| PairError::ReplyTimeout)?
+    .await
+    .map_err(|_| PairError::ReplyFailure)?;
+
+    BalanceOf::decode_reply(&reply_bytes).map_err(|_| PairError::UnableToDecode)
 }
 
 /// Decode reply received from the TransferFrom method.

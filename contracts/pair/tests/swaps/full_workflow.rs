@@ -2,7 +2,8 @@ use crate::*;
 
 #[tokio::test]
 async fn test_multiple_lps_with_swap_fees_and_withdrawal() {
-    let mut env = TestEnv::new().await;
+    let treasury_id = ActorId::zero();
+    let mut env = TestEnv::new(treasury_id).await;
 
     // Setup 5 liquidity providers + 1 swapper
     let lp_users = vec![
@@ -169,7 +170,7 @@ async fn test_multiple_lps_with_swap_fees_and_withdrawal() {
                 .await
                 .unwrap();
 
-            let (after_a, after_b, _) = env.get_balances(swapper.into()).await;
+            let (_, after_b, _) = env.get_balances(swapper.into()).await;
             let used_b = before_b - after_b;
 
             // Calculate fee (0.3% of input)

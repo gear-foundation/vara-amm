@@ -2,7 +2,8 @@ use crate::*;
 
 #[tokio::test]
 async fn test_remove_liquidity_basic() {
-    let mut env = TestEnv::new().await;
+    let treasury_id = ActorId::zero();
+    let mut env = TestEnv::new(treasury_id).await;
     let user = ACTOR_ID.into();
 
     // Add initial liquidity
@@ -64,7 +65,8 @@ async fn test_remove_liquidity_basic() {
 
 #[tokio::test]
 async fn test_remove_liquidity_with_minimum_liquidity_impact() {
-    let mut env = TestEnv::new().await;
+    let treasury_id = ActorId::zero();
+    let mut env = TestEnv::new(treasury_id).await;
     let user = ACTOR_ID.into();
 
     // Add initial liquidity
@@ -155,7 +157,8 @@ async fn test_remove_liquidity_with_minimum_liquidity_impact() {
 
 #[tokio::test]
 async fn test_remove_liquidity_after_price_change() {
-    let mut env = TestEnv::new().await;
+    let treasury_id = ActorId::zero();
+    let mut env = TestEnv::new(treasury_id).await;
     let lp_user = ACTOR_ID.into();
     let trader = ActorId::from(43);
 
@@ -242,7 +245,8 @@ async fn test_remove_liquidity_after_price_change() {
 
 #[tokio::test]
 async fn test_remove_liquidity_insufficient_minimum() {
-    let mut env = TestEnv::new().await;
+    let treasury_id = ActorId::zero();
+    let mut env = TestEnv::new(treasury_id).await;
     let user = ACTOR_ID.into();
 
     // Add liquidity
@@ -277,7 +281,8 @@ async fn test_remove_liquidity_insufficient_minimum() {
 
 #[tokio::test]
 async fn test_remove_liquidity_expired_deadline() {
-    let mut env = TestEnv::new().await;
+    let treasury_id = ActorId::zero();
+    let mut env = TestEnv::new(treasury_id).await;
     let user = ACTOR_ID.into();
 
     // Add liquidity first

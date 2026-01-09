@@ -2,7 +2,8 @@ use crate::*;
 
 #[tokio::test]
 async fn test_add_liquidity_expired_deadline() {
-    let mut env = TestEnv::new().await;
+    let treasury_id = ActorId::zero();
+    let mut env = TestEnv::new(treasury_id).await;
     let user = ACTOR_ID.into();
     let amount = medium_amount();
 
@@ -30,7 +31,8 @@ async fn test_add_liquidity_expired_deadline() {
 
 #[tokio::test]
 async fn test_add_liquidity_subsequent_perfect_ratio() {
-    let mut env = TestEnv::new().await;
+    let treasury_id = ActorId::zero();
+    let mut env = TestEnv::new(treasury_id).await;
     let user1 = ACTOR_ID.into();
     let user2 = ActorId::from(43);
 
@@ -96,7 +98,8 @@ async fn test_add_liquidity_subsequent_perfect_ratio() {
 
 #[tokio::test]
 async fn test_add_liquidity_subsequent_excess_token_a() {
-    let mut env = TestEnv::new().await;
+    let treasury_id = ActorId::zero();
+    let mut env = TestEnv::new(treasury_id).await;
     let user1 = ACTOR_ID.into();
     let user2 = ActorId::from(43);
 
@@ -144,7 +147,8 @@ async fn test_add_liquidity_subsequent_excess_token_a() {
 
 #[tokio::test]
 async fn test_add_liquidity_subsequent_excess_token_b() {
-    let mut env = TestEnv::new().await;
+    let treasury_id = ActorId::zero();
+    let mut env = TestEnv::new(treasury_id).await;
     let user1 = ACTOR_ID.into();
     let user2 = ActorId::from(43);
 
@@ -192,7 +196,8 @@ async fn test_add_liquidity_subsequent_excess_token_b() {
 
 #[tokio::test]
 async fn test_add_liquidity_insufficient_minimum_amounts() {
-    let mut env = TestEnv::new().await;
+    let treasury_id = ActorId::zero();
+    let mut env = TestEnv::new(treasury_id).await;
     let user1 = ACTOR_ID.into();
     let user2 = ActorId::from(43);
 
@@ -232,7 +237,8 @@ async fn test_add_liquidity_insufficient_minimum_amounts() {
 
 #[tokio::test]
 async fn test_add_liquidity_zero_amounts() {
-    let mut env = TestEnv::new().await;
+    let treasury_id = ActorId::zero();
+    let mut env = TestEnv::new(treasury_id).await;
     let user = ACTOR_ID.into();
 
     env.setup_user(ACTOR_ID, medium_amount()).await;
@@ -256,7 +262,8 @@ async fn test_add_liquidity_zero_amounts() {
 
 #[tokio::test]
 async fn test_add_liquidity_insufficient_balance() {
-    let mut env = TestEnv::new().await;
+    let treasury_id = ActorId::zero();
+    let mut env = TestEnv::new(treasury_id).await;
     let user = ACTOR_ID.into();
 
     // Setup user with limited balance

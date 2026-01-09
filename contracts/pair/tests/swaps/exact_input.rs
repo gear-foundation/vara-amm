@@ -9,27 +9,144 @@ pub fn calculate_price_token0_in_token1(
     if reserve1.is_zero() {
         return 0.0;
     }
-    
+
     let normalized_reserve0 = if decimals0 < 18 {
         reserve0 * U256::from(10u128).pow(U256::from(18 - decimals0))
     } else {
         reserve0 / U256::from(10u128).pow(U256::from(decimals0 - 18))
     };
-    
+
     let normalized_reserve1 = if decimals1 < 18 {
         reserve1 * U256::from(10u128).pow(U256::from(18 - decimals1))
     } else {
         reserve1 / U256::from(10u128).pow(U256::from(decimals1 - 18))
     };
-    
-    let price_scaled = normalized_reserve1 * U256::from(10u128).pow(U256::from(18)) / normalized_reserve0;
-    
+
+    let price_scaled =
+        normalized_reserve1 * U256::from(10u128).pow(U256::from(18)) / normalized_reserve0;
+
     price_scaled.as_u128() as f64 / 1e18
 }
 
 #[tokio::test]
+async fn test_quick_test() {
+    let treasury_id = ActorId::zero();
+    let mut env = TestEnv::new(treasury_id).await;
+    let lp_user = ACTOR_ID.into();
+    let trader = ActorId::from(TRADER_1);
+
+    // Setup balanced liquidity pool
+    let decimals0 = 6;
+    let decimals1 = 12;
+
+    let liquidity_amount_0 =
+        U256::from(1000000u128) * U256::from(10u128).pow(U256::from(decimals0));
+
+    let liquidity_amount_1 = U256::from(340000u128) * U256::from(10u128).pow(U256::from(decimals1));
+
+    println!("{:?}", liquidity_amount_0);
+    println!("{:?}", liquidity_amount_1);
+    env.setup_user(TRADER_1, liquidity_amount_1 * 10).await;
+    env.setup_user(ACTOR_ID, liquidity_amount_1 * 10).await;
+
+    env.pair_client
+        .add_liquidity(
+            liquidity_amount_0,
+            liquidity_amount_1,
+            liquidity_amount_0 / U256::from(2),
+            liquidity_amount_1 / U256::from(2),
+            env.get_deadline(),
+        )
+        .with_args(|args| args.with_actor_id(lp_user))
+        .send_recv(env.pair_id)
+        .await
+        .unwrap();
+
+    let (reserve_a, reserve_b) = env.get_reserves().await;
+    println!("Initial reserves: A={}, B={}", reserve_a, reserve_b);
+
+    let lp_tokens = env
+        .lp_vft_client
+        .balance_of(lp_user)
+        .recv(env.pair_id)
+        .await
+        .unwrap();
+
+    println!("lp_tokens {:?}", lp_tokens);
+
+    let (amount_a, amount_b) = env
+        .pair_client
+        .calculate_remove_liquidity(lp_tokens)
+        .recv(env.pair_id)
+        .await
+        .unwrap();
+    println!("amount_a {:?}", amount_a);
+    println!("amount_b {:?}", amount_b);
+    env.pair_client
+        .remove_liquidity(
+            lp_tokens,
+            U256::zero(), // Accept any amount
+            U256::zero(),
+            env.get_deadline(),
+        )
+        .with_args(|args| args.with_actor_id(lp_user))
+        .send_recv(env.pair_id)
+        .await
+        .unwrap();
+
+    let liquidity_amount_0 =
+        U256::from(10000000u128) * U256::from(10u128).pow(U256::from(decimals0));
+
+    let liquidity_amount_1 =
+        U256::from(1700000u128) * U256::from(10u128).pow(U256::from(decimals1));
+
+    env.pair_client
+        .add_liquidity(
+            liquidity_amount_0,
+            liquidity_amount_1,
+            liquidity_amount_0 / U256::from(2),
+            liquidity_amount_1 / U256::from(2),
+            env.get_deadline(),
+        )
+        .with_args(|args| args.with_actor_id(lp_user))
+        .send_recv(env.pair_id)
+        .await
+        .unwrap();
+
+    let lp_tokens = env
+        .lp_vft_client
+        .balance_of(lp_user)
+        .recv(env.pair_id)
+        .await
+        .unwrap();
+
+    println!("lp_tokens {:?}", lp_tokens);
+
+    let (amount_a, amount_b) = env
+        .pair_client
+        .calculate_remove_liquidity(lp_tokens)
+        .recv(env.pair_id)
+        .await
+        .unwrap();
+    println!("amount_a {:?}", amount_a);
+    println!("amount_b {:?}", amount_b);
+
+    env.pair_client
+        .remove_liquidity(
+            lp_tokens,
+            U256::zero(), // Accept any amount
+            U256::zero(),
+            env.get_deadline(),
+        )
+        .with_args(|args| args.with_actor_id(lp_user))
+        .send_recv(env.pair_id)
+        .await
+        .unwrap();
+}
+#[tokio::test]
 async fn test_exact_input_swap_low_price_impact() {
-    let mut env = TestEnv::new().await;
+    let treasury_id = ActorId::zero();
+    let mut env = TestEnv::new(treasury_id).await;
     let lp_user = ACTOR_ID.into();
     let trader = ActorId::from(TRADER_1);
 
@@ -43,11 +160,10 @@ async fn test_exact_input_swap_low_price_impact() {
     // 44341 USDC
     let liquidity_amount_1 = U256::from(44341u128) * U256::from(10u128).pow(U256::from(decimals1));
 
-
     println!("{:?}", liquidity_amount_0);
     println!("{:?}", liquidity_amount_1);
-    env.setup_user(TRADER_1, liquidity_amount_0*2).await;
-    env.setup_user(ACTOR_ID, liquidity_amount_0*2).await;
+    env.setup_user(TRADER_1, liquidity_amount_0 * 2).await;
+    env.setup_user(ACTOR_ID, liquidity_amount_0 * 2).await;
 
     env.pair_client
         .add_liquidity(
@@ -65,14 +181,19 @@ async fn test_exact_input_swap_low_price_impact() {
     let (reserve_a, reserve_b) = env.get_reserves().await;
 
     println!("=== EXACT INPUT SWAP A->B BASIC TEST ===");
-    let initial_price = calculate_price_token0_in_token1(reserve_a, reserve_b, decimals0, decimals1);
-    println!("Initial reserves: A={}, B={}, price={}", reserve_a, reserve_b, initial_price);
+    let initial_price =
+        calculate_price_token0_in_token1(reserve_a, reserve_b, decimals0, decimals1);
+    println!(
+        "Initial reserves: A={}, B={}, price={}",
+        reserve_a, reserve_b, initial_price
+    );
 
     // Perform 1% swap A -> B
     let amount_in = calculate_swap_amount_from_percent(reserve_a, 1);
     println!("amount_in={}", amount_in);
 
-    let min_amount_out = SwapCalculator::calculate_exact_output(amount_in, reserve_a, reserve_b) - 1000;
+    let min_amount_out =
+        SwapCalculator::calculate_exact_output(amount_in, reserve_a, reserve_b) - 1000;
 
     env.pair_client
         .swap_exact_tokens_for_tokens(
@@ -91,14 +212,22 @@ async fn test_exact_input_swap_low_price_impact() {
     println!("amount_out={}", expected_out);
     // Verify k-invariant
     let (new_reserve_a, new_reserve_b) = env.get_reserves().await;
-    let new_price = calculate_price_token0_in_token1(new_reserve_a, new_reserve_b, decimals0, decimals1);
-    println!("New reserves: A={}, B={}, price={}", new_reserve_a, new_reserve_b, new_price);
-    println!("Price impact {:?}", ((new_price - initial_price) / initial_price) * 100.0);
+    let new_price =
+        calculate_price_token0_in_token1(new_reserve_a, new_reserve_b, decimals0, decimals1);
+    println!(
+        "New reserves: A={}, B={}, price={}",
+        new_reserve_a, new_reserve_b, new_price
+    );
+    println!(
+        "Price impact {:?}",
+        ((new_price - initial_price) / initial_price) * 100.0
+    );
 }
 
 #[tokio::test]
 async fn test_exact_input_swap_low_price_impact_1() {
-    let mut env = TestEnv::new().await;
+    let treasury_id = ActorId::zero();
+    let mut env = TestEnv::new(treasury_id).await;
     let lp_user = ACTOR_ID.into();
     let trader = ActorId::from(TRADER_1);
 
@@ -107,11 +236,12 @@ async fn test_exact_input_swap_low_price_impact_1() {
     let decimals1 = 6;
 
     // 10 ETH
-    let liquidity_amount_0 = U256::from(100_000u128) * U256::from(10u128).pow(U256::from(decimals0));
+    let liquidity_amount_0 =
+        U256::from(100_000u128) * U256::from(10u128).pow(U256::from(decimals0));
 
     // 44341 USDC
-    let liquidity_amount_1 = U256::from(100_000u128) * U256::from(10u128).pow(U256::from(decimals1));
-
+    let liquidity_amount_1 =
+        U256::from(100_000u128) * U256::from(10u128).pow(U256::from(decimals1));
 
     println!("{:?}", liquidity_amount_0);
     println!("{:?}", liquidity_amount_1);
@@ -134,14 +264,19 @@ async fn test_exact_input_swap_low_price_impact_1() {
     let (reserve_a, reserve_b) = env.get_reserves().await;
 
     println!("=== EXACT INPUT SWAP A->B BASIC TEST ===");
-    let initial_price = calculate_price_token0_in_token1(reserve_a, reserve_b, decimals0, decimals1);
-    println!("Initial reserves: A={}, B={}, price={}", reserve_a, reserve_b, initial_price);
+    let initial_price =
+        calculate_price_token0_in_token1(reserve_a, reserve_b, decimals0, decimals1);
+    println!(
+        "Initial reserves: A={}, B={}, price={}",
+        reserve_a, reserve_b, initial_price
+    );
 
     // Perform 1% swap A -> B
     let amount_in = calculate_swap_amount_from_percent(reserve_a, 5);
     println!("amount_in={}", amount_in);
 
-    let min_amount_out = SwapCalculator::calculate_exact_output(amount_in, reserve_a, reserve_b) - 1000;
+    let min_amount_out =
+        SwapCalculator::calculate_exact_output(amount_in, reserve_a, reserve_b) - 1000;
 
     env.pair_client
         .swap_exact_tokens_for_tokens(
@@ -160,15 +295,22 @@ async fn test_exact_input_swap_low_price_impact_1() {
     println!("amount_out={}", expected_out);
     // Verify k-invariant
     let (new_reserve_a, new_reserve_b) = env.get_reserves().await;
-    let new_price = calculate_price_token0_in_token1(new_reserve_a, new_reserve_b, decimals0, decimals1);
-    println!("New reserves: A={}, B={}, price={}", new_reserve_a, new_reserve_b, new_price);
-    println!("Price impact {:?}", ((new_price - initial_price) / initial_price) * 100.0);
+    let new_price =
+        calculate_price_token0_in_token1(new_reserve_a, new_reserve_b, decimals0, decimals1);
+    println!(
+        "New reserves: A={}, B={}, price={}",
+        new_reserve_a, new_reserve_b, new_price
+    );
+    println!(
+        "Price impact {:?}",
+        ((new_price - initial_price) / initial_price) * 100.0
+    );
 }
-
 
 #[tokio::test]
 async fn test_exact_input_swap_a_to_b_basic() {
-    let mut env = TestEnv::new().await;
+    let treasury_id = ActorId::zero();
+    let mut env = TestEnv::new(treasury_id).await;
     let lp_user = ACTOR_ID.into();
     let trader = ActorId::from(TRADER_1);
 
@@ -248,7 +390,8 @@ async fn test_exact_input_swap_a_to_b_basic() {
 
 #[tokio::test]
 async fn test_exact_input_swap_b_to_a_basic() {
-    let mut env = TestEnv::new().await;
+    let treasury_id = ActorId::zero();
+    let mut env = TestEnv::new(treasury_id).await;
     let lp_user = ACTOR_ID.into();
     let trader = ActorId::from(TRADER_1);
 
@@ -327,7 +470,8 @@ async fn test_exact_input_swap_b_to_a_basic() {
 
 #[tokio::test]
 async fn test_exact_input_different_swap_sizes() {
-    let mut env = TestEnv::new().await;
+    let treasury_id = ActorId::zero();
+    let mut env = TestEnv::new(treasury_id).await;
     let lp_user = ACTOR_ID.into();
     let trader = ActorId::from(TRADER_1);
 
@@ -409,7 +553,8 @@ async fn test_exact_input_different_swap_sizes() {
 
 #[tokio::test]
 async fn test_exact_input_swap_exceeds_slippage_tolerance() {
-    let mut env = TestEnv::new().await;
+    let treasury_id = ActorId::zero();
+    let mut env = TestEnv::new(treasury_id).await;
     let user = ACTOR_ID.into();
 
     // Create small liquidity pool for higher slippage demonstration
@@ -477,7 +622,8 @@ async fn test_exact_input_swap_exceeds_slippage_tolerance() {
 
 #[tokio::test]
 async fn test_exact_input_swap_not_enoght_funds() {
-    let mut env = TestEnv::new().await;
+    let treasury_id = ActorId::zero();
+    let mut env = TestEnv::new(treasury_id).await;
     let lp_user = ACTOR_ID.into();
     let trader = ActorId::from(TRADER_1);
 

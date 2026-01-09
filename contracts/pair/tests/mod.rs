@@ -46,6 +46,9 @@ pub const FEE_RATE: u64 = 3;
 /// Minimum liquidity locked forever (in LP tokens)
 pub const MINIMUM_LIQUIDITY: u64 = 1000;
 
+pub const FEE_DENOM_BPS: u64 = 10_000; // 100.00%
+pub const TREASURY_FEE_BPS: u64 = 5; // 0.05%
+
 // ============================================================================
 // TEST AMOUNT CONSTANTS (in base units, multiply by 10^18)
 // ============================================================================

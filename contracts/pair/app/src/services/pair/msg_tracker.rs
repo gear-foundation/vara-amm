@@ -36,6 +36,10 @@ pub enum MessageStatus {
     SendingMsgToUnlockTokenA,
     /// Reply is received for a token deposit message.
     TokenAUnlocked(bool),
+    SendingTreasuryTokenA,
+    SendingTreasuryTokenB,
+    TreasuryTokenASent(bool),
+    TreasuryTokenBSent(bool),
 
     // during add liquiduty
     SendingMsgToUnlockTokenB,
