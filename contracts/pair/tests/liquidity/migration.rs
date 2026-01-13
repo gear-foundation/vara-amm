@@ -66,8 +66,16 @@ async fn test_migrate_all_liquidity_transfers_funds_and_disables_pool() {
         .unwrap();
 
     let (reserve0_after, reserve1_after) = env.get_reserves().await;
-    assert_eq!(reserve0_after, U256::zero(), "reserve0 must be zero after migration");
-    assert_eq!(reserve1_after, U256::zero(), "reserve1 must be zero after migration");
+    assert_eq!(
+        reserve0_after,
+        U256::zero(),
+        "reserve0 must be zero after migration"
+    );
+    assert_eq!(
+        reserve1_after,
+        U256::zero(),
+        "reserve1 must be zero after migration"
+    );
 
     let (_, fee0_after, fee1_after) = env
         .pair_client
@@ -75,8 +83,16 @@ async fn test_migrate_all_liquidity_transfers_funds_and_disables_pool() {
         .recv(env.pair_id)
         .await
         .unwrap();
-    assert_eq!(fee0_after, U256::zero(), "accrued_treasury_fee0 must be zero after migration");
-    assert_eq!(fee1_after, U256::zero(), "accrued_treasury_fee1 must be zero after migration");
+    assert_eq!(
+        fee0_after,
+        U256::zero(),
+        "accrued_treasury_fee0 must be zero after migration"
+    );
+    assert_eq!(
+        fee1_after,
+        U256::zero(),
+        "accrued_treasury_fee1 must be zero after migration"
+    );
 
     let (target0_after, target1_after, _) = env.get_balances(migration_target).await;
 
@@ -99,12 +115,7 @@ async fn test_migrate_all_liquidity_transfers_funds_and_disables_pool() {
 
     let res = env
         .pair_client
-        .swap_exact_tokens_for_tokens(
-            try_amount_in,
-            U256::zero(),
-            true,
-            env.get_deadline(),
-        )
+        .swap_exact_tokens_for_tokens(try_amount_in, U256::zero(), true, env.get_deadline())
         .with_args(|args| args.with_actor_id(trader))
         .send_recv(env.pair_id)
         .await;
@@ -151,7 +162,10 @@ async fn test_migrate_all_liquidity_only_admin_can_call() {
         .send_recv(env.pair_id)
         .await;
 
-    assert!(res.is_err(), "Non-admin must not be able to migrate liquidity");
+    assert!(
+        res.is_err(),
+        "Non-admin must not be able to migrate liquidity"
+    );
 
     let (reserve0_after, reserve1_after) = env.get_reserves().await;
     assert!(

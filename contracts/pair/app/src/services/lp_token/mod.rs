@@ -65,7 +65,7 @@ impl ExtendedService {
         })
     }
 
-    pub fn burn(&mut self, from: ActorId, value: U256) -> bool {      
+    pub fn burn(&mut self, from: ActorId, value: U256) -> bool {
         services::utils::panicking(|| {
             funcs::burn(Storage::balances(), Storage::total_supply(), from, value)
         })

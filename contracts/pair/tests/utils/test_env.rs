@@ -41,9 +41,16 @@ impl TestEnv {
         fee_to: ActorId,
         treasury_id: ActorId,
     ) -> (ActorId, ActorId, ActorId) {
-        let token_code_id = remoting
-            .system()
-            .submit_code_file("../target/wasm32-gear/release/extended_vft.opt.wasm");
+        let release_path = "../target/wasm32-gear/release/extended_vft.opt.wasm";
+        let debug_path = "../target/wasm32-gear/debug/extended_vft.opt.wasm";
+
+        let wasm_path = if std::path::Path::new(release_path).exists() {
+            release_path
+        } else {
+            debug_path
+        };
+
+        let token_code_id = remoting.system().submit_code_file(wasm_path);
 
         let token_factory = extended_vft_client::ExtendedVftFactory::new(remoting.clone());
 
@@ -60,7 +67,7 @@ impl TestEnv {
             .unwrap();
 
         let program_code_id = remoting.system().submit_code(pair::WASM_BINARY);
-        let program_factory = pair_client::PairFactory::new(remoting.clone());
+        let program_factory = pair_client::PairClientFactory::new(remoting.clone());
 
         let config = Config {
             gas_for_token_ops: 5_000_000_000,
@@ -86,7 +93,9 @@ impl TestEnv {
     }
 
     pub async fn setup_user(&self, user_id: u64, token_amount: U256) {
-        self.remoting.system().mint_to(user_id, 1_000_000_000_000_000);
+        self.remoting
+            .system()
+            .mint_to(user_id, 1_000_000_000_000_000);
         self.mint_and_approve_tokens(user_id.into(), token_amount)
             .await;
     }

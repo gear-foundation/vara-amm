@@ -3,7 +3,7 @@ use crate::services::pair::{
     msg_tracker::{MessageStatus, MessageTracker, msg_tracker_mut},
     state_mut,
 };
-use extended_vft_client::vft::io::{Transfer, TransferFrom, BalanceOf};
+use extended_vft_client::vft::io::{BalanceOf, Transfer, TransferFrom};
 use sails_rs::{U256, calls::ActionIo, gstd::msg, prelude::*};
 
 pub async fn transfer_from(
@@ -77,7 +77,6 @@ async fn send_message_with_gas_for_reply(
 
     fetch_transfer_result(&*msg_tracker_mut(), &msg_id)
 }
-
 
 /// Handle reply received from `VFT` program.
 ///

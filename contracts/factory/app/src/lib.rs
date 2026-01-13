@@ -99,7 +99,7 @@ impl FactoryService {
             gas_for_full_tx: state.config.gas_for_full_tx,
         };
 
-        let payload = pair_client::pair_factory::io::New::encode_call(
+        let payload = pair_client::pair_client_factory::io::New::encode_call(
             pair_config,
             token0,
             token1,

@@ -165,7 +165,6 @@ impl PairService {
 }
 #[sails_rs::service(events = PairEvent)]
 impl PairService {
-
     #[export]
     pub async fn add_liquidity(
         &mut self,
@@ -231,11 +230,8 @@ impl PairService {
     /// - Intended for final pool shutdown / migration to a new contract.
     /// - Should be callable only by an admin
     #[export]
-    pub async fn migrate_all_liquidity(&mut self,target: ActorId) {
-        let event = event_or_panic_async!(funcs::migrate_all_liquidity(
-            self.get_mut(),
-            target
-        ));
+    pub async fn migrate_all_liquidity(&mut self, target: ActorId) {
+        let event = event_or_panic_async!(funcs::migrate_all_liquidity(self.get_mut(), target));
         self.emit_event(event).expect("Event emission error");
     }
 
