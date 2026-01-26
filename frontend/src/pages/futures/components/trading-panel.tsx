@@ -26,7 +26,8 @@ export function TradingPanel({ market }: TradingPanelProps) {
   const [orderType, setOrderType] = useState<OrderType>('market');
   const [payAmount, setPayAmount] = useState('');
   const [positionSize, setPositionSize] = useState('');
-  const [leverage, setLeverage] = useState(4.1);
+  const [leverage, setLeverage] = useState(2);
+  const [limitPrice, setLimitPrice] = useState('');
   const [showTpSl, setShowTpSl] = useState(false);
   const [collateralToken] = useState('USD');
 
@@ -47,7 +48,7 @@ export function TradingPanel({ market }: TradingPanelProps) {
   return (
     <Card className="card overflow-hidden">
       <Tabs value={direction} onValueChange={(v) => setDirection(v as 'long' | 'short' | 'swap')} className="w-full">
-        <TabsList className="w-full flex p-0 h-auto rounded-none bg-transparent">
+        <TabsList className="w-full flex p-0 h-auto rounded-none bg-transparent border-b border-gray-500/20">
           <TabsTrigger
             value="long"
             className="flex-1 py-3 rounded-none data-[state=active]:bg-green-500 data-[state=active]:text-white font-bold uppercase">
@@ -66,7 +67,7 @@ export function TradingPanel({ market }: TradingPanelProps) {
         </TabsList>
 
         <CardContent className="p-4 space-y-4">
-          {/* Order Type: Market / Limit / More */}
+          {/* Order Type: Market / Limit */}
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <button
@@ -84,10 +85,6 @@ export function TradingPanel({ market }: TradingPanelProps) {
                   orderType === 'limit' ? 'bg-gray-500/20 theme-text' : 'text-gray-400 hover:text-white',
                 )}>
                 Limit
-              </button>
-              <button className="px-3 py-1.5 text-sm font-medium text-gray-400 hover:text-white flex items-center">
-                More
-                <ChevronDown className="w-3 h-3 ml-1" />
               </button>
             </div>
             <div className="flex items-center space-x-2">
@@ -136,6 +133,22 @@ export function TradingPanel({ market }: TradingPanelProps) {
               setPositionSize={setPositionSize}
               leverage={leverage}
             />
+            {/* Limit Price Input (only when Limit is selected) */}
+            {orderType === 'limit' && (
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">Limit Price</span>
+                  <span className="text-gray-400">Mark: ${market.price.toLocaleString()}</span>
+                </div>
+                <Input
+                  type="number"
+                  placeholder="Price USD"
+                  value={limitPrice}
+                  onChange={(e) => setLimitPrice(e.target.value)}
+                  className="input-field w-full text-xl"
+                />
+              </div>
+            )}
             <LeverageSlider
               leverage={leverage}
               setLeverage={setLeverage}
@@ -157,6 +170,22 @@ export function TradingPanel({ market }: TradingPanelProps) {
               setPositionSize={setPositionSize}
               leverage={leverage}
             />
+            {/* Limit Price Input (only when Limit is selected) */}
+            {orderType === 'limit' && (
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">Limit Price</span>
+                  <span className="text-gray-400">Mark: ${market.price.toLocaleString()}</span>
+                </div>
+                <Input
+                  type="number"
+                  placeholder="Price USD"
+                  value={limitPrice}
+                  onChange={(e) => setLimitPrice(e.target.value)}
+                  className="input-field w-full text-xl"
+                />
+              </div>
+            )}
             <LeverageSlider
               leverage={leverage}
               setLeverage={setLeverage}
@@ -301,10 +330,7 @@ function PoolCollateralInfo({ market, collateralToken }: { market: Market; colla
             <Info className="w-3 h-3 ml-1" />
           </Tooltip>
         </span>
-        <span className="text-sm theme-text hover:!text-inherit flex items-center">
-          {collateralToken}
-          <ChevronDown className="w-3 h-3 ml-1" />
-        </span>
+        <span className="text-sm theme-text">{collateralToken}</span>
       </div>
     </div>
   );
