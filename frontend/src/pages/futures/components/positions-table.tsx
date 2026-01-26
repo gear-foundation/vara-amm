@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { memo, useState } from 'react';
 
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -27,12 +27,14 @@ type Order = {
   markPrice: number;
 };
 
-// Mock data - will be replaced with real data later
-const MOCK_POSITIONS: Position[] = [];
-const MOCK_ORDERS: Order[] = [];
-
-export function PositionsTable() {
+export const PositionsTable = memo(function PositionsTable() {
   const [showChartPositions, setShowChartPositions] = useState(true);
+
+  // NOTE: Futures positions should be user-specific and must not be sourced
+  // from global market snapshots. Keep empty until proper user positions exist.
+  const positions: Position[] = [];
+
+  const orders: Order[] = []; // No orders from sim yet
 
   const getTabLabel = (label: string, count?: number) => (
     <span className="flex items-center space-x-1">
@@ -49,12 +51,12 @@ export function PositionsTable() {
             <TabsTrigger
               value="positions"
               className="px-4 py-3 rounded-none data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-[#00FF85] font-medium uppercase">
-              {getTabLabel('Positions', MOCK_POSITIONS.length)}
+              {getTabLabel('Positions', positions.length)}
             </TabsTrigger>
             <TabsTrigger
               value="orders"
               className="px-4 py-3 rounded-none data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-[#00FF85] font-medium uppercase">
-              {getTabLabel('Orders', MOCK_ORDERS.length)}
+              {getTabLabel('Orders', orders.length)}
             </TabsTrigger>
             <TabsTrigger
               value="trades"
@@ -84,10 +86,10 @@ export function PositionsTable() {
 
         <div className="min-h-[200px]">
           <TabsContent value="positions" className="mt-0">
-            <PositionsContent positions={MOCK_POSITIONS} />
+            <PositionsContent positions={positions} />
           </TabsContent>
           <TabsContent value="orders" className="mt-0">
-            <OrdersContent orders={MOCK_ORDERS} />
+            <OrdersContent orders={orders} />
           </TabsContent>
           <TabsContent value="trades" className="mt-0">
             <TradesContent />
@@ -99,7 +101,7 @@ export function PositionsTable() {
       </Tabs>
     </Card>
   );
-}
+});
 
 function PositionsContent({ positions }: { positions: Position[] }) {
   if (positions.length === 0) {

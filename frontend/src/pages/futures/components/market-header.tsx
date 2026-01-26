@@ -1,5 +1,5 @@
 import { ChevronDown, TrendingUp, TrendingDown } from 'lucide-react';
-import { useState, useEffect, useRef } from 'react';
+import { memo, useState, useEffect, useRef, useMemo } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -14,7 +14,7 @@ type MarketHeaderProps = {
   onMarketChange: (market: Market) => void;
 };
 
-export function MarketHeader({ market, markets, onMarketChange }: MarketHeaderProps) {
+export const MarketHeader = memo(function MarketHeader({ market, markets, onMarketChange }: MarketHeaderProps) {
   const [isMarketSelectorOpen, setIsMarketSelectorOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -35,9 +35,11 @@ export function MarketHeader({ market, markets, onMarketChange }: MarketHeaderPr
     };
   }, [isMarketSelectorOpen]);
 
-  const openInterestPercent = Math.round(
-    (market.openInterestLong / (market.openInterestLong + market.openInterestShort)) * 100,
-  );
+  // Memoize computed value to avoid recalculation on every render
+  const openInterestPercent = useMemo(() => {
+    const total = market.openInterestLong + market.openInterestShort;
+    return total > 0 ? Math.round((market.openInterestLong / total) * 100) : 50;
+  }, [market.openInterestLong, market.openInterestShort]);
 
   return (
     <Card className="card p-4 relative z-20">
@@ -88,7 +90,7 @@ export function MarketHeader({ market, markets, onMarketChange }: MarketHeaderPr
 
         {/* Price */}
         <div className="flex flex-col">
-          <span className="text-lg font-bold mono theme-text">{formatPrice(market.price)}</span>
+          <span className="text-base font-bold mono theme-text">{formatPrice(market.price)}</span>
           <span className={cn('text-sm flex items-center', market.change24h >= 0 ? 'text-green-500' : 'text-red-500')}>
             {market.change24h >= 0 ? (
               <TrendingUp className="w-3 h-3 mr-1" />
@@ -126,11 +128,7 @@ export function MarketHeader({ market, markets, onMarketChange }: MarketHeaderPr
           <div className="flex flex-col">
             <span className="text-gray-400 text-xs uppercase">Available Liquidity</span>
             <div className="flex items-center space-x-1">
-              <TrendingUp className="w-3 h-3 text-green-500" />
-              <span className="text-green-500 mono">{formatCurrency(market.availableLiquidityLong)}</span>
-              <span className="text-gray-400">/</span>
-              <TrendingDown className="w-3 h-3 text-red-500" />
-              <span className="text-red-500 mono">{formatCurrency(market.availableLiquidityShort)}</span>
+              <span className="theme-text mono">{formatCurrency(market.availableLiquidityLong)}</span>
             </div>
           </div>
 
@@ -138,15 +136,19 @@ export function MarketHeader({ market, markets, onMarketChange }: MarketHeaderPr
           <div className="flex flex-col">
             <span className="text-gray-400 text-xs uppercase">Net Rate / 1H</span>
             <div className="flex items-center space-x-1">
-              <TrendingDown className="w-3 h-3 text-red-500" />
-              <span className="text-red-500 mono">{(market.fundingRate * 100).toFixed(4)}%</span>
-              <span className="text-gray-400">/</span>
-              <TrendingUp className="w-3 h-3 text-green-500" />
-              <span className="text-green-500 mono">+{(Math.abs(market.fundingRate) * 100).toFixed(4)}%</span>
+              {market.fundingRatePerHour >= 0 ? (
+                <TrendingUp className="w-3 h-3 text-green-500" />
+              ) : (
+                <TrendingDown className="w-3 h-3 text-red-500" />
+              )}
+              <span className={cn('mono', market.fundingRatePerHour >= 0 ? 'text-green-500' : 'text-red-500')}>
+                {market.fundingRatePerHour >= 0 ? '+' : ''}
+                {market.fundingRatePerHour.toFixed(4)}%
+              </span>
             </div>
           </div>
         </div>
       </div>
     </Card>
   );
-}
+});

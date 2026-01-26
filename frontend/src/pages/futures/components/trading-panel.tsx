@@ -1,6 +1,6 @@
 import { useAccount } from '@gear-js/react-hooks';
 import { ChevronDown, Info, Settings } from 'lucide-react';
-import { useState } from 'react';
+import { memo, useEffect, useState, useRef, useCallback } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Tooltip } from '@/components/ui/tooltip';
 import { Wallet } from '@/components/wallet';
+import { useSimWsContext } from '@/features/sim';
 import { cn } from '@/lib/utils';
 
 import type { Market } from '../index';
@@ -20,8 +21,12 @@ type OrderType = 'market' | 'limit';
 
 const LEVERAGE_PRESETS = [0.1, 1, 2, 5, 10, 25, 50, 100];
 
-export function TradingPanel({ market }: TradingPanelProps) {
+// Debounce delay for preview requests (ms)
+const PREVIEW_DEBOUNCE_MS = 300;
+
+export const TradingPanel = memo(function TradingPanel({ market }: TradingPanelProps) {
   const { account } = useAccount();
+  const { requestPreview, processedPreview } = useSimWsContext();
   const [direction, setDirection] = useState<'long' | 'short' | 'swap'>('long');
   const [orderType, setOrderType] = useState<OrderType>('market');
   const [payAmount, setPayAmount] = useState('');
@@ -32,18 +37,47 @@ export function TradingPanel({ market }: TradingPanelProps) {
   const [collateralToken] = useState('USD');
 
   const isWalletConnected = !!account;
+  const preview = processedPreview;
 
-  const handleLeverageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Extract stable primitive value to prevent unnecessary effect triggers
+  const marketApiSymbol = market.apiSymbol;
+
+  // Debounce ref for preview requests
+  const previewTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Request preview when parameters change (debounced)
+  useEffect(() => {
+    // Clear previous timeout
+    if (previewTimeoutRef.current) {
+      clearTimeout(previewTimeoutRef.current);
+    }
+
+    const qty = parseFloat(positionSize) || 0;
+    if (qty > 0 && leverage > 0 && (direction === 'long' || direction === 'short')) {
+      // Debounce preview request to avoid spamming on rapid input changes
+      previewTimeoutRef.current = setTimeout(() => {
+        requestPreview(marketApiSymbol, direction, qty, leverage);
+      }, PREVIEW_DEBOUNCE_MS);
+    }
+
+    return () => {
+      if (previewTimeoutRef.current) {
+        clearTimeout(previewTimeoutRef.current);
+      }
+    };
+  }, [marketApiSymbol, direction, positionSize, leverage, requestPreview]);
+
+  const handleLeverageChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseFloat(e.target.value);
     if (!isNaN(value) && value >= 0.1 && value <= 100) {
       setLeverage(value);
     }
-  };
+  }, []);
 
-  const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSliderChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseFloat(e.target.value);
     setLeverage(value);
-  };
+  }, []);
 
   return (
     <Card className="card overflow-hidden">
@@ -159,7 +193,11 @@ export function TradingPanel({ market }: TradingPanelProps) {
             <TpSlToggle showTpSl={showTpSl} setShowTpSl={setShowTpSl} />
             {showTpSl && <TpSlInputs />}
             <TradeButton isWalletConnected={isWalletConnected} direction="long" baseAsset={market.baseAsset} />
-            <TradeInfo />
+            <TradeInfo
+              liquidationPrice={preview?.liquidation_price}
+              priceImpactUsd={preview?.price_impact_usd}
+              closeFeesUsd={preview?.close_fees_usd}
+            />
           </TabsContent>
 
           <TabsContent value="short" className="mt-0 space-y-4">
@@ -196,7 +234,11 @@ export function TradingPanel({ market }: TradingPanelProps) {
             <TpSlToggle showTpSl={showTpSl} setShowTpSl={setShowTpSl} />
             {showTpSl && <TpSlInputs />}
             <TradeButton isWalletConnected={isWalletConnected} direction="short" baseAsset={market.baseAsset} />
-            <TradeInfo />
+            <TradeInfo
+              liquidationPrice={preview?.liquidation_price}
+              priceImpactUsd={preview?.price_impact_usd}
+              closeFeesUsd={preview?.close_fees_usd}
+            />
           </TabsContent>
 
           <TabsContent value="swap" className="mt-0 space-y-4">
@@ -206,7 +248,7 @@ export function TradingPanel({ market }: TradingPanelProps) {
       </Tabs>
     </Card>
   );
-}
+});
 
 // Sub-components
 
@@ -403,16 +445,36 @@ function TradeButton({
   );
 }
 
-function TradeInfo() {
+type TradeInfoProps = {
+  liquidationPrice?: number;
+  priceImpactUsd?: number;
+  closeFeesUsd?: number;
+};
+
+function TradeInfo({ liquidationPrice, priceImpactUsd, closeFeesUsd }: TradeInfoProps) {
+  const formatPrice = (price: number | undefined) => {
+    if (price === undefined || price === null) return '-';
+    if (price === 0) return '$0.00';
+    return `$${Math.abs(price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
+
+  const formatImpact = (impact: number | undefined) => {
+    if (impact === undefined || impact === null) return '-';
+    const sign = impact >= 0 ? '' : '-';
+    return `${sign}$${Math.abs(impact).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
+
   return (
     <div className="space-y-2 pt-2 border-t border-gray-500/10">
       <div className="flex justify-between text-sm">
         <span className="text-gray-400">Liquidation Price</span>
-        <span className="theme-text">-</span>
+        <span className="theme-text">{formatPrice(liquidationPrice)}</span>
       </div>
       <div className="flex justify-between text-sm">
         <span className="text-gray-400">Price Impact / Fees</span>
-        <span className="theme-text">0.000% / 0.000%</span>
+        <span className="theme-text">
+          {formatImpact(priceImpactUsd)} / {formatPrice(closeFeesUsd)}
+        </span>
       </div>
       <button className="flex items-center justify-between w-full text-sm text-gray-400 hover:text-white">
         <span>Execution Details</span>
