@@ -11,6 +11,7 @@ export const ROUTES = {
   TRADE: '/trade',
   EXPLORE: '/explore',
   POOL: '/pool',
+  FUTURES: '/futures',
 };
 
 export const LOGO_URI_BY_SYMBOL: Record<string, string> = {

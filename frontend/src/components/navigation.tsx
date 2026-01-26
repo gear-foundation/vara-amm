@@ -39,6 +39,9 @@ export function Navigation() {
               <NavLink to={ROUTES.TRADE} className={navLinkClassName}>
                 TRADE
               </NavLink>
+              <NavLink to={ROUTES.FUTURES} className={navLinkClassName}>
+                FUTURES
+              </NavLink>
               <NavLink to={ROUTES.EXPLORE} className={navLinkClassName}>
                 EXPLORE
               </NavLink>
@@ -91,6 +94,9 @@ export function Navigation() {
               <div className="flex flex-col space-y-4">
                 <NavLink to={ROUTES.TRADE} className={navLinkClassName}>
                   TRADE
+                </NavLink>
+                <NavLink to={ROUTES.FUTURES} className={navLinkClassName}>
+                  FUTURES
                 </NavLink>
                 <NavLink to={ROUTES.EXPLORE} className={navLinkClassName}>
                   EXPLORE
