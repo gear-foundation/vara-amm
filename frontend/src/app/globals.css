@@ -338,4 +338,34 @@
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
     background: rgba(255, 255, 255, 0.2);
   }
+
+  /* TradingView chart styles */
+  .tradingview-chart-container {
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background-color: #131722;
+    position: relative;
+  }
+
+  /* Скрываем внутренний бордер iframe через position */
+  .tradingview-chart-container > div {
+    border: none !important;
+    outline: none !important;
+    position: relative !important;
+    top: -2px !important;
+    left: -2px !important;
+    width: calc(100% + 4px) !important;
+    height: calc(100% + 4px) !important;
+  }
+
+  .tradingview-chart-container iframe {
+    border: none !important;
+    outline: none !important;
+    position: relative !important;
+    top: -2px !important;
+    left: -2px !important;
+    width: calc(100% + 4px) !important;
+    height: calc(100% + 4px) !important;
+  }
 }

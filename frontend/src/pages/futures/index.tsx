@@ -1,9 +1,9 @@
 import { useState } from 'react';
 
-import { ChartPlaceholder } from './components/chart-placeholder';
 import { MarketHeader } from './components/market-header';
 import { PositionsTable } from './components/positions-table';
 import { TradingPanel } from './components/trading-panel';
+import { TradingViewChart } from './components/trading-view-chart';
 
 export type Market = {
   symbol: string;
@@ -18,6 +18,10 @@ export type Market = {
   availableLiquidityShort: number;
   fundingRate: number;
   nextFundingTime: number;
+  // TradingView integration
+  tradingViewSymbol: string;
+  // Contract integration
+  marketIndex: number;
 };
 
 const MOCK_MARKETS: Market[] = [
@@ -34,6 +38,10 @@ const MOCK_MARKETS: Market[] = [
     availableLiquidityShort: 69100000,
     fundingRate: -0.0017,
     nextFundingTime: Date.now() + 3600000,
+    // TradingView - Binance BTC/USDT
+    tradingViewSymbol: 'BINANCE:BTCUSDT',
+    // Contract market index
+    marketIndex: 0,
   },
   {
     symbol: 'ETH/USD',
@@ -48,6 +56,10 @@ const MOCK_MARKETS: Market[] = [
     availableLiquidityShort: 38700000,
     fundingRate: 0.0023,
     nextFundingTime: Date.now() + 3600000,
+    // TradingView - Binance ETH/USDT
+    tradingViewSymbol: 'BINANCE:ETHUSDT',
+    // Contract market index
+    marketIndex: 1,
   },
 ];
 
@@ -63,7 +75,7 @@ function Futures() {
       <div className="flex flex-col lg:flex-row gap-4 mt-4 relative z-0">
         {/* Chart Area */}
         <div className="flex-1 min-h-[500px]">
-          <ChartPlaceholder market={selectedMarket} />
+          <TradingViewChart market={selectedMarket} />
         </div>
 
         {/* Trading Panel */}
