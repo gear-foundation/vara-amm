@@ -1,6 +1,13 @@
-use crate::services::lp_token::ExtendedService as VftService;
-use crate::services::pair::{PairError, PairEvent, State, amm_math, token_operations};
+use crate::services::lp_token::{Event as VftEvent, ExtendedService as VftService};
+use crate::services::pair::{
+    PairError, PairEvent, State, VftExposure, amm_math,
+    amm_math::TREASURY_FEE_BPS,
+    msg_tracker::{MessageStatus, msg_tracker_mut},
+    token_operations,
+};
+
 const FEE_BPS: u64 = 3; // 0.3% fee (3/1000)
+
 use sails_rs::{
     gstd::{exec, msg},
     prelude::*,
@@ -33,7 +40,21 @@ pub async fn add_liquidity(
     amount_a_min: U256,
     amount_b_min: U256,
     deadline: u64,
+    vft_exposure: &mut VftExposure,
 ) -> Result<PairEvent, PairError> {
+    if state.migrated {
+        return Err(PairError::PoolMigrated);
+    }
+    if exec::gas_available() < state.config.gas_for_full_tx {
+        return Err(PairError::NotEnoghAttachedGas);
+    }
+
+    if amount_a_desired == U256::zero() || amount_b_desired == U256::zero() {
+        return Err(PairError::ZeroLiquidity);
+    }
+    if state.lock {
+        return Err(PairError::AnotherTxInProgress);
+    }
     if exec::block_timestamp() > deadline {
         return Err(PairError::DeadlineExpired);
     }
@@ -49,15 +70,10 @@ pub async fn add_liquidity(
 
     // transfer user's tokens
     let sender = msg::source();
-    let program_id = exec::program_id();
 
-    token_operations::transfer_from(state.token0, sender, program_id, amount_a, &state.config)
-        .await?;
+    transfer_tokens_to_pool(state, sender, amount_a, amount_b).await?;
 
-    token_operations::transfer_from(state.token1, sender, program_id, amount_b, &state.config)
-        .await?;
-
-    let fee_on = mint_fee(state)?;
+    let fee_on = mint_fee(state, vft_exposure)?;
     let total_supply = VftService::total_supply();
 
     let liquidity = amm_math::calculate_liquidity(
@@ -69,10 +85,13 @@ pub async fn add_liquidity(
     )?;
 
     if total_supply.is_zero() {
-        mint_liquidity(ActorId::zero(), U256::from(amm_math::MINIMUM_LIQUIDITY));
+        mint_liquidity(
+            vft_exposure,
+            ActorId::zero(),
+            U256::from(amm_math::MINIMUM_LIQUIDITY),
+        );
     }
-
-    mint_liquidity(sender, liquidity);
+    mint_liquidity(vft_exposure, sender, liquidity);
 
     update_reserves(state, amount_a, amount_b);
 
@@ -81,6 +100,7 @@ pub async fn add_liquidity(
     }
 
     Ok(PairEvent::LiquidityAdded {
+        user_id: sender,
         amount_a,
         amount_b,
         liquidity,
@@ -93,12 +113,21 @@ pub async fn remove_liquidity(
     amount_a_min: U256,
     amount_b_min: U256,
     deadline: u64,
+    vft_exposure: &mut VftExposure,
 ) -> Result<PairEvent, PairError> {
+    if state.migrated {
+        return Err(PairError::PoolMigrated);
+    }
     // Check if transaction deadline has passed
     if exec::block_timestamp() > deadline {
         return Err(PairError::DeadlineExpired);
     }
 
+    if state.lock {
+        return Err(PairError::AnotherTxInProgress);
+    }
+
+    state.lock = true;
     let sender = msg::source();
 
     // Verify user has sufficient LP tokens
@@ -113,7 +142,6 @@ pub async fn remove_liquidity(
 
     // Recalculate total supply after potential fee minting
     let total_supply = VftService::total_supply();
-
     // Calculate proportional amounts of underlying tokens to return
     // Formula: user_amount = (liquidity_to_burn * reserve) / total_supply
     let amount_a = liquidity
@@ -125,7 +153,6 @@ pub async fn remove_liquidity(
         .checked_mul(state.reserve1)
         .and_then(|result| result.checked_div(total_supply + lp_protocol_fee))
         .ok_or(PairError::Overflow)?;
-
     // Slippage protection: ensure user receives at least minimum amounts
     if amount_a < amount_a_min {
         return Err(PairError::InsufficientAmountA);
@@ -140,15 +167,11 @@ pub async fn remove_liquidity(
     }
 
     // Transfer underlying tokens back to user
-    let program_id = exec::program_id();
+    return_tokens_from_pool(state, sender, amount_a, amount_b).await?;
+    let fee_on = mint_fee(state, vft_exposure)?;
 
-    token_operations::transfer(state.token0, program_id, sender, amount_a, &state.config).await?;
-
-    token_operations::transfer(state.token1, program_id, sender, amount_b, &state.config).await?;
-
-    let fee_on = mint_fee(state)?;
     // Burn user's LP tokens (reduces both user balance and total supply)
-    burn_liquidity(sender, liquidity);
+    burn_liquidity(vft_exposure, sender, liquidity);
 
     // Update pool reserves after token withdrawal
     let new_reserve0 = state
@@ -167,11 +190,108 @@ pub async fn remove_liquidity(
     if fee_on {
         set_new_k_last(state)?;
     }
-
     Ok(PairEvent::LiquidityRemoved {
+        user_id: sender,
         amount_a,
         amount_b,
         liquidity,
+    })
+}
+
+pub async fn migrate_all_liquidity(
+    state: &mut State,
+    target: ActorId,
+) -> Result<PairEvent, PairError> {
+    if state.migrated {
+        return Err(PairError::PoolMigrated);
+    }
+    if msg::source() != state.admin_id {
+        return Err(PairError::Unauthorized);
+    }
+
+    if exec::gas_available() < state.config.gas_for_full_tx {
+        return Err(PairError::NotEnoghAttachedGas);
+    }
+
+    if state.lock {
+        return Err(PairError::AnotherTxInProgress);
+    }
+    state.lock = true;
+    let program_id = exec::program_id();
+
+    let balance0 = token_operations::balance_of(state.token0, program_id, &state.config).await?;
+    let balance1 = token_operations::balance_of(state.token1, program_id, &state.config).await?;
+
+    if balance0.is_zero() && balance1.is_zero() {
+        return Err(PairError::NoLiquidityToMigrate);
+    }
+
+    return_tokens_from_pool(state, target, balance0, balance1).await?;
+
+    state.reserve0 = U256::zero();
+    state.reserve1 = U256::zero();
+    state.k_last = U256::zero();
+    state.accrued_treasury_fee0 = U256::zero();
+    state.accrued_treasury_fee1 = U256::zero();
+    state.migrated = true;
+
+    Ok(PairEvent::LiquidityMigrated {
+        to: target,
+        amount0: balance0,
+        amount1: balance1,
+    })
+}
+pub async fn send_treasury_fees_from_pool(state: &mut State) -> Result<PairEvent, PairError> {
+    if state.migrated {
+        return Err(PairError::PoolMigrated);
+    }
+    if msg::source() != state.treasury_id {
+        return Err(PairError::NotTreasuryId);
+    }
+    if exec::gas_available() < state.config.gas_for_full_tx {
+        return Err(PairError::NotEnoghAttachedGas);
+    }
+    if state.lock {
+        return Err(PairError::AnotherTxInProgress);
+    }
+    let amount_a = state.accrued_treasury_fee0;
+    let amount_b = state.accrued_treasury_fee1;
+
+    if amount_a.is_zero() && amount_b.is_zero() {
+        return Err(PairError::NoTreasuryFees);
+    }
+
+    state.lock = true;
+    let msg_id = msg::id();
+    let treasury_id = state.treasury_id;
+
+    msg_tracker_mut().insert_msg_status(msg_id, MessageStatus::SendingTreasuryTokenA);
+
+    // Send token0 fees if any
+    if !amount_a.is_zero() {
+        token_operations::transfer(state.token0, treasury_id, amount_a, &state.config, msg_id)
+            .await
+            .map_err(|_| PairError::TokenTransferFailed)?;
+    }
+    msg_tracker_mut().insert_msg_status(msg_id, MessageStatus::SendingTreasuryTokenB);
+
+    // Send token1 fees if any
+    if !amount_b.is_zero() {
+        token_operations::transfer(state.token1, treasury_id, amount_b, &state.config, msg_id)
+            .await
+            .map_err(|_| PairError::TokenTransferFailed)?;
+    }
+
+    state.accrued_treasury_fee0 = U256::zero();
+    state.accrued_treasury_fee1 = U256::zero();
+
+    state.lock = false;
+    msg_tracker_mut().remove_msg_status(&msg_id);
+
+    Ok(PairEvent::TreasuryFeesCollected {
+        treasury_id,
+        amount_a,
+        amount_b,
     })
 }
 
@@ -219,9 +339,25 @@ pub async fn swap_tokens(
     is_token0_to_token1: bool,
     deadline: u64,
 ) -> Result<PairEvent, PairError> {
+    if state.migrated {
+        return Err(PairError::PoolMigrated);
+    }
+    if exec::gas_available() < state.config.gas_for_full_tx {
+        return Err(PairError::NotEnoghAttachedGas);
+    }
+    if state.lock {
+        return Err(PairError::AnotherTxInProgress);
+    }
     if exec::block_timestamp() > deadline {
         return Err(PairError::DeadlineExpired);
     }
+
+    // Treasury is enabled only if a non-zero treasury address is configured.
+    let treasury_fee_bps = if state.treasury_id.is_zero() {
+        0
+    } else {
+        TREASURY_FEE_BPS
+    };
 
     // Determine swap direction
     let swap_direction = if is_token0_to_token1 {
@@ -240,41 +376,48 @@ pub async fn swap_tokens(
         }
     };
 
-    // Calculate amounts based on swap type
-    let (amount_in, amount_out) = match swap_type {
+    // amount_in_for_pool — effective input that enters the pool (used in AMM math)
+    // amount_in_total   — total amount the user pays (used for transfers/slippage)
+    // amount_out        — output amount computed by AMM math
+    // treasury_fee      — part of input reserved for treasury (not included in reserves)
+    let (amount_in_for_pool, amount_in_total, amount_out, treasury_fee) = match swap_type {
         SwapType::ExactInput {
             amount_in,
             amount_out_min,
         } => {
-            let calculated_amount_out = amm_math::get_amount_out(
-                amount_in,
+            // ExactInput: user specifies total input amount.
+            let (in_for_pool, out, t_fee) = amm_math::get_amount_out_with_treasury(
+                amount_in, // user-provided total input
                 swap_direction.reserve_in,
                 swap_direction.reserve_out,
+                treasury_fee_bps,
             )?;
 
-            // Check slippage for exact input
-            if calculated_amount_out < amount_out_min {
+            // Slippage protection: ensure actual output is not below user minimum.
+            if out < amount_out_min {
                 return Err(PairError::InsufficientAmount);
             }
 
-            (amount_in, calculated_amount_out)
+            (in_for_pool, amount_in, out, t_fee)
         }
         SwapType::ExactOutput {
             amount_out,
             amount_in_max,
         } => {
-            let calculated_amount_in = amm_math::get_amount_in(
+            // ExactOutput: user specifies desired output amount and max input.
+            let (in_for_pool, in_total, t_fee) = amm_math::get_amount_in_with_treasury(
                 amount_out,
                 swap_direction.reserve_in,
                 swap_direction.reserve_out,
+                treasury_fee_bps,
             )?;
 
-            // Check slippage for exact output
-            if calculated_amount_in > amount_in_max {
+            // Slippage protection: user limits the total amount they are willing to pay.
+            if in_total > amount_in_max {
                 return Err(PairError::ExcessiveInputAmount);
             }
 
-            (calculated_amount_in, amount_out)
+            (in_for_pool, in_total, amount_out, t_fee)
         }
     };
 
@@ -287,8 +430,10 @@ pub async fn swap_tokens(
     execute_swap(
         state,
         &swap_direction,
-        amount_in,
+        amount_in_for_pool,
+        amount_in_total,
         amount_out,
+        treasury_fee,
         is_token0_to_token1,
     )
     .await
@@ -297,8 +442,10 @@ pub async fn swap_tokens(
 async fn execute_swap(
     state: &mut State,
     swap_direction: &SwapDirection,
-    amount_in: U256,
+    amount_in_for_pool: U256,
+    amount_in_total: U256,
     amount_out: U256,
+    treasury_fee: U256,
     is_token0_to_token1: bool,
 ) -> Result<PairEvent, PairError> {
     // Calculate new balances
@@ -306,7 +453,7 @@ async fn execute_swap(
         (
             state
                 .reserve0
-                .checked_add(amount_in)
+                .checked_add(amount_in_for_pool)
                 .ok_or(PairError::Overflow)?,
             state
                 .reserve1
@@ -321,16 +468,32 @@ async fn execute_swap(
                 .ok_or(PairError::Overflow)?,
             state
                 .reserve1
-                .checked_add(amount_in)
+                .checked_add(amount_in_for_pool)
                 .ok_or(PairError::Overflow)?,
         )
     };
 
+    // Pre-compute new treasury accumulators
+    let mut new_accrued_treasury_fee0 = state.accrued_treasury_fee0;
+    let mut new_accrued_treasury_fee1 = state.accrued_treasury_fee1;
+
+    if !treasury_fee.is_zero() && !state.treasury_id.is_zero() {
+        if is_token0_to_token1 {
+            new_accrued_treasury_fee0 = new_accrued_treasury_fee0
+                .checked_add(treasury_fee)
+                .ok_or(PairError::Overflow)?;
+        } else {
+            new_accrued_treasury_fee1 = new_accrued_treasury_fee1
+                .checked_add(treasury_fee)
+                .ok_or(PairError::Overflow)?;
+        }
+    }
+
     // Prepare data for invariant check
     let (amount0_in, amount1_in) = if is_token0_to_token1 {
-        (amount_in, U256::zero())
+        (amount_in_for_pool, U256::zero())
     } else {
-        (U256::zero(), amount_in)
+        (U256::zero(), amount_in_for_pool)
     };
 
     // Verify constant product invariant
@@ -343,35 +506,136 @@ async fn execute_swap(
         state.reserve1,
     )?;
 
-    // Execute transfers
     let sender = msg::source();
-    let program_id = exec::program_id();
-
-    // Receive input tokens from user
-    token_operations::transfer_from(
+    // Execute transfers
+    execute_swap_transfers(
+        state,
+        sender,
         swap_direction.token_in,
-        sender,
-        program_id,
-        amount_in,
-        &state.config,
-    )
-    .await?;
-
-    // Send output tokens to user
-    token_operations::transfer(
+        amount_in_total, // total user payment, including treasury part
         swap_direction.token_out,
-        program_id,
-        sender,
         amount_out,
-        &state.config,
     )
     .await?;
 
     // Update reserves
     state.reserve0 = new_balance0;
     state.reserve1 = new_balance1;
+    state.accrued_treasury_fee0 = new_accrued_treasury_fee0;
+    state.accrued_treasury_fee1 = new_accrued_treasury_fee1;
 
-    Ok(PairEvent::Swap)
+    Ok(PairEvent::Swap {
+        user_id: sender,
+        amount_in: amount_in_total,
+        amount_out,
+        is_token0_to_token1,
+    })
+}
+
+async fn transfer_tokens_to_pool(
+    state: &mut State,
+    sender: ActorId,
+    amount_a: U256,
+    amount_b: U256,
+) -> Result<(), PairError> {
+    state.lock = true;
+    let program_id = exec::program_id();
+    let msg_id = msg::id();
+    msg_tracker_mut().insert_msg_status(msg_id, MessageStatus::SendingMsgToLockTokenA);
+
+    token_operations::transfer_from(
+        state.token0,
+        sender,
+        program_id,
+        amount_a,
+        &state.config,
+        msg_id,
+    )
+    .await?;
+
+    msg_tracker_mut().insert_msg_status(msg_id, MessageStatus::SendingMsgToLockTokenB);
+    let result = token_operations::transfer_from(
+        state.token1,
+        sender,
+        program_id,
+        amount_b,
+        &state.config,
+        msg_id,
+    )
+    .await;
+
+    if result.is_err() {
+        msg_tracker_mut().insert_msg_status(msg_id, MessageStatus::SendingMessageToReturnTokensA);
+        // transfer tokens back
+        token_operations::transfer(state.token0, sender, amount_a, &state.config, msg_id).await?;
+        return Err(PairError::TokenTransferFailed);
+    }
+    state.lock = false;
+    msg_tracker_mut().remove_msg_status(&msg_id);
+    Ok(())
+}
+
+async fn execute_swap_transfers(
+    state: &mut State,
+    sender: ActorId,
+    token_in: ActorId,
+    amount_in: U256,
+    token_out: ActorId,
+    amount_out: U256,
+) -> Result<(), PairError> {
+    let program_id = exec::program_id();
+    let msg_id = msg::id();
+
+    msg_tracker_mut().insert_msg_status(msg_id, MessageStatus::SendingMsgToTransferTokenIn);
+
+    // Receive input tokens from user
+    token_operations::transfer_from(
+        token_in,
+        sender,
+        program_id,
+        amount_in,
+        &state.config,
+        msg_id,
+    )
+    .await?;
+
+    msg_tracker_mut().insert_msg_status(msg_id, MessageStatus::SendingMsgToTransferTokenOut);
+
+    // Send output tokens to user
+    let result =
+        token_operations::transfer(token_out, sender, amount_out, &state.config, msg_id).await;
+
+    // Very unlikely
+    if result.is_err() {
+        msg_tracker_mut().insert_msg_status(msg_id, MessageStatus::SendingMessageToReturnTokenIn);
+        // transfer tokens back
+        token_operations::transfer(token_in, sender, amount_in, &state.config, msg_id).await?;
+        return Err(PairError::TokenTransferFailed);
+    }
+    state.lock = false;
+    msg_tracker_mut().remove_msg_status(&msg_id);
+    Ok(())
+}
+
+async fn return_tokens_from_pool(
+    state: &mut State,
+    sender: ActorId,
+    amount_a: U256,
+    amount_b: U256,
+) -> Result<(), PairError> {
+    let msg_id = msg::id();
+
+    msg_tracker_mut().insert_msg_status(msg_id, MessageStatus::SendingMsgToUnlockTokenA);
+
+    token_operations::transfer(state.token0, sender, amount_a, &state.config, msg_id).await?;
+
+    msg_tracker_mut().insert_msg_status(msg_id, MessageStatus::SendingMsgToUnlockTokenB);
+
+    token_operations::transfer(state.token1, sender, amount_b, &state.config, msg_id).await?;
+
+    state.lock = false;
+    msg_tracker_mut().remove_msg_status(&msg_id);
+    Ok(())
 }
 
 /// Verifies the constant product invariant (k) after a swap, accounting for a 0.3% fee.
@@ -427,15 +691,25 @@ pub fn verify_constant_product_invariant(
     Ok(())
 }
 
-fn mint_liquidity(sender: ActorId, liquidity: U256) {
-    let mut vft_service = VftService::new();
-    vft_service.mint(sender, liquidity);
+fn mint_liquidity(vft_exposure: &mut VftExposure, sender: ActorId, liquidity: U256) {
+    VftService::new().mint(sender, liquidity);
+    vft_exposure
+        .emit_event(VftEvent::Minted {
+            to: sender,
+            value: liquidity,
+        })
+        .expect("Error during vft event emitting");
 }
 
 /// Burns LP tokens from user's balance
-fn burn_liquidity(user: ActorId, amount: U256) {
-    let mut vft_service = VftService::new();
-    vft_service.burn(user, amount);
+fn burn_liquidity(vft_exposure: &mut VftExposure, user: ActorId, amount: U256) {
+    VftService::new().burn(user, amount);
+    vft_exposure
+        .emit_event(VftEvent::Burned {
+            from: user,
+            value: amount,
+        })
+        .expect("Error during vft event emitting");
 }
 
 fn update_reserves(state: &mut State, amount_a: U256, amount_b: U256) {
@@ -461,8 +735,8 @@ fn set_new_k_last(state: &mut State) -> Result<(), PairError> {
 ///
 /// Called internally before adding (`mint`) or removing (`burn`) liquidity to
 /// ensure protocol fees from accumulated swaps are accounted for.
-pub fn mint_fee(state: &mut State) -> Result<bool, PairError> {
-    let fee_to = state.fee_to; // Should be in your config
+pub fn mint_fee(state: &mut State, vft: &mut VftExposure) -> Result<bool, PairError> {
+    let fee_to = state.fee_to;
     let k_last = state.k_last;
     let fee_on = !fee_to.is_zero();
 
@@ -494,7 +768,7 @@ pub fn mint_fee(state: &mut State) -> Result<bool, PairError> {
                 let liquidity = numerator / denominator;
 
                 if !liquidity.is_zero() {
-                    mint_liquidity(fee_to, liquidity);
+                    mint_liquidity(vft, fee_to, liquidity);
                 }
             }
         }
@@ -525,9 +799,6 @@ pub fn calculate_protocol_fee(state: &State) -> Result<U256, PairError> {
 
     let root_k = current_k.integer_sqrt();
     let root_k_last = k_last.integer_sqrt();
-
-    sails_rs::gstd::debug!("root_k {:?}", root_k);
-    sails_rs::gstd::debug!("root_k_last {:?}", root_k_last);
 
     if root_k <= root_k_last {
         return Ok(U256::zero());
@@ -600,6 +871,12 @@ pub fn calculate_remove_liquidity(
     state: &State,
     liquidity: U256,
 ) -> Result<(U256, U256), PairError> {
+    if exec::gas_available() < state.config.gas_for_full_tx {
+        return Err(PairError::NotEnoghAttachedGas);
+    }
+    if state.lock {
+        return Err(PairError::AnotherTxInProgress);
+    }
     if liquidity.is_zero() {
         return Ok((U256::zero(), U256::zero()));
     }

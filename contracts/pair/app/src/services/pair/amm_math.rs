@@ -2,6 +2,9 @@ use crate::services::pair::PairError;
 use sails_rs::{U256, prelude::*};
 
 pub const MINIMUM_LIQUIDITY: u64 = 1000;
+pub const FEE_DENOM_BPS: u64 = 10_000; // 100.00%
+pub const TREASURY_FEE_BPS: u64 = 5; // 0.05%
+
 /// Calculates the amount of token B needed for a given amount of token A based on current reserves.
 /// Formula: amount_b = (amount_a * reserve_b) / reserve_a (floor division).
 /// # Arguments
@@ -61,6 +64,131 @@ pub fn calculate_optimal_amounts(
 
         Ok((amount_a_optimal, amount_b_desired))
     }
+}
+
+/// Calculates output amount for an ExactInput swap, taking into account
+/// an additional treasury fee in the input token.
+///
+/// 1. User specifies `amount_in_total` (total input they send to the pair).
+/// 2. We compute `treasury_fee = amount_in_total * treasury_fee_bps / 10_000`.
+/// 3. Remaining part goes into the pool:
+///      amount_in_for_pool = amount_in_total - treasury_fee
+/// 4. `get_amount_out(amount_in_for_pool, ...)` is used with the standard
+///    Uniswap 0.3% fee math (997/1000).
+///
+/// If `treasury_fee_bps == 0`, then:
+///   amount_in_for_pool == amount_in_total and treasury_fee == 0.
+///
+/// Returns:
+///   - amount_in_for_pool : effective input that enters the AMM reserves
+///   - amount_out         : output amount computed by Uniswap math
+///   - treasury_fee       : part of the input reserved for treasury
+pub fn get_amount_out_with_treasury(
+    amount_in_total: U256,
+    reserve_in: U256,
+    reserve_out: U256,
+    treasury_fee_bps: u64,
+) -> Result<(U256, U256, U256), PairError> {
+    if amount_in_total.is_zero() {
+        return Err(PairError::InsufficientAmount);
+    }
+
+    let denom = U256::from(FEE_DENOM_BPS);
+    let treasury_bps = U256::from(treasury_fee_bps);
+
+    // treasury_fee = amount_in_total * treasury_fee_bps / 10_000 (or 0 if disabled)
+    let treasury_fee = if treasury_fee_bps == 0 {
+        U256::zero()
+    } else {
+        amount_in_total
+            .checked_mul(treasury_bps)
+            .and_then(|v| v.checked_div(denom))
+            .ok_or(PairError::Overflow)?
+    };
+
+    // Portion that actually enters the pool and participates in x*y=k and 0.3% fee logic
+    let amount_in_for_pool = amount_in_total
+        .checked_sub(treasury_fee)
+        .ok_or(PairError::Overflow)?;
+
+    if amount_in_for_pool.is_zero() {
+        return Err(PairError::InsufficientAmount);
+    }
+
+    // Standard Uniswap V2 output calculation (internal 0.3% fee)
+    let amount_out = get_amount_out(amount_in_for_pool, reserve_in, reserve_out)?;
+
+    Ok((amount_in_for_pool, amount_out, treasury_fee))
+}
+
+/// Calculates required input amount for an ExactOutput swap, taking into account
+/// an additional treasury fee in the input token.
+///
+/// 1. We first compute how much must enter the pool using standard Uniswap math:
+///      amount_in_for_pool = get_amount_in(amount_out, reserve_in, reserve_out)
+///    This uses the internal 0.3% swap fee (997/1000).
+///
+/// 2. If `treasury_fee_bps > 0`, we solve:
+///      amount_in_for_pool = amount_in_total * (DENOM - treasury_fee_bps) / DENOM
+///
+///    Hence:
+///      amount_in_total = ceil(amount_in_for_pool * DENOM / (DENOM - treasury_fee_bps))
+///
+///    Then:
+///      treasury_fee = amount_in_total - amount_in_for_pool
+///
+/// 3. If `treasury_fee_bps == 0`, then:
+///      amount_in_total == amount_in_for_pool and treasury_fee == 0.
+/// Returns:
+///   - amount_in_for_pool : effective input that must enter the pool
+///   - amount_in_total    : total input the user has to pay (for slippage checks, transfers)
+///   - treasury_fee       : part of input reserved for treasury
+pub fn get_amount_in_with_treasury(
+    amount_out: U256,
+    reserve_in: U256,
+    reserve_out: U256,
+    treasury_fee_bps: u64,
+) -> Result<(U256, U256, U256), PairError> {
+    // First, compute the pool-side requirement using Uniswap's 0.3% math
+    let amount_in_for_pool = get_amount_in(amount_out, reserve_in, reserve_out)?;
+
+    if amount_in_for_pool.is_zero() {
+        return Err(PairError::InsufficientAmount);
+    }
+
+    if treasury_fee_bps == 0 {
+        // Treasury disabled → user pays exactly what the pool needs
+        return Ok((amount_in_for_pool, amount_in_for_pool, U256::zero()));
+    }
+
+    let denom = U256::from(FEE_DENOM_BPS);
+    let treasury_bps = U256::from(treasury_fee_bps);
+    let denom_minus_treasury = denom.checked_sub(treasury_bps).ok_or(PairError::Overflow)?;
+
+    // amount_in_for_pool = amount_in_total * (denom - treasury_bps) / denom
+    //
+    // amount_in_total = ceil(amount_in_for_pool * denom / (denom - treasury_bps))
+    let numerator = amount_in_for_pool
+        .checked_mul(denom)
+        .ok_or(PairError::Overflow)?;
+
+    let numerator_ceil = numerator
+        .checked_add(
+            denom_minus_treasury
+                .checked_sub(U256::from(1u64))
+                .ok_or(PairError::Overflow)?,
+        )
+        .ok_or(PairError::Overflow)?;
+
+    let amount_in_total = numerator_ceil
+        .checked_div(denom_minus_treasury)
+        .ok_or(PairError::Overflow)?;
+
+    let treasury_fee = amount_in_total
+        .checked_sub(amount_in_for_pool)
+        .ok_or(PairError::Overflow)?;
+
+    Ok((amount_in_for_pool, amount_in_total, treasury_fee))
 }
 
 /// Calculates the liquidity amount to mint based on added token amounts and current pool state.

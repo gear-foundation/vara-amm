@@ -1,4 +1,4 @@
 #![no_std]
 
 // Incorporate code generated based on the IDL file
-include!(concat!(env!("OUT_DIR"), "/factory_client.rs"));
+include!("factory_client.rs");

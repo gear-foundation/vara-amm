@@ -14,6 +14,7 @@ struct State {
     fee_to: ActorId,
     admin: ActorId,
     config: Config,
+    treasury_id: ActorId,
 }
 
 /// Config that will be used to send messages to the other programs or create programs.
@@ -29,10 +30,13 @@ pub struct Config {
     /// Timeout in blocks that current program will wait for reply from
     /// the other programs such as VFT
     reply_timeout: u32,
+    gas_for_full_tx: u64,
     gas_for_pair_creation: u64,
+    gas_to_change_fee_to: u64,
 }
 static mut STATE: Option<State> = None;
 
+#[event]
 #[derive(Debug, Decode, Encode, TypeInfo)]
 pub enum FactoryEvent {
     PairCreated {
@@ -43,13 +47,20 @@ pub enum FactoryEvent {
 }
 
 impl FactoryService {
-    pub fn init(pair_id: CodeId, admin: ActorId, fee_to: ActorId, config: Config) -> Self {
+    pub fn init(
+        pair_id: CodeId,
+        admin: ActorId,
+        fee_to: ActorId,
+        config: Config,
+        treasury_id: ActorId,
+    ) -> Self {
         unsafe {
             STATE = Some(State {
                 pair_id,
                 admin,
                 fee_to,
                 config,
+                treasury_id,
                 ..Default::default()
             })
         }
@@ -63,12 +74,14 @@ impl FactoryService {
     }
 }
 
-#[sails_rs::service(events = FactoryEvent)]
 impl FactoryService {
     pub fn new() -> Self {
         Self(())
     }
-
+}
+#[sails_rs::service(events = FactoryEvent)]
+impl FactoryService {
+    #[export]
     pub async fn create_pair(&mut self, token0: ActorId, token1: ActorId) {
         let state = self.get_mut();
         let (token0, token1) = sort_tokens(token0, token1);
@@ -83,20 +96,23 @@ impl FactoryService {
             gas_for_token_ops: state.config.gas_for_token_ops,
             gas_for_reply_deposit: state.config.gas_for_reply_deposit,
             reply_timeout: state.config.reply_timeout,
+            gas_for_full_tx: state.config.gas_for_full_tx,
         };
 
-        let payload = pair_client::pair_factory::io::New::encode_call(
+        let payload = pair_client::pair_client_factory::io::New::encode_call(
             pair_config,
             token0,
             token1,
             state.fee_to,
+            state.treasury_id,
+            state.admin,
         );
 
         let create_program_future = ProgramGenerator::create_program_bytes_with_gas_for_reply(
             state.pair_id,
             payload,
             state.config.gas_for_pair_creation,
-            ONE_VARA,
+            0,
             0,
         )
         .unwrap_or_else(|e| panic!("{:?}", e));
@@ -115,22 +131,64 @@ impl FactoryService {
         .expect("Error during event emission");
     }
 
+    #[export]
     pub fn change_fee_to(&mut self, fee_to: ActorId) {
-        if msg::source() != self.get().admin {
+        let state = self.get();
+        if msg::source() != state.admin {
             panic!("Not admin")
         }
 
         self.get_mut().fee_to = fee_to;
+        for &pair_id in state.pairs.values() {
+            let payload = pair_client::pair::io::ChangeFeeTo::encode_call(fee_to);
+            msg::send_bytes_with_gas(pair_id, payload, state.config.gas_to_change_fee_to, 0)
+                .expect("Error during sending message");
+        }
     }
 
+    #[export]
+    pub fn add_pair(&mut self, token0: ActorId, token1: ActorId, pair_address: ActorId) {
+        let state = self.get_mut();
+        if msg::source() != state.admin {
+            panic!("Not admin")
+        }
+        let (token0, token1) = sort_tokens(token0, token1);
+        state.pairs.insert((token0, token1), pair_address);
+
+        self.emit_event(FactoryEvent::PairCreated {
+            token0,
+            token1,
+            pair_address,
+        })
+        .expect("Error during event emission");
+    }
+
+    #[export]
+    pub fn change_treasury_id(&mut self, new_treasury_id: ActorId) {
+        let state = self.get();
+        if msg::source() != state.admin {
+            panic!("Not admin")
+        }
+
+        self.get_mut().treasury_id = new_treasury_id;
+    }
+
+    #[export]
     pub fn fee_to(&self) -> ActorId {
         self.get().fee_to
     }
 
+    #[export]
+    pub fn treasury_id(&self) -> ActorId {
+        self.get().treasury_id
+    }
+
+    #[export]
     pub fn pairs(&self) -> Vec<((ActorId, ActorId), ActorId)> {
         self.get().pairs.iter().map(|(k, v)| (*k, *v)).collect()
     }
 
+    #[export]
     pub fn get_pair(&self, token0: ActorId, token1: ActorId) -> ActorId {
         let (token0, token1) = sort_tokens(token0, token1);
         *(self
@@ -159,8 +217,14 @@ pub struct FactoryProgram(());
 #[sails_rs::program]
 impl FactoryProgram {
     // Program's constructor
-    pub fn new(pair_id: CodeId, admin: ActorId, fee_to: ActorId, config: Config) -> Self {
-        FactoryService::init(pair_id, admin, fee_to, config);
+    pub fn new(
+        pair_id: CodeId,
+        admin: ActorId,
+        fee_to: ActorId,
+        config: Config,
+        treasury_id: ActorId,
+    ) -> Self {
+        FactoryService::init(pair_id, admin, fee_to, config, treasury_id);
         Self(())
     }
 
