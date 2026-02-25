@@ -12,7 +12,7 @@ async fn test_exact_output_swap_with_fee() {
 
     env.setup_user(42, initial_a + initial_b).await;
 
-    env.pair_client
+    env.pair
         .add_liquidity(
             initial_a,
             initial_b,
@@ -20,8 +20,7 @@ async fn test_exact_output_swap_with_fee() {
             initial_b / U256::from(2),
             env.get_deadline(),
         )
-        .with_args(|args| args.with_actor_id(user))
-        .send_recv(env.pair_id)
+        .with_params(|args| args.with_actor_id(user))
         .await
         .unwrap();
 
@@ -35,11 +34,9 @@ async fn test_exact_output_swap_with_fee() {
     let (before_a, before_b, _) = env.get_balances(user).await; // Balances of A and B before swap
 
     // Perform swap (A -> B, exact output)
-    let result = env
-        .pair_client
+    env.pair
         .swap_tokens_for_exact_tokens(amount_out, amount_in_max, true, env.get_deadline())
-        .with_args(|args| args.with_actor_id(user))
-        .send_recv(env.pair_id)
+        .with_params(|args| args.with_actor_id(user))
         .await
         .unwrap();
 
@@ -139,7 +136,7 @@ async fn test_exact_output_swap_property_based_swap_invariants() {
         .await;
 
         // Add initial liquidity
-        env.pair_client
+        env.pair
             .add_liquidity(
                 liquidity_a,
                 liquidity_b,
@@ -147,8 +144,7 @@ async fn test_exact_output_swap_property_based_swap_invariants() {
                 liquidity_b * U256::from(90) / U256::from(100),
                 env.get_deadline(),
             )
-            .with_args(|args| args.with_actor_id(user))
-            .send_recv(env.pair_id)
+            .with_params(|args| args.with_actor_id(user))
             .await
             .unwrap();
 
@@ -182,10 +178,9 @@ async fn test_exact_output_swap_property_based_swap_invariants() {
         let (before_a, before_b, _) = env.get_balances(user).await;
 
         // Perform swap
-        env.pair_client
+        env.pair
             .swap_tokens_for_exact_tokens(amount_out, amount_in_max, a_to_b, env.get_deadline())
-            .with_args(|args| args.with_actor_id(user))
-            .send_recv(env.pair_id)
+            .with_params(|args| args.with_actor_id(user))
             .await
             .unwrap();
 
@@ -251,7 +246,7 @@ async fn test_exact_output_swap_edge_case_very_large_amounts() {
 
     env.setup_user(ACTOR_ID, liquidity_a * 3).await;
 
-    env.pair_client
+    env.pair
         .add_liquidity(
             liquidity_a,
             liquidity_b,
@@ -259,17 +254,11 @@ async fn test_exact_output_swap_edge_case_very_large_amounts() {
             liquidity_b / U256::from(2),
             env.get_deadline(),
         )
-        .with_args(|args| args.with_actor_id(user))
-        .send_recv(env.pair_id)
+        .with_params(|args| args.with_actor_id(user))
         .await
         .unwrap();
 
-    let (reserve_a, reserve_b) = env
-        .pair_client
-        .get_reserves()
-        .recv(env.pair_id)
-        .await
-        .unwrap();
+    let (reserve_a, reserve_b) = env.pair.get_reserves().await.unwrap();
 
     // Test very large swap (50% of reserves - should still work)
     let amount_out = reserve_b / U256::from(2);
@@ -278,10 +267,9 @@ async fn test_exact_output_swap_edge_case_very_large_amounts() {
 
     let (before_a, before_b, _) = env.get_balances(user).await;
 
-    env.pair_client
+    env.pair
         .swap_tokens_for_exact_tokens(amount_out, amount_in_max, true, env.get_deadline())
-        .with_args(|args| args.with_actor_id(user))
-        .send_recv(env.pair_id)
+        .with_params(|args| args.with_actor_id(user))
         .await
         .unwrap();
 
@@ -322,7 +310,7 @@ async fn test_exact_output_swap_edge_case_very_small_amounts() {
 
     env.setup_user(ACTOR_ID, liquidity_a + liquidity_b).await;
 
-    env.pair_client
+    env.pair
         .add_liquidity(
             liquidity_a,
             liquidity_b,
@@ -330,8 +318,7 @@ async fn test_exact_output_swap_edge_case_very_small_amounts() {
             liquidity_b / U256::from(2),
             env.get_deadline(),
         )
-        .with_args(|args| args.with_actor_id(user))
-        .send_recv(env.pair_id)
+        .with_params(|args| args.with_actor_id(user))
         .await
         .unwrap();
 
@@ -339,18 +326,12 @@ async fn test_exact_output_swap_edge_case_very_small_amounts() {
     let amount_out = U256::from(1);
     let amount_in_max = U256::from(10);
 
-    let (reserve_a, reserve_b) = env
-        .pair_client
-        .get_reserves()
-        .recv(env.pair_id)
-        .await
-        .unwrap();
+    let (reserve_a, reserve_b) = env.pair.get_reserves().await.unwrap();
     let (before_a, before_b, _) = env.get_balances(user).await;
 
-    env.pair_client
+    env.pair
         .swap_tokens_for_exact_tokens(amount_out, amount_in_max, true, env.get_deadline())
-        .with_args(|args| args.with_actor_id(user))
-        .send_recv(env.pair_id)
+        .with_params(|args| args.with_actor_id(user))
         .await
         .unwrap();
 
@@ -369,12 +350,7 @@ async fn test_exact_output_swap_edge_case_very_small_amounts() {
     assert!(used_a <= amount_in_max, "Should not exceed max input");
 
     // Verify k still increases even for tiny swaps
-    let (new_reserve_a, new_reserve_b) = env
-        .pair_client
-        .get_reserves()
-        .recv(env.pair_id)
-        .await
-        .unwrap();
+    let (new_reserve_a, new_reserve_b) = env.pair.get_reserves().await.unwrap();
     assert!(
         new_reserve_a * new_reserve_b > reserve_a * reserve_b,
         "K should increase even for 1 wei"
@@ -399,7 +375,7 @@ async fn test_edge_case_extreme_price_ratios() {
     )
     .await;
 
-    env.pair_client
+    env.pair
         .add_liquidity(
             liquidity_a,
             liquidity_b,
@@ -407,8 +383,7 @@ async fn test_edge_case_extreme_price_ratios() {
             liquidity_b * U256::from(90) / U256::from(100),
             env.get_deadline(),
         )
-        .with_args(|args| args.with_actor_id(ACTOR_ID.into()))
-        .send_recv(env.pair_id)
+        .with_params(|args| args.with_actor_id(ACTOR_ID.into()))
         .await
         .unwrap();
 
@@ -421,10 +396,9 @@ async fn test_edge_case_extreme_price_ratios() {
 
     let (before_a, before_b, _) = env.get_balances(ACTOR_ID.into()).await;
 
-    env.pair_client
+    env.pair
         .swap_tokens_for_exact_tokens(amount_out, amount_in_max, true, env.get_deadline())
-        .with_args(|args| args.with_actor_id(ACTOR_ID.into()))
-        .send_recv(env.pair_id)
+        .with_params(|args| args.with_actor_id(ACTOR_ID.into()))
         .await
         .unwrap();
 
@@ -466,7 +440,7 @@ async fn test_exact_output_swap_edge_case_insufficient_liquidity() {
 
     env.setup_user(42, liquidity_a + liquidity_b).await;
 
-    env.pair_client
+    env.pair
         .add_liquidity(
             liquidity_a,
             liquidity_b,
@@ -474,22 +448,20 @@ async fn test_exact_output_swap_edge_case_insufficient_liquidity() {
             liquidity_b / U256::from(2),
             env.get_deadline(),
         )
-        .with_args(|args| args.with_actor_id(user))
-        .send_recv(env.pair_id)
+        .with_params(|args| args.with_actor_id(user))
         .await
         .unwrap();
 
-    let (reserve_a, reserve_b) = env.get_reserves().await;
+    let (_reserve_a, reserve_b) = env.get_reserves().await;
 
     // Try to swap more than available (should fail)
     let amount_out = reserve_b + U256::from(1);
     let amount_in_max = U256::from(u64::MAX) * U256::exp10(18);
 
     let result = env
-        .pair_client
+        .pair
         .swap_tokens_for_exact_tokens(amount_out, amount_in_max, true, env.get_deadline())
-        .with_args(|args| args.with_actor_id(user))
-        .send_recv(env.pair_id)
+        .with_params(|args| args.with_actor_id(user))
         .await;
 
     assert!(
@@ -500,10 +472,9 @@ async fn test_exact_output_swap_edge_case_insufficient_liquidity() {
     // Try to swap exactly the reserve amount (should also fail due to k invariant)
     let amount_out = reserve_b;
     let result = env
-        .pair_client
+        .pair
         .swap_tokens_for_exact_tokens(amount_out, amount_in_max, true, env.get_deadline())
-        .with_args(|args| args.with_actor_id(user))
-        .send_recv(env.pair_id)
+        .with_params(|args| args.with_actor_id(user))
         .await;
 
     assert!(

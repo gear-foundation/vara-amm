@@ -1,5 +1,5 @@
 use crate::*;
-
+use pair_client::vft::Vft;
 #[tokio::test]
 async fn test_multiple_lps_with_swap_fees_and_withdrawal() {
     let treasury_id = ActorId::zero();
@@ -40,13 +40,9 @@ async fn test_multiple_lps_with_swap_fees_and_withdrawal() {
     // Give swapper lots of tokens for swapping
     let swapper_tokens = U256::from(200000) * U256::exp10(18);
     env.setup_user(swapper, swapper_tokens).await;
-    env.remoting
-        .system()
-        .mint_to(swapper, 1_000_000_000_000_000);
-    env.remoting
-        .system()
-        .mint_to(ACTOR_ID, 1_000_000_000_000_000);
-    env.remoting.system().mint_to(FEE_TO, 1_000_000_000_000_000);
+    env.env.system().mint_to(swapper, 1_000_000_000_000_000);
+    env.env.system().mint_to(ACTOR_ID, 1_000_000_000_000_000);
+    env.env.system().mint_to(FEE_TO, 1_000_000_000_000_000);
 
     // Track LP tokens for each user
     let mut lp_tokens: Vec<U256> = Vec::new();
@@ -66,7 +62,7 @@ async fn test_multiple_lps_with_swap_fees_and_withdrawal() {
             lp_amounts_b[i]
         );
 
-        env.pair_client
+        env.pair
             .add_liquidity(
                 lp_amounts_a[i],
                 lp_amounts_b[i],
@@ -74,12 +70,11 @@ async fn test_multiple_lps_with_swap_fees_and_withdrawal() {
                 lp_amounts_b[i] * U256::from(95) / U256::from(100),
                 env.get_deadline(),
             )
-            .with_args(|args| args.with_actor_id(lp_user.into()))
-            .send_recv(env.pair_id)
+            .with_params(|args| args.with_actor_id(lp_user.into()))
             .await
             .unwrap();
 
-        let (after_a, after_b, after_lp) = env.get_balances(lp_user.into()).await;
+        let (_after_a, _after_b, after_lp) = env.get_balances(lp_user.into()).await;
         let lp_tokens_received = after_lp - before_lp;
         lp_tokens.push(lp_tokens_received);
 
@@ -87,19 +82,9 @@ async fn test_multiple_lps_with_swap_fees_and_withdrawal() {
     }
 
     // Get state after all LPs added liquidity
-    let (initial_reserve_a, initial_reserve_b) = env
-        .pair_client
-        .get_reserves()
-        .recv(env.pair_id)
-        .await
-        .unwrap();
+    let (initial_reserve_a, initial_reserve_b) = env.pair.get_reserves().await.unwrap();
     let initial_k = initial_reserve_a * initial_reserve_b;
-    let total_lp_supply = env
-        .lp_vft_client
-        .total_supply()
-        .recv(env.pair_id)
-        .await
-        .unwrap();
+    let total_lp_supply = env.lp_vft.total_supply().await.unwrap();
 
     println!("\nInitial state after LP setup:");
     println!(
@@ -111,7 +96,6 @@ async fn test_multiple_lps_with_swap_fees_and_withdrawal() {
 
     // Constants for calculations
     let thousand = U256::from(1000u64);
-    let fee_multiplier = U256::from(997u64);
 
     println!("\n🔄 Starting 30 swaps by swapper...");
 
@@ -127,21 +111,20 @@ async fn test_multiple_lps_with_swap_fees_and_withdrawal() {
             let amount_out = U256::from(100 + i * 20) * U256::exp10(18);
             let amount_in_max = U256::from(500 + i * 50) * U256::exp10(18);
 
-            let (before_a, before_b, _) = env.get_balances(swapper.into()).await;
+            let (before_a, _before_b, _) = env.get_balances(swapper.into()).await;
 
-            env.pair_client
+            env.pair
                 .swap_tokens_for_exact_tokens(
                     amount_out,
                     amount_in_max,
                     true, // A to B
                     env.get_deadline(),
                 )
-                .with_args(|args| args.with_actor_id(swapper.into()))
-                .send_recv(env.pair_id)
+                .with_params(|args| args.with_actor_id(swapper.into()))
                 .await
                 .unwrap();
 
-            let (after_a, after_b, _) = env.get_balances(swapper.into()).await;
+            let (after_a, _after_b, _) = env.get_balances(swapper.into()).await;
             let used_a = before_a - after_a;
 
             // Calculate fee (0.3% of input)
@@ -156,17 +139,16 @@ async fn test_multiple_lps_with_swap_fees_and_withdrawal() {
             let amount_out = U256::from(80 + i * 15) * U256::exp10(18);
             let amount_in_max = U256::from(400 + i * 40) * U256::exp10(18);
 
-            let (before_a, before_b, _) = env.get_balances(swapper.into()).await;
+            let (_before_a, before_b, _) = env.get_balances(swapper.into()).await;
 
-            env.pair_client
+            env.pair
                 .swap_tokens_for_exact_tokens(
                     amount_out,
                     amount_in_max,
                     false, // B to A
                     env.get_deadline(),
                 )
-                .with_args(|args| args.with_actor_id(swapper.into()))
-                .send_recv(env.pair_id)
+                .with_params(|args| args.with_actor_id(swapper.into()))
                 .await
                 .unwrap();
 
@@ -184,12 +166,7 @@ async fn test_multiple_lps_with_swap_fees_and_withdrawal() {
     }
 
     // Get state after swaps
-    let (mid_reserve_a, mid_reserve_b) = env
-        .pair_client
-        .get_reserves()
-        .recv(env.pair_id)
-        .await
-        .unwrap();
+    let (mid_reserve_a, mid_reserve_b) = env.pair.get_reserves().await.unwrap();
     let mid_k = mid_reserve_a * mid_reserve_b;
     let k_growth = mid_k - initial_k;
 
@@ -222,15 +199,14 @@ async fn test_multiple_lps_with_swap_fees_and_withdrawal() {
         let (before_a, before_b, before_lp) = env.get_balances(lp_user.into()).await;
 
         // Remove liquidity
-        env.pair_client
+        env.pair
             .remove_liquidity(
                 lp_tokens_to_remove,
                 U256::zero(), // min_amount_a (accept any)
                 U256::zero(), // min_amount_b (accept any)
                 env.get_deadline(),
             )
-            .with_args(|args| args.with_actor_id(lp_user.into()))
-            .send_recv(env.pair_id)
+            .with_params(|args| args.with_actor_id(lp_user.into()))
             .await
             .unwrap();
 
@@ -320,18 +296,8 @@ async fn test_multiple_lps_with_swap_fees_and_withdrawal() {
     }
 
     // Final verification
-    let (final_reserve_a, final_reserve_b) = env
-        .pair_client
-        .get_reserves()
-        .recv(env.pair_id)
-        .await
-        .unwrap();
-    let final_lp_supply = env
-        .lp_vft_client
-        .total_supply()
-        .recv(env.pair_id)
-        .await
-        .unwrap();
+    let (final_reserve_a, final_reserve_b) = env.pair.get_reserves().await.unwrap();
+    let final_lp_supply = env.lp_vft.total_supply().await.unwrap();
 
     println!("\nFINAL RESULTS:");
     println!(
@@ -352,15 +318,14 @@ async fn test_multiple_lps_with_swap_fees_and_withdrawal() {
         protocol_fee_tokens
     );
     // Remove protocol fee liquidity
-    env.pair_client
+    env.pair
         .remove_liquidity(
             protocol_fee_tokens,
             U256::zero(), // min_amount_a (accept any)
             U256::zero(), // min_amount_b (accept any)
             env.get_deadline(),
         )
-        .with_args(|args| args.with_actor_id(FEE_TO.into()))
-        .send_recv(env.pair_id)
+        .with_params(|args| args.with_actor_id(FEE_TO.into()))
         .await
         .unwrap();
 
@@ -409,12 +374,7 @@ async fn test_multiple_lps_with_swap_fees_and_withdrawal() {
     );
 
     // Final check - only MINIMUM_LIQUIDITY should remain
-    let final_final_lp_supply = env
-        .lp_vft_client
-        .total_supply()
-        .recv(env.pair_id)
-        .await
-        .unwrap();
+    let final_final_lp_supply = env.lp_vft.total_supply().await.unwrap();
     assert_eq!(
         final_final_lp_supply,
         U256::from(1000),

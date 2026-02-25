@@ -1,4 +1,6 @@
 use crate::*;
+use pair_client::vft::Vft;
+use pair_client::LockState;
 
 #[tokio::test]
 async fn test_add_liquidity_expired_deadline() {
@@ -10,10 +12,10 @@ async fn test_add_liquidity_expired_deadline() {
     env.setup_user(ACTOR_ID, amount * U256::from(2)).await;
 
     // Set deadline in the past
-    let expired_deadline = env.remoting.system().block_timestamp() - 1;
+    let expired_deadline = env.env.system().block_timestamp() - 1;
 
     let result = env
-        .pair_client
+        .pair
         .add_liquidity(
             amount,
             amount,
@@ -21,8 +23,7 @@ async fn test_add_liquidity_expired_deadline() {
             amount / U256::from(2),
             expired_deadline,
         )
-        .with_args(|args| args.with_actor_id(user))
-        .send_recv(env.pair_id)
+        .with_params(|args| args.with_actor_id(user))
         .await;
 
     assert!(result.is_err(), "Should fail with expired deadline");
@@ -52,10 +53,9 @@ async fn test_add_liquidity_subsequent_perfect_ratio() {
 
     let (before_a, before_b, before_lp) = env.get_balances(user2).await;
 
-    env.pair_client
+    env.pair
         .add_liquidity(second_a, second_b, second_a, second_b, env.get_deadline())
-        .with_args(|args| args.with_actor_id(user2))
-        .send_recv(env.pair_id)
+        .with_params(|args| args.with_actor_id(user2))
         .await
         .unwrap();
 
@@ -66,18 +66,8 @@ async fn test_add_liquidity_subsequent_perfect_ratio() {
     assert_eq!(before_b - after_b, second_b, "Should use exact amount B");
 
     // Verify LP tokens calculation
-    let (reserve_a, reserve_b) = env
-        .pair_client
-        .get_reserves()
-        .recv(env.pair_id)
-        .await
-        .unwrap();
-    let total_supply = env
-        .lp_vft_client
-        .total_supply()
-        .recv(env.pair_id)
-        .await
-        .unwrap();
+    let (reserve_a, reserve_b) = env.pair.get_reserves().await.unwrap();
+    let total_supply = env.lp_vft.total_supply().await.unwrap();
 
     let expected_liquidity = calculate_expected_liquidity_subsequent(
         second_a,
@@ -120,10 +110,9 @@ async fn test_add_liquidity_subsequent_excess_token_a() {
 
     let (before_a, before_b, _) = env.get_balances(user2).await;
 
-    env.pair_client
+    env.pair
         .add_liquidity(desired_a, desired_b, min_a, min_b, env.get_deadline())
-        .with_args(|args| args.with_actor_id(user2))
-        .send_recv(env.pair_id)
+        .with_params(|args| args.with_actor_id(user2))
         .await
         .unwrap();
 
@@ -169,10 +158,9 @@ async fn test_add_liquidity_subsequent_excess_token_b() {
 
     let (before_a, before_b, _) = env.get_balances(user2).await;
 
-    env.pair_client
+    env.pair
         .add_liquidity(desired_a, desired_b, min_a, min_b, env.get_deadline())
-        .with_args(|args| args.with_actor_id(user2))
-        .send_recv(env.pair_id)
+        .with_params(|args| args.with_actor_id(user2))
         .await
         .unwrap();
 
@@ -244,7 +232,7 @@ async fn test_add_liquidity_zero_amounts() {
     env.setup_user(ACTOR_ID, medium_amount()).await;
 
     let result = env
-        .pair_client
+        .pair
         .add_liquidity(
             U256::zero(),
             U256::zero(),
@@ -252,8 +240,7 @@ async fn test_add_liquidity_zero_amounts() {
             U256::zero(),
             env.get_deadline(),
         )
-        .with_args(|args| args.with_actor_id(user))
-        .send_recv(env.pair_id)
+        .with_params(|args| args.with_actor_id(user))
         .await;
 
     assert!(result.is_err(), "Should fail with zero amounts");
@@ -274,7 +261,7 @@ async fn test_add_liquidity_insufficient_balance() {
     let large_amount = small_balance * U256::from(10);
 
     let result = env
-        .pair_client
+        .pair
         .add_liquidity(
             large_amount,
             large_amount,
@@ -282,8 +269,7 @@ async fn test_add_liquidity_insufficient_balance() {
             large_amount / U256::from(2),
             env.get_deadline(),
         )
-        .with_args(|args| args.with_actor_id(user))
-        .send_recv(env.pair_id)
+        .with_params(|args| args.with_actor_id(user))
         .await;
 
     assert!(
@@ -292,19 +278,14 @@ async fn test_add_liquidity_insufficient_balance() {
     );
 
     // check msg tracker is empty
-    let msgs_in_msg_tracker = env
-        .pair_client
-        .msgs_in_msg_tracker()
-        .recv(env.pair_id)
-        .await
-        .unwrap();
+    let msgs_in_msg_tracker = env.pair.msgs_in_msg_tracker().await.unwrap();
     assert_eq!(msgs_in_msg_tracker.len(), 1);
 
-    let lock = env.pair_client.lock().recv(env.pair_id).await.unwrap();
-    assert!(!lock);
+    let lock = env.pair.lock().await.unwrap();
+    assert_eq!(lock, LockState::Free);
 
     let result = env
-        .pair_client
+        .pair
         .add_liquidity(
             small_balance,
             large_amount,
@@ -312,8 +293,7 @@ async fn test_add_liquidity_insufficient_balance() {
             large_amount / U256::from(2),
             env.get_deadline(),
         )
-        .with_args(|args| args.with_actor_id(user))
-        .send_recv(env.pair_id)
+        .with_params(|args| args.with_actor_id(user))
         .await;
 
     assert!(
@@ -322,16 +302,11 @@ async fn test_add_liquidity_insufficient_balance() {
     );
 
     // check msg tracker is empty
-    let msgs_in_msg_tracker = env
-        .pair_client
-        .msgs_in_msg_tracker()
-        .recv(env.pair_id)
-        .await
-        .unwrap();
+    let msgs_in_msg_tracker = env.pair.msgs_in_msg_tracker().await.unwrap();
     assert_eq!(msgs_in_msg_tracker.len(), 2);
 
-    let lock = env.pair_client.lock().recv(env.pair_id).await.unwrap();
-    assert!(!lock);
+    let lock = env.pair.lock().await.unwrap();
+    assert_eq!(lock, LockState::Free);
 
-    println!("✅ Insufficient balance test passed");
+    println!("Insufficient balance test passed");
 }

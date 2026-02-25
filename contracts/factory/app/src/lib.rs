@@ -99,7 +99,7 @@ impl FactoryService {
             gas_for_full_tx: state.config.gas_for_full_tx,
         };
 
-        let payload = pair_client::pair_client_factory::io::New::encode_call(
+        let payload = pair_client::io::New::encode_params(
             pair_config,
             token0,
             token1,
@@ -140,7 +140,7 @@ impl FactoryService {
 
         self.get_mut().fee_to = fee_to;
         for &pair_id in state.pairs.values() {
-            let payload = pair_client::pair::io::ChangeFeeTo::encode_call(fee_to);
+            let payload = pair_client::pair::io::ChangeFeeTo::encode_params(fee_to);
             msg::send_bytes_with_gas(pair_id, payload, state.config.gas_to_change_fee_to, 0)
                 .expect("Error during sending message");
         }

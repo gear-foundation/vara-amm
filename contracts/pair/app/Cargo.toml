@@ -5,8 +5,8 @@ edition = "2024"
 
 [dependencies]
 sails-rs = { workspace = true, features = ["debug"] }
-extended-vft-client = { git = "https://github.com/gear-foundation/standards/", rev = "004dfba2ff3ac1ef12cb16b7f6f20a57605a5f28"}
-vft-service = { git = "https://github.com/gear-foundation/standards/", rev = "004dfba2ff3ac1ef12cb16b7f6f20a57605a5f28"}
+extended-vft-client = { git = "https://github.com/gear-foundation/standards/", rev = "ac8dfdc41ba557669d98651267ab5cf53b46c0ee"}
+vft-service = { git = "https://github.com/gear-foundation/standards/", rev = "ac8dfdc41ba557669d98651267ab5cf53b46c0ee"}
 parity-scale-codec.workspace = true
 scale-info.workspace = true
 gstd.workspace = true

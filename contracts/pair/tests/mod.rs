@@ -1,16 +1,12 @@
-use sails_rs::{
-    calls::*,
-    gtest::{calls::*, System},
-    prelude::*,
-    U256,
-};
+use sails_rs::{client::*, gtest::*, prelude::*, U256};
 
-use extended_vft_client::traits::*;
-use pair_client::{traits::Vft as LpVft, traits::*, Config};
+use pair_client::{pair::*, Config};
 use rand::prelude::*;
 
 pub mod liquidity;
 pub mod swaps;
+
+pub mod recovery;
 
 mod utils;
 pub use utils::*;

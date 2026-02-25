@@ -4,7 +4,7 @@ use sails_rs::{gstd::msg, prelude::*};
 mod amm_math;
 mod funcs;
 mod msg_tracker;
-use msg_tracker::{MessageStatus, msg_tracker_ref};
+use msg_tracker::{MessageStatus, msg_tracker_ref, msg_tracker_mut};
 use sails_rs::gstd::services::Service as Svc;
 
 mod token_operations;
@@ -26,7 +26,7 @@ pub struct State {
     factory_id: ActorId,
     k_last: U256,
     config: Config,
-    lock: bool,
+    lock: LockState,
     treasury_id: ActorId,
     admin_id: ActorId,
     migrated: bool,
@@ -89,12 +89,76 @@ pub enum PairError {
     TokenTransferFailed,
     ReplyHook,
     ZeroLiquidity,
+    InsufficientLiquidityBurned,
     Unauthorized,
     NoTreasuryFees,
     NotTreasuryId,
     NoLiquidityToMigrate,
     PoolMigrated,
     UnableToDecode,
+    NotPaused,
+    InvalidRecoveryState,
+}
+
+#[derive(Debug, Clone, Encode, Decode, TypeInfo, PartialEq, Eq)]
+pub enum LockState {
+    Free,
+    /// Normal in-flight operation: no pause, but we have full context.
+    Busy(LockCtx),
+    /// Contract is paused; keep the same context for recovery.
+    Paused(LockCtx),
+}
+
+impl LockState {
+    pub fn is_free(&self) -> bool {
+        matches!(self, LockState::Free)
+    }
+}
+impl Default for LockState {
+    fn default() -> Self {
+        LockState::Free
+    }
+}
+#[derive(Debug, Clone, Encode, Decode, TypeInfo, PartialEq, Eq)]
+pub enum LockCtx {
+    /// remove_liquidity: we are doing sequential payouts. Stage tells where we are.
+    RemLiq {
+        user: ActorId,
+        liquidity: U256,
+        amount_a: U256,
+        amount_b: U256,
+        stage: SendTokenStage,
+    },
+    /// swap: refund needs to be retried
+    SwapRefund {
+        user: ActorId,
+        token: ActorId,
+        amount: U256,
+    },
+    /// add_liquidity: refund needs to be retried
+    AddLiqRefund {
+        user: ActorId,
+        token: ActorId,
+        amount: U256,
+    },
+    MigrateAllLiquidity {
+        target: ActorId,
+        amount0: U256,
+        amount1: U256,
+        stage: SendTokenStage,
+    },
+    TreasuryPayout {
+        treasury: ActorId,
+        amount0: U256,
+        amount1: U256,
+        stage: SendTokenStage,
+    },
+}
+
+#[derive(Debug, Clone, Encode, Decode, TypeInfo, PartialEq, Eq)]
+pub enum SendTokenStage {
+    SendToken0, // about to send token0
+    SendToken1, // token0 already done, about to send token1 (critical if fails)
 }
 
 /// Config that will be used to send messages to the other programs.
@@ -147,16 +211,6 @@ impl PairService {
 pub fn state_mut() -> &'static mut State {
     unsafe { static_mut!(STATE).as_mut() }.expect("State is not initialized")
 }
-macro_rules! event_or_panic_async {
-    ($expr:expr) => {{
-        match $expr.await {
-            Ok(value) => value,
-            Err(e) => {
-                panic!("Message processing failed with error: {:?}", e)
-            }
-        }
-    }};
-}
 
 impl PairService {
     pub fn new(vft_exposure: VftExposure) -> Self {
@@ -165,7 +219,7 @@ impl PairService {
 }
 #[sails_rs::service(events = PairEvent)]
 impl PairService {
-    #[export]
+    #[export(unwrap_result)]
     pub async fn add_liquidity(
         &mut self,
         amount_a_desired: U256,
@@ -173,17 +227,19 @@ impl PairService {
         amount_a_min: U256,
         amount_b_min: U256,
         deadline: u64,
-    ) {
-        let event = event_or_panic_async!(funcs::add_liquidity(
+    ) -> Result<(), PairError> {
+        let event = funcs::add_liquidity(
             self.get_mut(),
             amount_a_desired,
             amount_b_desired,
             amount_a_min,
             amount_b_min,
             deadline,
-            &mut self.vft_exposure
-        ));
+            &mut self.vft_exposure,
+        )
+        .await?;
         self.emit_event(event).expect("Event emission error");
+        Ok(())
     }
 
     /// Removes liquidity from the AMM pool
@@ -201,23 +257,25 @@ impl PairService {
     /// 4. Validates amounts against minimum thresholds
     /// 5. Burns user's LP tokens and transfers underlying tokens back
     /// 6. Updates pool reserves
-    #[export]
+    #[export(unwrap_result)]
     pub async fn remove_liquidity(
         &mut self,
         liquidity: U256,
         amount_a_min: U256,
         amount_b_min: U256,
         deadline: u64,
-    ) {
-        let event = event_or_panic_async!(funcs::remove_liquidity(
+    ) -> Result<(), PairError> {
+        let event = funcs::remove_liquidity(
             self.get_mut(),
             liquidity,
             amount_a_min,
             amount_b_min,
             deadline,
-            &mut self.vft_exposure
-        ));
+            &mut self.vft_exposure,
+        )
+        .await?;
         self.emit_event(event).expect("Event emission error");
+        Ok(())
     }
 
     /// Migrates all pool liquidity and accrued treasury fees to a target address.
@@ -229,10 +287,11 @@ impl PairService {
     /// NOTE:
     /// - Intended for final pool shutdown / migration to a new contract.
     /// - Should be callable only by an admin
-    #[export]
-    pub async fn migrate_all_liquidity(&mut self, target: ActorId) {
-        let event = event_or_panic_async!(funcs::migrate_all_liquidity(self.get_mut(), target));
+    #[export(unwrap_result)]
+    pub async fn migrate_all_liquidity(&mut self, target: ActorId) -> Result<(), PairError> {
+        let event = funcs::migrate_all_liquidity(self.get_mut(), target).await?;
         self.emit_event(event).expect("Event emission error");
+        Ok(())
     }
 
     /// Swaps an exact amount of input tokens for as many output tokens as possible in a single pair.
@@ -243,22 +302,24 @@ impl PairService {
     /// * `amount_out_min` - Minimum amount of output token expected (slippage protection)
     /// * `is_token0_to_token1` - Direction of swap (true: token0 to token1, false: token1 to token0)
     /// * `deadline` - Unix timestamp after which the transaction will revert
-    #[export]
+    #[export(unwrap_result)]
     pub async fn swap_exact_tokens_for_tokens(
         &mut self,
         amount_in: U256,
         amount_out_min: U256,
         is_token0_to_token1: bool,
         deadline: u64,
-    ) {
-        let event = event_or_panic_async!(funcs::swap_exact_tokens_for_tokens(
+    ) -> Result<(), PairError> {
+        let event = funcs::swap_exact_tokens_for_tokens(
             self.get_mut(),
             amount_in,
             amount_out_min,
             is_token0_to_token1,
             deadline,
-        ));
+        )
+        .await?;
         self.emit_event(event).expect("Event emission error");
+        Ok(())
     }
 
     /// Swaps as few input tokens as possible for an exact amount of output tokens in a single pair.
@@ -269,32 +330,44 @@ impl PairService {
     /// * `amount_in_max` - Maximum amount of input token willing to pay (slippage protection)
     /// * `is_token0_to_token1` - Direction of swap (true: token0 to token1, false: token1 to token0)
     /// * `deadline` - Unix timestamp after which the transaction will revert
-    #[export]
+    #[export(unwrap_result)]
     pub async fn swap_tokens_for_exact_tokens(
         &mut self,
         amount_out: U256,
         amount_in_max: U256,
         is_token0_to_token1: bool,
         deadline: u64,
-    ) {
-        let event = event_or_panic_async!(funcs::swap_tokens_for_exact_tokens(
+    ) -> Result<(), PairError> {
+        let event = funcs::swap_tokens_for_exact_tokens(
             self.get_mut(),
             amount_out,
             amount_in_max,
             is_token0_to_token1,
             deadline,
-        ));
+        )
+        .await?;
         self.emit_event(event).expect("Event emission error");
+        Ok(())
+    }
+
+    #[export(unwrap_result)]
+    pub async fn recover_paused(&mut self) -> Result<(), PairError> {
+        let res = funcs::recover_paused(self.get_mut(), &mut self.vft_exposure).await?;
+        if let Some(event) = res {
+            self.emit_event(event).expect("Event emission error");
+        }
+        Ok(())
+    }
+
+    #[export(unwrap_result)]
+    pub async fn send_treasury_fees(&mut self) -> Result<(), PairError> {
+        let event = funcs::send_treasury_fees_from_pool(self.get_mut()).await?;
+        self.emit_event(event).expect("Event emission error");
+        Ok(())
     }
 
     #[export]
-    pub async fn send_treasury_fees(&mut self) {
-        let event = event_or_panic_async!(funcs::send_treasury_fees_from_pool(self.get_mut(),));
-        self.emit_event(event).expect("Event emission error");
-    }
-
-    #[export]
-    pub async fn set_lock(&mut self, lock: bool) {
+    pub async fn set_lock(&mut self, lock: LockState) {
         let state = self.get_mut();
         if msg::source() == state.admin_id {
             state.lock = lock;
@@ -427,6 +500,15 @@ impl PairService {
     }
 
     #[export]
+    pub fn update_config(&mut self, config: Config) {
+        let state = self.get_mut();
+        if msg::source() != state.admin_id {
+            panic!("Not admin")
+        }
+        state.config = config;
+    }
+
+    #[export]
     pub fn treasury_id(&self) -> ActorId {
         self.get().treasury_id
     }
@@ -437,13 +519,31 @@ impl PairService {
     }
 
     #[export]
+    pub fn remove_msg_status(&mut self, msg_id: MessageId) {
+        let state = self.get_mut();
+        if msg::source() != state.admin_id {
+            panic!("Not admin")
+        }
+        msg_tracker_mut().remove_msg_status(&msg_id);
+    }
+
+    #[export]
+    pub fn clear_msg_tracker(&mut self) {
+        let state = self.get_mut();
+        if msg::source() != state.admin_id {
+            panic!("Not admin")
+        }
+        msg_tracker_mut().clear_all();
+    }
+
+    #[export]
     pub fn msgs_in_msg_tracker(&self) -> Vec<(MessageId, MessageStatus)> {
         msg_tracker_ref().message_info.clone().into_iter().collect()
     }
 
     #[export]
-    pub fn lock(&self) -> bool {
-        self.get().lock
+    pub fn lock(&self) -> LockState {
+        self.get().lock.clone()
     }
 
     #[export]
