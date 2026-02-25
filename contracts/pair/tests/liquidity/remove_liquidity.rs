@@ -12,7 +12,7 @@ async fn test_remove_liquidity_basic() {
 
     env.setup_user(ACTOR_ID, amount_a + amount_b).await;
 
-    let (before_a, before_b, before_lp) = env.get_balances(user).await;
+    let (_before_a, _before_b, before_lp) = env.get_balances(user).await;
 
     setup_initial_liquidity(&mut env, user, amount_a, amount_b).await;
 
@@ -26,15 +26,14 @@ async fn test_remove_liquidity_basic() {
     // Remove half of the liquidity
     let lp_to_remove = lp_tokens_received / U256::from(2);
 
-    env.pair_client
+    env.pair
         .remove_liquidity(
             lp_to_remove,
             U256::zero(), // Accept any amount
             U256::zero(),
             env.get_deadline(),
         )
-        .with_args(|args| args.with_actor_id(user))
-        .send_recv(env.pair_id)
+        .with_params(|args| args.with_actor_id(user))
         .await
         .unwrap();
 
@@ -90,15 +89,14 @@ async fn test_remove_liquidity_with_minimum_liquidity_impact() {
     // Try to remove ALL user's liquidity (this should work, but MINIMUM_LIQUIDITY stays locked)
     let (before_a, before_b, _) = env.get_balances(user).await;
 
-    env.pair_client
+    env.pair
         .remove_liquidity(
             lp_balance, // Remove all user's LP tokens
             U256::zero(),
             U256::zero(),
             env.get_deadline(),
         )
-        .with_args(|args| args.with_actor_id(user))
-        .send_recv(env.pair_id)
+        .with_params(|args| args.with_actor_id(user))
         .await
         .unwrap();
 
@@ -181,15 +179,14 @@ async fn test_remove_liquidity_after_price_change() {
 
     let k_last = reserve_a * reserve_b;
 
-    env.pair_client
+    env.pair
         .swap_tokens_for_exact_tokens(
             swap_amount,
             max_input,
             false, // B -> A (makes A more expensive)
             env.get_deadline(),
         )
-        .with_args(|args| args.with_actor_id(trader))
-        .send_recv(env.pair_id)
+        .with_params(|args| args.with_actor_id(trader))
         .await
         .unwrap();
 
@@ -201,10 +198,9 @@ async fn test_remove_liquidity_after_price_change() {
 
     let total_supply = env.get_total_supply().await;
 
-    env.pair_client
+    env.pair
         .remove_liquidity(lp_balance, U256::zero(), U256::zero(), env.get_deadline())
-        .with_args(|args| args.with_actor_id(lp_user))
-        .send_recv(env.pair_id)
+        .with_params(|args| args.with_actor_id(lp_user))
         .await
         .unwrap();
 
@@ -261,15 +257,14 @@ async fn test_remove_liquidity_insufficient_minimum() {
 
     // Try to remove with unrealistic minimum requirements
     let result = env
-        .pair_client
+        .pair
         .remove_liquidity(
             lp_balance / U256::from(2),
             amount_a, // Impossible minimum
             amount_b,
             env.get_deadline(),
         )
-        .with_args(|args| args.with_actor_id(user))
-        .send_recv(env.pair_id)
+        .with_params(|args| args.with_actor_id(user))
         .await;
 
     assert!(
@@ -294,18 +289,17 @@ async fn test_remove_liquidity_expired_deadline() {
     let lp_balance = env.get_balances(user).await.2;
 
     // Try to remove with expired deadline
-    let expired_deadline = env.remoting.system().block_timestamp() - 1;
+    let expired_deadline = env.env.system().block_timestamp() - 1;
 
     let result = env
-        .pair_client
+        .pair
         .remove_liquidity(
             lp_balance / U256::from(2),
             U256::zero(),
             U256::zero(),
             expired_deadline,
         )
-        .with_args(|args| args.with_actor_id(user))
-        .send_recv(env.pair_id)
+        .with_params(|args| args.with_actor_id(user))
         .await;
 
     assert!(result.is_err(), "Should fail with expired deadline");

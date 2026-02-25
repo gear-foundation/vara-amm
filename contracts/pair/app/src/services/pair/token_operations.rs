@@ -1,10 +1,10 @@
 use crate::services::pair::{
-    Config, PairError,
+    Config, LockCtx, LockState, PairError, SendTokenStage,
     msg_tracker::{MessageStatus, MessageTracker, msg_tracker_mut},
     state_mut,
 };
 use extended_vft_client::vft::io::{BalanceOf, Transfer, TransferFrom};
-use sails_rs::{U256, calls::ActionIo, gstd::msg, prelude::*};
+use sails_rs::{U256, client::CallCodec, gstd::msg, prelude::*};
 
 pub async fn transfer_from(
     token_id: ActorId,
@@ -14,7 +14,7 @@ pub async fn transfer_from(
     config: &Config,
     msg_id: MessageId,
 ) -> Result<(), PairError> {
-    let bytes: Vec<u8> = TransferFrom::encode_call(sender, receiver, amount);
+    let bytes: Vec<u8> = TransferFrom::encode_params_with_prefix("Vft", sender, receiver, amount);
 
     send_message_with_gas_for_reply(
         token_id,
@@ -34,7 +34,7 @@ pub async fn transfer(
     config: &Config,
     msg_id: MessageId,
 ) -> Result<(), PairError> {
-    let bytes: Vec<u8> = Transfer::encode_call(receiver, amount);
+    let bytes: Vec<u8> = Transfer::encode_params_with_prefix("Vft", receiver, amount);
 
     send_message_with_gas_for_reply(
         token_id,
@@ -94,8 +94,9 @@ fn handle_reply_hook(msg_id: MessageId) {
         MessageStatus::SendingMsgToLockTokenA => {
             let reply = decode_transfer_from_reply(&reply_bytes);
             msg_tracker.update_msg_status(msg_id, MessageStatus::TokenALocked(reply));
+            // If we failed to lock token A, the operation did not progress; release the lock.
             if !reply {
-                state.lock = false;
+                state.lock = LockState::Free;
             }
         }
         MessageStatus::SendingMsgToLockTokenB => {
@@ -105,42 +106,94 @@ fn handle_reply_hook(msg_id: MessageId) {
         MessageStatus::SendingMessageToReturnTokensA => {
             let reply = decode_transfer_reply(&reply_bytes);
             msg_tracker.update_msg_status(msg_id, MessageStatus::TokensAReturnComplete(reply));
-            state.lock = false;
+
+            // ADD-LIQUIDITY REFUND:
+            // This is a "recovery/refund" path after add_liquidity partially failed.
+            // If the refund transfer itself fails, funds may become stuck => pause for manual investigation.
+            if !reply {
+                pause_keep_ctx(&mut state.lock);
+            } else {
+                state.lock = LockState::Free;
+            }
         }
         MessageStatus::SendingMsgToTransferTokenIn => {
             let reply = decode_transfer_from_reply(&reply_bytes);
             msg_tracker.update_msg_status(msg_id, MessageStatus::TokenInTransfered(reply));
+
+            // If token_in could not be taken from the user, the swap did not start; release the lock.
             if !reply {
-                state.lock = false;
+                state.lock = LockState::Free;
             }
         }
         MessageStatus::SendingMsgToTransferTokenOut => {
             let reply = decode_transfer_reply(&reply_bytes);
             msg_tracker.update_msg_status(msg_id, MessageStatus::TokenOutTransfered(reply));
+            // lock stays Busy; failure handling is usually in later stages / refund
         }
         MessageStatus::SendingMessageToReturnTokenIn => {
             let reply = decode_transfer_reply(&reply_bytes);
             msg_tracker.update_msg_status(msg_id, MessageStatus::TokenInReturnComplete(reply));
-            state.lock = false;
+            // SWAP REFUND:
+            // This is a "recovery/refund" path. If refund fails, user funds may be stuck => pause for manual investigation.
+            if !reply {
+                pause_keep_ctx(&mut state.lock);
+            } else {
+                state.lock = LockState::Free;
+            }
         }
         MessageStatus::SendingMsgToUnlockTokenA => {
             let reply = decode_transfer_reply(&reply_bytes);
             msg_tracker.update_msg_status(msg_id, MessageStatus::TokenAUnlocked(reply));
+            // REMOVE LIQUIDITY:
+            // Extremely rare but high-impact: failure to transfer underlying back to the user => pause for manual investigation/recovery.
+            if reply {
+                match &mut state.lock {
+                    LockState::Busy(LockCtx::RemLiq { stage, .. })
+                    | LockState::Busy(LockCtx::MigrateAllLiquidity { stage, .. }) => {
+                        *stage = SendTokenStage::SendToken1;
+                    }
+                    _ => {}
+                }
+            } else {
+                pause_keep_ctx(&mut state.lock);
+            }
         }
         MessageStatus::SendingMsgToUnlockTokenB => {
             let reply = decode_transfer_reply(&reply_bytes);
             msg_tracker.update_msg_status(msg_id, MessageStatus::TokenBUnlocked(reply));
+            // REMOVE LIQUIDITY:
+            // Extremely rare but high-impact: failure to transfer underlying back to the user => pause for manual investigation/recovery.
+            if !reply {
+                pause_keep_ctx(&mut state.lock);
+            }
         }
         MessageStatus::SendingTreasuryTokenA => {
             let reply = decode_transfer_reply(&reply_bytes);
             msg_tracker.update_msg_status(msg_id, MessageStatus::TreasuryTokenASent(reply));
+            if reply {
+                if let LockState::Busy(LockCtx::TreasuryPayout { stage, .. }) = &mut state.lock {
+                    *stage = SendTokenStage::SendToken1;
+                }
+            } else {
+                pause_keep_ctx(&mut state.lock);
+            }
         }
 
         MessageStatus::SendingTreasuryTokenB => {
             let reply = decode_transfer_reply(&reply_bytes);
             msg_tracker.update_msg_status(msg_id, MessageStatus::TreasuryTokenBSent(reply));
+            if !reply {
+                pause_keep_ctx(&mut state.lock);
+            }
         }
         _ => {}
+    };
+}
+
+fn pause_keep_ctx(lock: &mut LockState) {
+    *lock = match mem::replace(lock, LockState::Free) {
+        LockState::Busy(ctx) => LockState::Paused(ctx),
+        other => other,
     };
 }
 
@@ -183,7 +236,7 @@ pub async fn balance_of(
     account_id: ActorId,
     config: &Config,
 ) -> Result<U256, PairError> {
-    let bytes: Vec<u8> = BalanceOf::encode_call(account_id);
+    let bytes: Vec<u8> = BalanceOf::encode_params_with_prefix("Vft", account_id);
 
     let reply_bytes = sails_rs::gstd::msg::send_bytes_with_gas_for_reply(
         token_id,
@@ -198,14 +251,14 @@ pub async fn balance_of(
     .await
     .map_err(|_| PairError::ReplyFailure)?;
 
-    BalanceOf::decode_reply(&reply_bytes).map_err(|_| PairError::UnableToDecode)
+    BalanceOf::decode_reply_with_prefix("Vft", &reply_bytes).map_err(|_| PairError::UnableToDecode)
 }
 
 /// Decode reply received from the TransferFrom method.
 fn decode_transfer_from_reply(bytes: &[u8]) -> bool {
-    TransferFrom::decode_reply(bytes).unwrap_or(false)
+    TransferFrom::decode_reply_with_prefix("Vft", bytes).unwrap_or(false)
 }
 /// Decode reply received from the TransferFrom method.
 fn decode_transfer_reply(bytes: &[u8]) -> bool {
-    Transfer::decode_reply(bytes).unwrap_or(false)
+    Transfer::decode_reply_with_prefix("Vft", bytes).unwrap_or(false)
 }

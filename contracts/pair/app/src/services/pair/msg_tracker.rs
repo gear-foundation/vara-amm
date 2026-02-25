@@ -84,4 +84,9 @@ impl MessageTracker {
     pub fn remove_msg_status(&mut self, msg_id: &MessageId) -> Option<MessageStatus> {
         self.message_info.remove(msg_id)
     }
+
+    /// Clear all tracked messages
+    pub fn clear_all(&mut self) {
+        self.message_info.clear();
+    }
 }

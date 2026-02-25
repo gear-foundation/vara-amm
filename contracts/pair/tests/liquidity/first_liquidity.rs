@@ -1,5 +1,5 @@
 use crate::*;
-
+use pair_client::vft::Vft as LpVft;
 #[tokio::test]
 async fn test_first_liquidity_balanced_amounts() {
     let treasury_id = ActorId::zero();
@@ -14,7 +14,7 @@ async fn test_first_liquidity_balanced_amounts() {
 
     let (before_a, before_b, before_lp) = env.get_balances(user).await;
 
-    env.pair_client
+    env.pair
         .add_liquidity(
             amount_a,
             amount_b,
@@ -22,8 +22,7 @@ async fn test_first_liquidity_balanced_amounts() {
             amount_b / U256::from(2),
             env.get_deadline(),
         )
-        .with_args(|args| args.with_actor_id(user))
-        .send_recv(env.pair_id)
+        .with_params(|args| args.with_actor_id(user))
         .await
         .unwrap();
 
@@ -50,12 +49,7 @@ async fn test_first_liquidity_balanced_amounts() {
     );
 
     // Verify total supply includes minimum liquidity
-    let total_supply = env
-        .lp_vft_client
-        .total_supply()
-        .recv(env.pair_id)
-        .await
-        .unwrap();
+    let total_supply = env.lp_vft.total_supply().await.unwrap();
     assert_eq!(
         total_supply,
         expected_liquidity + U256::from(MINIMUM_LIQUIDITY),
@@ -78,10 +72,9 @@ async fn test_first_liquidity_minimum_amounts() {
     env.setup_user(ACTOR_ID, amount_a * U256::from(1000)).await;
 
     let result = env
-        .pair_client
+        .pair
         .add_liquidity(amount_a, amount_b, amount_a, amount_b, env.get_deadline())
-        .with_args(|args| args.with_actor_id(user))
-        .send_recv(env.pair_id)
+        .with_params(|args| args.with_actor_id(user))
         .await;
 
     assert!(
@@ -107,8 +100,7 @@ async fn test_first_liquidity_maximum_amounts() {
 
     let (before_a, before_b, before_lp) = env.get_balances(user).await;
 
-    let result = env
-        .pair_client
+    env.pair
         .add_liquidity(
             amount_a,
             amount_b,
@@ -116,8 +108,7 @@ async fn test_first_liquidity_maximum_amounts() {
             amount_b / U256::from(2),
             env.get_deadline(),
         )
-        .with_args(|args| args.with_actor_id(user))
-        .send_recv(env.pair_id)
+        .with_params(|args| args.with_actor_id(user))
         .await
         .unwrap();
 
@@ -143,12 +134,7 @@ async fn test_first_liquidity_maximum_amounts() {
     );
 
     // Verify total supply
-    let total_supply = env
-        .lp_vft_client
-        .total_supply()
-        .recv(env.pair_id)
-        .await
-        .unwrap();
+    let total_supply = env.lp_vft.total_supply().await.unwrap();
     assert_eq!(
         total_supply,
         expected_liquidity + U256::from(1000),

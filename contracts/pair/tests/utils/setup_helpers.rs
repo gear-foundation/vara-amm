@@ -7,9 +7,9 @@ pub async fn setup_initial_liquidity(
     amount_a: U256,
     amount_b: U256,
 ) -> U256 {
-    let (before_a, before_b, before_lp) = env.get_balances(user).await;
+    let (_before_a, _before_b, before_lp) = env.get_balances(user).await;
 
-    env.pair_client
+    env.pair
         .add_liquidity(
             amount_a,
             amount_b,
@@ -19,12 +19,11 @@ pub async fn setup_initial_liquidity(
             //  amount_b * U256::from(90) / U256::from(100),
             env.get_deadline(),
         )
-        .with_args(|args| args.with_actor_id(user))
-        .send_recv(env.pair_id)
+        .with_params(|args| args.with_actor_id(user))
         .await
         .unwrap();
 
-    let (after_a, after_b, after_lp) = env.get_balances(user).await;
+    let (_after_a, _after_b, after_lp) = env.get_balances(user).await;
     after_lp - before_lp // Return LP tokens received
 }
 
@@ -69,10 +68,9 @@ pub async fn expect_minimum_amount_failure(
     min_b: U256,
 ) {
     let result = env
-        .pair_client
+        .pair
         .add_liquidity(desired_a, desired_b, min_a, min_b, env.get_deadline())
-        .with_args(|args| args.with_actor_id(user))
-        .send_recv(env.pair_id)
+        .with_params(|args| args.with_actor_id(user))
         .await;
 
     assert!(

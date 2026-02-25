@@ -6,7 +6,7 @@ edition.workspace = true
 
 [dependencies]
 pair-app = { path = "app" }
-extended-vft = { git = "https://github.com/gear-foundation/standards/", rev = "004dfba2ff3ac1ef12cb16b7f6f20a57605a5f28" }
+extended-vft = { git = "https://github.com/gear-foundation/standards/", rev = "ac8dfdc41ba557669d98651267ab5cf53b46c0ee" }
 
 [build-dependencies]
 pair-app = { path = "app" }
@@ -16,9 +16,10 @@ sails-rs = { workspace = true, features = ["build"] }
 pair = { path = ".", features = ["wasm-binary"] }
 pair-client = { path = "client" }
 sails-rs = { workspace = true, features = ["gtest"] }
+gtest.workspace = true
 tokio = { workspace = true, features = ["rt", "macros"] }
-extended-vft-client = { git = "https://github.com/gear-foundation/standards/", rev = "004dfba2ff3ac1ef12cb16b7f6f20a57605a5f28" }
-extended-vft = { git = "https://github.com/gear-foundation/standards/", rev = "004dfba2ff3ac1ef12cb16b7f6f20a57605a5f28" }
+extended-vft-client = { git = "https://github.com/gear-foundation/standards/", rev = "ac8dfdc41ba557669d98651267ab5cf53b46c0ee" }
+extended-vft = { git = "https://github.com/gear-foundation/standards/", rev = "ac8dfdc41ba557669d98651267ab5cf53b46c0ee" }
 rand = "0.9.2"
 
 [features]

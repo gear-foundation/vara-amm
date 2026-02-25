@@ -5,9 +5,7 @@ async fn test_exact_output_swap_a_to_b_with_treasury_basic() {
     // Non-zero treasury id to enable treasury logic
     let treasury_id = ActorId::from([1u8; 32]);
     let mut env = TestEnv::new(treasury_id).await;
-    env.remoting
-        .system()
-        .mint_to(treasury_id, 100_000_000_000_000);
+    env.env.system().mint_to(treasury_id, 100_000_000_000_000);
     let lp_user = ACTOR_ID.into();
     let trader = ActorId::from(TRADER_1);
 
@@ -18,7 +16,7 @@ async fn test_exact_output_swap_a_to_b_with_treasury_basic() {
     env.setup_user(TRADER_1, trader_funds).await;
     env.setup_user(ACTOR_ID, liquidity_amount).await;
 
-    env.pair_client
+    env.pair
         .add_liquidity(
             liquidity_amount,
             liquidity_amount,
@@ -26,8 +24,7 @@ async fn test_exact_output_swap_a_to_b_with_treasury_basic() {
             liquidity_amount / U256::from(2),
             env.get_deadline(),
         )
-        .with_args(|args| args.with_actor_id(lp_user))
-        .send_recv(env.pair_id)
+        .with_params(|args| args.with_actor_id(lp_user))
         .await
         .unwrap();
 
@@ -41,9 +38,8 @@ async fn test_exact_output_swap_a_to_b_with_treasury_basic() {
 
     // View quote: MUST match actual swap result (same math helper inside)
     let quoted_in = env
-        .pair_client
+        .pair
         .get_amount_in(amount_out, true) // A -> B
-        .recv(env.pair_id)
         .await
         .unwrap();
 
@@ -51,22 +47,16 @@ async fn test_exact_output_swap_a_to_b_with_treasury_basic() {
 
     let (before_a, before_b, _) = env.get_balances(trader).await;
 
-    let (_, before_treasury0, before_treasury1) = env
-        .pair_client
-        .get_treasury_info()
-        .recv(env.pair_id)
-        .await
-        .unwrap();
+    let (_, before_treasury0, before_treasury1) = env.pair.get_treasury_info().await.unwrap();
 
-    env.pair_client
+    env.pair
         .swap_tokens_for_exact_tokens(
             amount_out,
             amount_in_max,
             true, // A -> B
             env.get_deadline(),
         )
-        .with_args(|args| args.with_actor_id(trader))
-        .send_recv(env.pair_id)
+        .with_params(|args| args.with_actor_id(trader))
         .await
         .unwrap();
 
@@ -125,12 +115,7 @@ async fn test_exact_output_swap_a_to_b_with_treasury_basic() {
     // 3. Check treasury accounting
     // ─────────────────────────────────────────────
 
-    let (_, after_treasury0, after_treasury1) = env
-        .pair_client
-        .get_treasury_info()
-        .recv(env.pair_id)
-        .await
-        .unwrap();
+    let (_, after_treasury0, after_treasury1) = env.pair.get_treasury_info().await.unwrap();
 
     assert_eq!(
         after_treasury0,
@@ -150,21 +135,15 @@ async fn test_exact_output_swap_a_to_b_with_treasury_basic() {
     // ─────────────────────────────────────────────
     // 4. Collect treasury fee0 and check balances
     // ─────────────────────────────────────────────
-    let (before_balance_a, before_balance_b, _) = env.get_balances(treasury_id).await;
+    let (before_balance_a, _before_balance_b, _) = env.get_balances(treasury_id).await;
 
-    env.pair_client
+    env.pair
         .send_treasury_fees()
-        .with_args(|args| args.with_actor_id(treasury_id))
-        .send_recv(env.pair_id)
+        .with_params(|args| args.with_actor_id(treasury_id))
         .await
         .unwrap();
 
-    let (_, fee_a_after, fee_b_after) = env
-        .pair_client
-        .get_treasury_info()
-        .recv(env.pair_id)
-        .await
-        .unwrap();
+    let (_, fee_a_after, fee_b_after) = env.pair.get_treasury_info().await.unwrap();
 
     let (after_balance_a, _, _) = env.get_balances(treasury_id).await;
 
@@ -198,9 +177,7 @@ async fn test_exact_output_swap_b_to_a_with_treasury_basic() {
     // Non-zero treasury id to enable treasury logic
     let treasury_id = ActorId::from([1u8; 32]);
     let mut env = TestEnv::new(treasury_id).await;
-    env.remoting
-        .system()
-        .mint_to(treasury_id, 100_000_000_000_000);
+    env.env.system().mint_to(treasury_id, 100_000_000_000_000);
     let lp_user = ACTOR_ID.into();
     let trader = ActorId::from(TRADER_1);
 
@@ -211,7 +188,7 @@ async fn test_exact_output_swap_b_to_a_with_treasury_basic() {
     env.setup_user(TRADER_1, trader_funds).await;
     env.setup_user(ACTOR_ID, liquidity_amount).await;
 
-    env.pair_client
+    env.pair
         .add_liquidity(
             liquidity_amount,
             liquidity_amount,
@@ -219,8 +196,7 @@ async fn test_exact_output_swap_b_to_a_with_treasury_basic() {
             liquidity_amount / U256::from(2),
             env.get_deadline(),
         )
-        .with_args(|args| args.with_actor_id(lp_user))
-        .send_recv(env.pair_id)
+        .with_params(|args| args.with_actor_id(lp_user))
         .await
         .unwrap();
 
@@ -234,9 +210,8 @@ async fn test_exact_output_swap_b_to_a_with_treasury_basic() {
 
     // View quote: MUST match actual swap result (same math helper inside)
     let quoted_in = env
-        .pair_client
+        .pair
         .get_amount_in(amount_out, false) // B -> A
-        .recv(env.pair_id)
         .await
         .unwrap();
 
@@ -244,22 +219,16 @@ async fn test_exact_output_swap_b_to_a_with_treasury_basic() {
 
     let (before_a, before_b, _) = env.get_balances(trader).await;
 
-    let (_, before_treasury0, before_treasury1) = env
-        .pair_client
-        .get_treasury_info()
-        .recv(env.pair_id)
-        .await
-        .unwrap();
+    let (_, before_treasury0, before_treasury1) = env.pair.get_treasury_info().await.unwrap();
 
-    env.pair_client
+    env.pair
         .swap_tokens_for_exact_tokens(
             amount_out,
             amount_in_max,
             false, // B -> A
             env.get_deadline(),
         )
-        .with_args(|args| args.with_actor_id(trader))
-        .send_recv(env.pair_id)
+        .with_params(|args| args.with_actor_id(trader))
         .await
         .unwrap();
 
@@ -318,12 +287,7 @@ async fn test_exact_output_swap_b_to_a_with_treasury_basic() {
     // 3. Check treasury accounting
     // ─────────────────────────────────────────────
 
-    let (_, after_treasury0, after_treasury1) = env
-        .pair_client
-        .get_treasury_info()
-        .recv(env.pair_id)
-        .await
-        .unwrap();
+    let (_, after_treasury0, after_treasury1) = env.pair.get_treasury_info().await.unwrap();
 
     assert_eq!(
         after_treasury0, before_treasury0,
@@ -345,19 +309,13 @@ async fn test_exact_output_swap_b_to_a_with_treasury_basic() {
     // ─────────────────────────────────────────────
     let (before_balance_a, before_balance_b, _) = env.get_balances(treasury_id).await;
 
-    env.pair_client
+    env.pair
         .send_treasury_fees()
-        .with_args(|args| args.with_actor_id(treasury_id))
-        .send_recv(env.pair_id)
+        .with_params(|args| args.with_actor_id(treasury_id))
         .await
         .unwrap();
 
-    let (_, fee_a_after, fee_b_after) = env
-        .pair_client
-        .get_treasury_info()
-        .recv(env.pair_id)
-        .await
-        .unwrap();
+    let (_, fee_a_after, fee_b_after) = env.pair.get_treasury_info().await.unwrap();
 
     let (_, after_balance_b, _) = env.get_balances(treasury_id).await;
 

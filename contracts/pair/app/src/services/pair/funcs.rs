@@ -1,4 +1,5 @@
 use crate::services::lp_token::{Event as VftEvent, ExtendedService as VftService};
+use crate::services::pair::{LockCtx, LockState, SendTokenStage};
 use crate::services::pair::{
     PairError, PairEvent, State, VftExposure, amm_math,
     amm_math::TREASURY_FEE_BPS,
@@ -52,7 +53,7 @@ pub async fn add_liquidity(
     if amount_a_desired == U256::zero() || amount_b_desired == U256::zero() {
         return Err(PairError::ZeroLiquidity);
     }
-    if state.lock {
+    if !state.lock.is_free() {
         return Err(PairError::AnotherTxInProgress);
     }
     if exec::block_timestamp() > deadline {
@@ -118,16 +119,19 @@ pub async fn remove_liquidity(
     if state.migrated {
         return Err(PairError::PoolMigrated);
     }
+
+    if liquidity.is_zero() {
+        return Err(PairError::ZeroLiquidity);
+    }
     // Check if transaction deadline has passed
     if exec::block_timestamp() > deadline {
         return Err(PairError::DeadlineExpired);
     }
 
-    if state.lock {
+    if !state.lock.is_free() {
         return Err(PairError::AnotherTxInProgress);
     }
 
-    state.lock = true;
     let sender = msg::source();
 
     // Verify user has sufficient LP tokens
@@ -161,10 +165,21 @@ pub async fn remove_liquidity(
         return Err(PairError::InsufficientAmountB);
     }
 
+    if amount_a.is_zero() || amount_b.is_zero() {
+        return Err(PairError::InsufficientLiquidityBurned);
+    }
     // Sanity check: ensure pool has sufficient reserves
     if amount_a > state.reserve0 || amount_b > state.reserve1 {
         return Err(PairError::InsufficientLiquidity);
     }
+
+    state.lock = LockState::Busy(LockCtx::RemLiq {
+        user: sender,
+        liquidity,
+        amount_a,
+        amount_b,
+        stage: SendTokenStage::SendToken0,
+    });
 
     // Transfer underlying tokens back to user
     return_tokens_from_pool(state, sender, amount_a, amount_b).await?;
@@ -213,10 +228,10 @@ pub async fn migrate_all_liquidity(
         return Err(PairError::NotEnoghAttachedGas);
     }
 
-    if state.lock {
+    if !state.lock.is_free() {
         return Err(PairError::AnotherTxInProgress);
     }
-    state.lock = true;
+
     let program_id = exec::program_id();
 
     let balance0 = token_operations::balance_of(state.token0, program_id, &state.config).await?;
@@ -225,7 +240,12 @@ pub async fn migrate_all_liquidity(
     if balance0.is_zero() && balance1.is_zero() {
         return Err(PairError::NoLiquidityToMigrate);
     }
-
+    state.lock = LockState::Busy(LockCtx::MigrateAllLiquidity {
+        target,
+        amount0: balance0,
+        amount1: balance1,
+        stage: SendTokenStage::SendToken0,
+    });
     return_tokens_from_pool(state, target, balance0, balance1).await?;
 
     state.reserve0 = U256::zero();
@@ -251,7 +271,7 @@ pub async fn send_treasury_fees_from_pool(state: &mut State) -> Result<PairEvent
     if exec::gas_available() < state.config.gas_for_full_tx {
         return Err(PairError::NotEnoghAttachedGas);
     }
-    if state.lock {
+    if !state.lock.is_free() {
         return Err(PairError::AnotherTxInProgress);
     }
     let amount_a = state.accrued_treasury_fee0;
@@ -261,9 +281,19 @@ pub async fn send_treasury_fees_from_pool(state: &mut State) -> Result<PairEvent
         return Err(PairError::NoTreasuryFees);
     }
 
-    state.lock = true;
     let msg_id = msg::id();
     let treasury_id = state.treasury_id;
+
+    state.lock = LockState::Busy(LockCtx::TreasuryPayout {
+        treasury: treasury_id,
+        amount0: amount_a,
+        amount1: amount_b,
+        stage: if amount_a.is_zero() {
+            SendTokenStage::SendToken1
+        } else {
+            SendTokenStage::SendToken0
+        },
+    });
 
     msg_tracker_mut().insert_msg_status(msg_id, MessageStatus::SendingTreasuryTokenA);
 
@@ -285,8 +315,8 @@ pub async fn send_treasury_fees_from_pool(state: &mut State) -> Result<PairEvent
     state.accrued_treasury_fee0 = U256::zero();
     state.accrued_treasury_fee1 = U256::zero();
 
-    state.lock = false;
-    msg_tracker_mut().remove_msg_status(&msg_id);
+    state.lock = LockState::Free;
+    msg_tracker_mut().clear_all();
 
     Ok(PairEvent::TreasuryFeesCollected {
         treasury_id,
@@ -345,7 +375,7 @@ pub async fn swap_tokens(
     if exec::gas_available() < state.config.gas_for_full_tx {
         return Err(PairError::NotEnoghAttachedGas);
     }
-    if state.lock {
+    if !state.lock.is_free() {
         return Err(PairError::AnotherTxInProgress);
     }
     if exec::block_timestamp() > deadline {
@@ -538,7 +568,11 @@ async fn transfer_tokens_to_pool(
     amount_a: U256,
     amount_b: U256,
 ) -> Result<(), PairError> {
-    state.lock = true;
+    state.lock = LockState::Busy(LockCtx::AddLiqRefund {
+        user: sender,
+        token: state.token0,
+        amount: amount_a,
+    });
     let program_id = exec::program_id();
     let msg_id = msg::id();
     msg_tracker_mut().insert_msg_status(msg_id, MessageStatus::SendingMsgToLockTokenA);
@@ -570,8 +604,8 @@ async fn transfer_tokens_to_pool(
         token_operations::transfer(state.token0, sender, amount_a, &state.config, msg_id).await?;
         return Err(PairError::TokenTransferFailed);
     }
-    state.lock = false;
-    msg_tracker_mut().remove_msg_status(&msg_id);
+    state.lock = LockState::Free;
+    msg_tracker_mut().clear_all();
     Ok(())
 }
 
@@ -585,7 +619,11 @@ async fn execute_swap_transfers(
 ) -> Result<(), PairError> {
     let program_id = exec::program_id();
     let msg_id = msg::id();
-
+    state.lock = LockState::Busy(LockCtx::SwapRefund {
+        user: sender,
+        token: token_in,
+        amount: amount_in,
+    });
     msg_tracker_mut().insert_msg_status(msg_id, MessageStatus::SendingMsgToTransferTokenIn);
 
     // Receive input tokens from user
@@ -612,8 +650,8 @@ async fn execute_swap_transfers(
         token_operations::transfer(token_in, sender, amount_in, &state.config, msg_id).await?;
         return Err(PairError::TokenTransferFailed);
     }
-    state.lock = false;
-    msg_tracker_mut().remove_msg_status(&msg_id);
+    state.lock = LockState::Free;
+    msg_tracker_mut().clear_all();
     Ok(())
 }
 
@@ -633,8 +671,8 @@ async fn return_tokens_from_pool(
 
     token_operations::transfer(state.token1, sender, amount_b, &state.config, msg_id).await?;
 
-    state.lock = false;
-    msg_tracker_mut().remove_msg_status(&msg_id);
+    state.lock = LockState::Free;
+    msg_tracker_mut().clear_all();
     Ok(())
 }
 
@@ -874,7 +912,7 @@ pub fn calculate_remove_liquidity(
     if exec::gas_available() < state.config.gas_for_full_tx {
         return Err(PairError::NotEnoghAttachedGas);
     }
-    if state.lock {
+    if !state.lock.is_free() {
         return Err(PairError::AnotherTxInProgress);
     }
     if liquidity.is_zero() {
@@ -896,4 +934,190 @@ pub fn calculate_remove_liquidity(
         / simulated_total_supply;
 
     Ok((amount0, amount1))
+}
+
+pub async fn recover_paused(
+    state: &mut State,
+    vft_exposure: &mut VftExposure,
+) -> Result<Option<PairEvent>, PairError> {
+    let caller = msg::source();
+
+    let ctx = match state.lock.clone() {
+        LockState::Paused(ctx) => ctx,
+        _ => return Err(PairError::NotPaused),
+    };
+
+    // optional: helper to avoid leaving old msg_id statuses around after recovery succeeds
+    let clear_tracker = || {
+        msg_tracker_mut().message_info.clear();
+    };
+    match ctx {
+        // -------------------------
+        // 1) Add liquidity refund retry
+        // -------------------------
+        LockCtx::AddLiqRefund {
+            user,
+            token,
+            amount,
+        } => {
+            // Only recipient (or admin) can finalize refund
+
+            if caller != user && caller != state.admin_id {
+                return Err(PairError::Unauthorized);
+            }
+            // Retry refund transfer
+            let msg_id = msg::id();
+            msg_tracker_mut()
+                .insert_msg_status(msg_id, MessageStatus::SendingMessageToReturnTokensA);
+            token_operations::transfer(token, user, amount, &state.config, msg_id).await?;
+            state.lock = LockState::Free;
+            clear_tracker();
+        }
+        // -------------------------
+        // 2) Swap refund retry
+        // -------------------------
+        LockCtx::SwapRefund {
+            user,
+            token,
+            amount,
+        } => {
+            if caller != user && caller != state.admin_id {
+                return Err(PairError::Unauthorized);
+            }
+
+            let msg_id = msg::id();
+            msg_tracker_mut()
+                .insert_msg_status(msg_id, MessageStatus::SendingMessageToReturnTokenIn);
+            token_operations::transfer(token, user, amount, &state.config, msg_id).await?;
+            state.lock = LockState::Free;
+            clear_tracker();
+        }
+
+        // -------------------------
+        // 3) Remove liquidity: ONLY if we are paused at UnlockB stage
+        //    => token0 already sent, token1 missing. We must finish token1 payout,
+        //       then mint_fee/burn/update reserves exactly once.
+        // -------------------------
+        LockCtx::RemLiq {
+            user,
+            liquidity,
+            amount_a,
+            amount_b,
+            stage,
+        } => {
+            if stage != SendTokenStage::SendToken1 {
+                // We only support recovery for the critical partial-execution case.
+                return Err(PairError::InvalidRecoveryState);
+            }
+            if caller != user && caller != state.admin_id {
+                return Err(PairError::Unauthorized);
+            }
+
+            // Finish the missing payout (token1)
+            let msg_id = msg::id();
+            msg_tracker_mut().insert_msg_status(msg_id, MessageStatus::SendingMsgToUnlockTokenB);
+
+            token_operations::transfer(state.token1, user, amount_b, &state.config, msg_id).await?;
+
+            // Now finalize the exact same steps that would have happened in remove_liquidity()
+            let fee_on = mint_fee(state, vft_exposure)?;
+
+            burn_liquidity(vft_exposure, user, liquidity);
+
+            state.reserve0 = state
+                .reserve0
+                .checked_sub(amount_a)
+                .ok_or(PairError::Overflow)?;
+            state.reserve1 = state
+                .reserve1
+                .checked_sub(amount_b)
+                .ok_or(PairError::Overflow)?;
+
+            if fee_on {
+                set_new_k_last(state)?;
+            }
+
+            state.lock = LockState::Free;
+            clear_tracker();
+            return Ok(Some(PairEvent::LiquidityRemoved {
+                user_id: user,
+                amount_a,
+                amount_b,
+                liquidity,
+            }));
+        }
+        // -------------------------
+        // 4) Migrate liquidity: ONLY if we are paused at SendToken1 stage
+        //    => token0 already sent, token1 missing. We must finish token1 payout,
+        // -------------------------
+        LockCtx::MigrateAllLiquidity {
+            target,
+            amount0,
+            amount1,
+            stage,
+        } => {
+            if stage != SendTokenStage::SendToken1 {
+                // We only support recovery for the critical partial-execution case.
+                return Err(PairError::InvalidRecoveryState);
+            }
+            if caller != state.admin_id {
+                return Err(PairError::Unauthorized);
+            }
+
+            // Finish the missing payout (token1)
+            let msg_id = msg::id();
+            msg_tracker_mut().insert_msg_status(msg_id, MessageStatus::SendingMsgToUnlockTokenB);
+
+            token_operations::transfer(state.token1, target, amount1, &state.config, msg_id)
+                .await?;
+            state.reserve0 = U256::zero();
+            state.reserve1 = U256::zero();
+            state.k_last = U256::zero();
+            state.accrued_treasury_fee0 = U256::zero();
+            state.accrued_treasury_fee1 = U256::zero();
+            state.migrated = true;
+            state.lock = LockState::Free;
+            clear_tracker();
+            return Ok(Some(PairEvent::LiquidityMigrated {
+                to: target,
+                amount0,
+                amount1,
+            }));
+        }
+        // -------------------------
+        // 5) Treasury payout: ONLY if we are paused at SendToken1 stage
+        //    => token0 already sent, token1 missing. We must finish token1 payout,
+        // -------------------------
+        LockCtx::TreasuryPayout {
+            treasury,
+            amount0,
+            amount1,
+            stage,
+        } => {
+            if stage != SendTokenStage::SendToken1 {
+                // We only support recovery for the critical partial-execution case.
+                return Err(PairError::InvalidRecoveryState);
+            }
+            if caller != state.admin_id {
+                return Err(PairError::Unauthorized);
+            }
+
+            // Finish the missing payout (token1)
+            let msg_id = msg::id();
+            msg_tracker_mut().insert_msg_status(msg_id, MessageStatus::SendingTreasuryTokenB);
+
+            token_operations::transfer(state.token1, treasury, amount1, &state.config, msg_id)
+                .await?;
+            state.accrued_treasury_fee0 = U256::zero();
+            state.accrued_treasury_fee1 = U256::zero();
+            state.lock = LockState::Free;
+            clear_tracker();
+            return Ok(Some(PairEvent::TreasuryFeesCollected {
+                treasury_id: treasury,
+                amount_a: amount0,
+                amount_b: amount1,
+            }));
+        }
+    }
+    Ok(None)
 }

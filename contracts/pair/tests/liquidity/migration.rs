@@ -14,7 +14,7 @@ async fn test_migrate_all_liquidity_transfers_funds_and_disables_pool() {
     env.setup_user(ACTOR_ID, liquidity_amount).await;
     env.setup_user(TRADER_1, liquidity_amount).await;
 
-    env.pair_client
+    env.pair
         .add_liquidity(
             liquidity_amount,
             liquidity_amount,
@@ -22,8 +22,7 @@ async fn test_migrate_all_liquidity_transfers_funds_and_disables_pool() {
             liquidity_amount / U256::from(2),
             env.get_deadline(),
         )
-        .with_args(|args| args.with_actor_id(lp_user))
-        .send_recv(env.pair_id)
+        .with_params(|args| args.with_actor_id(lp_user))
         .await
         .unwrap();
 
@@ -31,25 +30,19 @@ async fn test_migrate_all_liquidity_transfers_funds_and_disables_pool() {
     let amount_in = calculate_swap_amount_from_percent(reserve_a, 5);
     let min_out = U256::zero();
 
-    env.pair_client
+    env.pair
         .swap_exact_tokens_for_tokens(
             amount_in,
             min_out,
             true, // A -> B
             env.get_deadline(),
         )
-        .with_args(|args| args.with_actor_id(trader))
-        .send_recv(env.pair_id)
+        .with_params(|args| args.with_actor_id(trader))
         .await
         .unwrap();
 
     let (reserve0_before, reserve1_before) = env.get_reserves().await;
-    let (_, fee0_before, fee1_before) = env
-        .pair_client
-        .get_treasury_info()
-        .recv(env.pair_id)
-        .await
-        .unwrap();
+    let (_, fee0_before, fee1_before) = env.pair.get_treasury_info().await.unwrap();
 
     let (target0_before, target1_before, _) = env.get_balances(migration_target).await;
 
@@ -58,10 +51,9 @@ async fn test_migrate_all_liquidity_transfers_funds_and_disables_pool() {
         "Reserves should be non-zero before migration"
     );
 
-    env.pair_client
+    env.pair
         .migrate_all_liquidity(migration_target)
-        .with_args(|args| args.with_actor_id(admin_id))
-        .send_recv(env.pair_id)
+        .with_params(|args| args.with_actor_id(admin_id))
         .await
         .unwrap();
 
@@ -77,12 +69,7 @@ async fn test_migrate_all_liquidity_transfers_funds_and_disables_pool() {
         "reserve1 must be zero after migration"
     );
 
-    let (_, fee0_after, fee1_after) = env
-        .pair_client
-        .get_treasury_info()
-        .recv(env.pair_id)
-        .await
-        .unwrap();
+    let (_, fee0_after, fee1_after) = env.pair.get_treasury_info().await.unwrap();
     assert_eq!(
         fee0_after,
         U256::zero(),
@@ -114,10 +101,9 @@ async fn test_migrate_all_liquidity_transfers_funds_and_disables_pool() {
     let try_amount_in = small_amount();
 
     let res = env
-        .pair_client
+        .pair
         .swap_exact_tokens_for_tokens(try_amount_in, U256::zero(), true, env.get_deadline())
-        .with_args(|args| args.with_actor_id(trader))
-        .send_recv(env.pair_id)
+        .with_params(|args| args.with_actor_id(trader))
         .await;
 
     assert!(res.is_err(), "Swap must fail after pool migration");
@@ -142,7 +128,7 @@ async fn test_migrate_all_liquidity_only_admin_can_call() {
     env.setup_user(ACTOR_ID, liquidity_amount).await;
     env.setup_user(TRADER_1, liquidity_amount).await;
 
-    env.pair_client
+    env.pair
         .add_liquidity(
             liquidity_amount,
             liquidity_amount,
@@ -150,16 +136,14 @@ async fn test_migrate_all_liquidity_only_admin_can_call() {
             liquidity_amount / U256::from(2),
             env.get_deadline(),
         )
-        .with_args(|args| args.with_actor_id(admin_id))
-        .send_recv(env.pair_id)
+        .with_params(|args| args.with_actor_id(admin_id))
         .await
         .unwrap();
 
     let res = env
-        .pair_client
+        .pair
         .migrate_all_liquidity(migration_target)
-        .with_args(|args| args.with_actor_id(TRADER_1.into()))
-        .send_recv(env.pair_id)
+        .with_params(|args| args.with_actor_id(TRADER_1.into()))
         .await;
 
     assert!(
