@@ -4,6 +4,7 @@ export const ENV = {
   NODE_ADDRESS: import.meta.env.VITE_NODE_ADDRESS as string,
   EXPLORER_URL: import.meta.env.VITE_EXPLORER_URL as string,
   FACTORY_PROGRAM_ID: import.meta.env.VITE_FACTORY_PROGRAM_ID as HexString,
+  SIM_WS_URL: (import.meta.env.VITE_SIM_WS_URL as string) || 'ws://localhost:8081',
 };
 
 export const ROUTES = {
@@ -11,6 +12,7 @@ export const ROUTES = {
   TRADE: '/trade',
   EXPLORE: '/explore',
   POOL: '/pool',
+  FUTURES: '/futures',
 };
 
 export const LOGO_URI_BY_SYMBOL: Record<string, string> = {
