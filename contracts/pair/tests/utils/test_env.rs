@@ -109,8 +109,8 @@ impl TestEnv {
 
     pub async fn mint_and_approve_tokens(&mut self, user: ActorId, amount: U256) {
         // Mint tokens to user
-        self.token_a.mint(user.into(), amount).await.unwrap();
-        self.token_b.mint(user.into(), amount).await.unwrap();
+        self.token_a.mint(user, amount).await.unwrap();
+        self.token_b.mint(user, amount).await.unwrap();
 
         // Approve pair to spend tokens
         self.token_a

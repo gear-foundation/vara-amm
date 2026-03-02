@@ -125,9 +125,9 @@ async fn test_exact_output_swap_property_based_swap_invariants() {
         let user = ActorId::from(100);
 
         // Generate random but reasonable liquidity amounts
-        let base_liquidity = 1000 + rng.gen_range(0..50000);
+        let base_liquidity = 1000 + rng.random_range(0..50000);
         let liquidity_a = U256::from(base_liquidity) * U256::exp10(18);
-        let liquidity_b = U256::from(base_liquidity + rng.gen_range(0..10000)) * U256::exp10(18);
+        let liquidity_b = U256::from(base_liquidity + rng.random_range(0..10000)) * U256::exp10(18);
 
         env.setup_user(
             100,
@@ -152,14 +152,14 @@ async fn test_exact_output_swap_property_based_swap_invariants() {
         let initial_k = reserve_a * reserve_b;
 
         // Generate random swap amount (1-10% of reserves)
-        let swap_percentage = 1 + rng.gen_range(0..10);
-        let amount_out = if rng.gen_bool(0.5) {
+        let swap_percentage = 1 + rng.random_range(0..10);
+        let amount_out = if rng.random_bool(0.5) {
             reserve_b * U256::from(swap_percentage) / U256::from(100)
         } else {
             reserve_a * U256::from(swap_percentage) / U256::from(100)
         };
 
-        let a_to_b = rng.gen_bool(0.5);
+        let a_to_b = rng.random_bool(0.5);
         let (reserve_in, reserve_out) = if a_to_b {
             (reserve_a, reserve_b)
         } else {

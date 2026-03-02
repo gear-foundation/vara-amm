@@ -4,7 +4,7 @@ use sails_rs::{gstd::msg, prelude::*};
 mod amm_math;
 mod funcs;
 mod msg_tracker;
-use msg_tracker::{MessageStatus, msg_tracker_ref, msg_tracker_mut};
+use msg_tracker::{MessageStatus, msg_tracker_mut, msg_tracker_ref};
 use sails_rs::gstd::services::Service as Svc;
 
 mod token_operations;
@@ -100,8 +100,9 @@ pub enum PairError {
     InvalidRecoveryState,
 }
 
-#[derive(Debug, Clone, Encode, Decode, TypeInfo, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Encode, Decode, TypeInfo, PartialEq, Eq)]
 pub enum LockState {
+    #[default]
     Free,
     /// Normal in-flight operation: no pause, but we have full context.
     Busy(LockCtx),
@@ -114,11 +115,7 @@ impl LockState {
         matches!(self, LockState::Free)
     }
 }
-impl Default for LockState {
-    fn default() -> Self {
-        LockState::Free
-    }
-}
+
 #[derive(Debug, Clone, Encode, Decode, TypeInfo, PartialEq, Eq)]
 pub enum LockCtx {
     /// remove_liquidity: we are doing sequential payouts. Stage tells where we are.
