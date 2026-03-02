@@ -39,7 +39,7 @@ jobs:
         run: cargo fmt --all --check
 
       - name: Run Clippy
-        run: cargo clippy -r --all -- -D warnings
+        run: cargo clippy --workspace --all-targets -- -D warnings
 
       # - name: Prepare environment
       #   run: |
