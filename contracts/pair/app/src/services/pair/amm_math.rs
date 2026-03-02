@@ -72,7 +72,7 @@ pub fn calculate_optimal_amounts(
 /// 1. User specifies `amount_in_total` (total input they send to the pair).
 /// 2. We compute `treasury_fee = amount_in_total * treasury_fee_bps / 10_000`.
 /// 3. Remaining part goes into the pool:
-///      amount_in_for_pool = amount_in_total - treasury_fee
+///    amount_in_for_pool = amount_in_total - treasury_fee
 /// 4. `get_amount_out(amount_in_for_pool, ...)` is used with the standard
 ///    Uniswap 0.3% fee math (997/1000).
 ///
@@ -125,21 +125,21 @@ pub fn get_amount_out_with_treasury(
 /// an additional treasury fee in the input token.
 ///
 /// 1. We first compute how much must enter the pool using standard Uniswap math:
-///      amount_in_for_pool = get_amount_in(amount_out, reserve_in, reserve_out)
+///    amount_in_for_pool = get_amount_in(amount_out, reserve_in, reserve_out)
 ///    This uses the internal 0.3% swap fee (997/1000).
 ///
 /// 2. If `treasury_fee_bps > 0`, we solve:
-///      amount_in_for_pool = amount_in_total * (DENOM - treasury_fee_bps) / DENOM
+///    amount_in_for_pool = amount_in_total * (DENOM - treasury_fee_bps) / DENOM
 ///
 ///    Hence:
-///      amount_in_total = ceil(amount_in_for_pool * DENOM / (DENOM - treasury_fee_bps))
+///    amount_in_total = ceil(amount_in_for_pool * DENOM / (DENOM - treasury_fee_bps))
 ///
 ///    Then:
-///      treasury_fee = amount_in_total - amount_in_for_pool
+///    treasury_fee = amount_in_total - amount_in_for_pool
 ///
 /// 3. If `treasury_fee_bps == 0`, then:
-///      amount_in_total == amount_in_for_pool and treasury_fee == 0.
-/// Returns:
+///    amount_in_total == amount_in_for_pool and treasury_fee == 0.
+///    Returns:
 ///   - amount_in_for_pool : effective input that must enter the pool
 ///   - amount_in_total    : total input the user has to pay (for slippage checks, transfers)
 ///   - treasury_fee       : part of input reserved for treasury

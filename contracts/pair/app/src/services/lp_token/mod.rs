@@ -27,6 +27,12 @@ pub struct ExtendedService {
     vft: VftService,
 }
 
+impl Default for ExtendedService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ExtendedService {
     pub fn seed(name: String, symbol: String, decimals: u8) -> Self {
         let admin = msg::source();

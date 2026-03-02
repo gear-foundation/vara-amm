@@ -6,7 +6,7 @@ async fn test_multiple_lps_with_swap_fees_and_withdrawal() {
     let mut env = TestEnv::new(treasury_id).await;
 
     // Setup 5 liquidity providers + 1 swapper
-    let lp_users = vec![
+    let lp_users = [
         100, // LP1
         101, // LP2
         102, // LP3
@@ -16,14 +16,14 @@ async fn test_multiple_lps_with_swap_fees_and_withdrawal() {
     let swapper = 200;
 
     // Different liquidity amounts for each LP
-    let lp_amounts_a = vec![
+    let lp_amounts_a = [
         U256::from(10000) * U256::exp10(18), // LP1: 10,000 A
         U256::from(5000) * U256::exp10(18),  // LP2: 5,000 A
         U256::from(15000) * U256::exp10(18), // LP3: 15,000 A
         U256::from(8000) * U256::exp10(18),  // LP4: 8,000 A
         U256::from(12000) * U256::exp10(18), // LP5: 12,000 A
     ];
-    let lp_amounts_b = vec![
+    let lp_amounts_b = [
         U256::from(10000) * U256::exp10(18), // LP1: 10,000 B
         U256::from(5000) * U256::exp10(18),  // LP2: 5,000 B
         U256::from(15000) * U256::exp10(18), // LP3: 15,000 B
