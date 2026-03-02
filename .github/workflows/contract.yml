@@ -24,16 +24,10 @@ jobs:
         with:
           toolchain: 1.92
           target: wasm32v1-none
-          override: true
+          components: clippy, rustfmt, rust-src
 
-      - name: Install Clippy
-        run: rustup component add clippy
-
-      - name: Install Rustfmt
-        run: rustup component add rustfmt
-
-      - name: Install rust-src component
-        run: rustup component add rust-src
+      - name: Install wasm target
+        run: rustup target add wasm32v1-none
 
       - name: Check formatting
         run: cargo fmt --all --check
@@ -50,7 +44,7 @@ jobs:
         run: cargo test --release --all -- --ignored
 
       - name: Build project
-        run: cargo build --release
+        run: cargo build --release --target wasm32v1-none
 
       - name: Prepare artifacts directory
         run: |
