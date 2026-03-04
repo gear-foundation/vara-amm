@@ -120,7 +120,6 @@ impl FactoryService {
         let (pair_address, _) = create_program_future
             .await
             .unwrap_or_else(|e| panic!("{:?}", e));
-
         state.pairs.insert((token0, token1), pair_address);
 
         self.emit_event(FactoryEvent::PairCreated {

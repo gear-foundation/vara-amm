@@ -1,39 +1,43 @@
 #![allow(static_mut_refs)]
 
+use sails_rs::gstd::services::Service as Svc;
 use sails_rs::{gstd::msg, prelude::*};
+
 mod amm_math;
 mod funcs;
-mod msg_tracker;
-use msg_tracker::{MessageStatus, msg_tracker_mut, msg_tracker_ref};
-use sails_rs::gstd::services::Service as Svc;
-
+mod lock;
+pub mod msg_tracker;
+use crate::LpTokenState;
+use crate::services::pair::lock::LockState;
+use msg_tracker::{MessageStatus, MessageTracker};
+use sails_rs::cell::RefCell;
 mod token_operations;
-use crate::services::lp_token::ExtendedService as VftService;
-use gstd::static_mut;
-type VftExposure = <VftService as Svc>::Exposure;
+use crate::services::lp_token::LpService;
 
-pub struct PairService {
-    vft_exposure: VftExposure,
+type LpExposure<'a> = <LpService<'a> as Svc>::Exposure;
+pub struct PairService<'a> {
+    state: &'a RefCell<State>,
+    tracker: &'a RefCell<MessageTracker>,
+    lp: &'a LpTokenState,
 }
 
 #[derive(Debug, Default)]
 pub struct State {
-    token0: ActorId,
-    token1: ActorId,
-    reserve0: U256,
-    reserve1: U256,
-    fee_to: ActorId,
-    factory_id: ActorId,
-    k_last: U256,
-    config: Config,
-    lock: LockState,
-    treasury_id: ActorId,
-    admin_id: ActorId,
-    migrated: bool,
-    accrued_treasury_fee0: U256,
-    accrued_treasury_fee1: U256,
+    pub token0: ActorId,
+    pub token1: ActorId,
+    pub reserve0: U256,
+    pub reserve1: U256,
+    pub fee_to: ActorId,
+    pub factory_id: ActorId,
+    pub k_last: U256,
+    pub config: Config,
+    pub lock: LockState,
+    pub treasury_id: ActorId,
+    pub admin_id: ActorId,
+    pub migrated: bool,
+    pub accrued_treasury_fee0: U256,
+    pub accrued_treasury_fee1: U256,
 }
-static mut STATE: Option<State> = None;
 
 #[event]
 #[derive(Debug, Encode, Decode, TypeInfo)]
@@ -100,64 +104,6 @@ pub enum PairError {
     InvalidRecoveryState,
 }
 
-#[derive(Debug, Default, Clone, Encode, Decode, TypeInfo, PartialEq, Eq)]
-pub enum LockState {
-    #[default]
-    Free,
-    /// Normal in-flight operation: no pause, but we have full context.
-    Busy(LockCtx),
-    /// Contract is paused; keep the same context for recovery.
-    Paused(LockCtx),
-}
-
-impl LockState {
-    pub fn is_free(&self) -> bool {
-        matches!(self, LockState::Free)
-    }
-}
-
-#[derive(Debug, Clone, Encode, Decode, TypeInfo, PartialEq, Eq)]
-pub enum LockCtx {
-    /// remove_liquidity: we are doing sequential payouts. Stage tells where we are.
-    RemLiq {
-        user: ActorId,
-        liquidity: U256,
-        amount_a: U256,
-        amount_b: U256,
-        stage: SendTokenStage,
-    },
-    /// swap: refund needs to be retried
-    SwapRefund {
-        user: ActorId,
-        token: ActorId,
-        amount: U256,
-    },
-    /// add_liquidity: refund needs to be retried
-    AddLiqRefund {
-        user: ActorId,
-        token: ActorId,
-        amount: U256,
-    },
-    MigrateAllLiquidity {
-        target: ActorId,
-        amount0: U256,
-        amount1: U256,
-        stage: SendTokenStage,
-    },
-    TreasuryPayout {
-        treasury: ActorId,
-        amount0: U256,
-        amount1: U256,
-        stage: SendTokenStage,
-    },
-}
-
-#[derive(Debug, Clone, Encode, Decode, TypeInfo, PartialEq, Eq)]
-pub enum SendTokenStage {
-    SendToken0, // about to send token0
-    SendToken1, // token0 already done, about to send token1 (critical if fails)
-}
-
 /// Config that will be used to send messages to the other programs.
 #[derive(Default, Debug, Decode, Encode, TypeInfo, Clone)]
 pub struct Config {
@@ -174,48 +120,50 @@ pub struct Config {
     gas_for_full_tx: u64,
 }
 
-impl PairService {
-    pub fn init(
-        config: Config,
-        token0: ActorId,
-        token1: ActorId,
-        fee_to: ActorId,
-        treasury_id: ActorId,
-        admin_id: ActorId,
-    ) {
-        unsafe {
-            STATE = Some(State {
-                token0,
-                token1,
-                config,
-                fee_to,
-                factory_id: msg::source(),
-                treasury_id,
-                admin_id,
-                ..Default::default()
-            })
-        }
-        msg_tracker::init();
+impl<'a> PairService<'a> {
+    pub fn new(
+        state: &'a RefCell<State>,
+        tracker: &'a RefCell<MessageTracker>,
+        lp: &'a LpTokenState,
+    ) -> Self {
+        Self { state, tracker, lp }
     }
-    fn get_mut(&mut self) -> &'static mut State {
-        unsafe { STATE.as_mut().expect("State is not initialized") }
+    #[inline]
+    pub fn with_state<R>(&self, f: impl FnOnce(&State) -> R) -> R {
+        let st = self.state.borrow();
+        f(&st)
     }
-    fn get(&self) -> &'static State {
-        unsafe { STATE.as_ref().expect("State is not initialized") }
+
+    #[inline]
+    pub fn with_state_mut<R>(&self, f: impl FnOnce(&mut State) -> R) -> R {
+        let mut st = self.state.borrow_mut();
+        f(&mut st)
+    }
+
+    #[inline]
+    pub fn with_tracker<R>(&self, f: impl FnOnce(&MessageTracker) -> R) -> R {
+        let tr = self.tracker.borrow();
+        f(&tr)
+    }
+
+    #[inline]
+    pub fn with_tracker_mut<R>(&self, f: impl FnOnce(&mut MessageTracker) -> R) -> R {
+        let mut tr = self.tracker.borrow_mut();
+        f(&mut tr)
+    }
+    pub fn lp_service(&self) -> LpExposure<'_> {
+        LpService::new(
+            &self.lp.pause,
+            &self.lp.allowances,
+            &self.lp.balances,
+            &self.lp.metadata,
+        )
+        .expose(b"Vft")
     }
 }
 
-pub fn state_mut() -> &'static mut State {
-    unsafe { static_mut!(STATE).as_mut() }.expect("State is not initialized")
-}
-
-impl PairService {
-    pub fn new(vft_exposure: VftExposure) -> Self {
-        Self { vft_exposure }
-    }
-}
 #[sails_rs::service(events = PairEvent)]
-impl PairService {
+impl<'a> PairService<'a> {
     #[export(unwrap_result)]
     pub async fn add_liquidity(
         &mut self,
@@ -225,16 +173,15 @@ impl PairService {
         amount_b_min: U256,
         deadline: u64,
     ) -> Result<(), PairError> {
-        let event = funcs::add_liquidity(
-            self.get_mut(),
-            amount_a_desired,
-            amount_b_desired,
-            amount_a_min,
-            amount_b_min,
-            deadline,
-            &mut self.vft_exposure,
-        )
-        .await?;
+        let event = self
+            .add_liquidity_core(
+                amount_a_desired,
+                amount_b_desired,
+                amount_a_min,
+                amount_b_min,
+                deadline,
+            )
+            .await?;
         self.emit_event(event).expect("Event emission error");
         Ok(())
     }
@@ -262,15 +209,9 @@ impl PairService {
         amount_b_min: U256,
         deadline: u64,
     ) -> Result<(), PairError> {
-        let event = funcs::remove_liquidity(
-            self.get_mut(),
-            liquidity,
-            amount_a_min,
-            amount_b_min,
-            deadline,
-            &mut self.vft_exposure,
-        )
-        .await?;
+        let event = self
+            .remove_liquidity_core(liquidity, amount_a_min, amount_b_min, deadline)
+            .await?;
         self.emit_event(event).expect("Event emission error");
         Ok(())
     }
@@ -286,7 +227,7 @@ impl PairService {
     /// - Should be callable only by an admin
     #[export(unwrap_result)]
     pub async fn migrate_all_liquidity(&mut self, target: ActorId) -> Result<(), PairError> {
-        let event = funcs::migrate_all_liquidity(self.get_mut(), target).await?;
+        let event = self.migrate_all_liquidity_core(target).await?;
         self.emit_event(event).expect("Event emission error");
         Ok(())
     }
@@ -307,14 +248,14 @@ impl PairService {
         is_token0_to_token1: bool,
         deadline: u64,
     ) -> Result<(), PairError> {
-        let event = funcs::swap_exact_tokens_for_tokens(
-            self.get_mut(),
-            amount_in,
-            amount_out_min,
-            is_token0_to_token1,
-            deadline,
-        )
-        .await?;
+        let event = self
+            .swap_exact_tokens_for_tokens_core(
+                amount_in,
+                amount_out_min,
+                is_token0_to_token1,
+                deadline,
+            )
+            .await?;
         self.emit_event(event).expect("Event emission error");
         Ok(())
     }
@@ -335,21 +276,21 @@ impl PairService {
         is_token0_to_token1: bool,
         deadline: u64,
     ) -> Result<(), PairError> {
-        let event = funcs::swap_tokens_for_exact_tokens(
-            self.get_mut(),
-            amount_out,
-            amount_in_max,
-            is_token0_to_token1,
-            deadline,
-        )
-        .await?;
+        let event = self
+            .swap_tokens_for_exact_tokens_core(
+                amount_out,
+                amount_in_max,
+                is_token0_to_token1,
+                deadline,
+            )
+            .await?;
         self.emit_event(event).expect("Event emission error");
         Ok(())
     }
 
     #[export(unwrap_result)]
     pub async fn recover_paused(&mut self) -> Result<(), PairError> {
-        let res = funcs::recover_paused(self.get_mut(), &mut self.vft_exposure).await?;
+        let res = self.recover_paused_core().await?;
         if let Some(event) = res {
             self.emit_event(event).expect("Event emission error");
         }
@@ -358,19 +299,20 @@ impl PairService {
 
     #[export(unwrap_result)]
     pub async fn send_treasury_fees(&mut self) -> Result<(), PairError> {
-        let event = funcs::send_treasury_fees_from_pool(self.get_mut()).await?;
+        let event = self.send_treasury_fees_from_pool().await?;
         self.emit_event(event).expect("Event emission error");
         Ok(())
     }
 
     #[export]
     pub async fn set_lock(&mut self, lock: LockState) {
-        let state = self.get_mut();
-        if msg::source() == state.admin_id {
-            state.lock = lock;
-        } else {
-            panic!("Not admin")
-        }
+        let caller = msg::source();
+        self.with_state_mut(|st| {
+            if caller != st.admin_id {
+                panic!("Not admin");
+            }
+            st.lock = lock;
+        });
     }
     /// Calculates protocol fees for the liquidity pool, similar to Uniswap V2, without minting.
     ///
@@ -384,7 +326,8 @@ impl PairService {
     /// Can be called for estimation or off-chain calculations. Does not modify state.
     #[export]
     pub fn calculate_protocol_fee(&self) -> U256 {
-        funcs::calculate_protocol_fee(self.get()).unwrap_or_default()
+        let total_supply = self.lp_service().total_supply().unwrap_or(U256::zero());
+        self.with_state(|st| funcs::calculate_protocol_fee(st, total_supply).unwrap_or_default())
     }
 
     /// Calculates accumulated swap fees for a specific LP provider.
@@ -393,8 +336,11 @@ impl PairService {
     /// LP token balance (pro-rata based on `user_lp_balance / total_supply`). Returns 0 if no growth.
     #[export]
     pub fn calculate_lp_user_fee(&self, user: ActorId) -> U256 {
-        let user_lp_balance = VftService::balance_of(user);
-        funcs::calculate_lp_user_fee(self.get(), user_lp_balance).unwrap_or_default()
+        let user_lp_balance = self.lp_service().balance_of(user).unwrap_or(U256::zero());
+        let total_supply = self.lp_service().total_supply().unwrap_or(U256::zero());
+        self.with_state(|st| {
+            funcs::calculate_lp_user_fee(st, user_lp_balance, total_supply).unwrap_or_default()
+        })
     }
 
     /// Calculates the amounts of token A and B a user would receive when removing liquidity.
@@ -405,7 +351,10 @@ impl PairService {
     /// Does not modify state or perform any transactions.
     #[export]
     pub fn calculate_remove_liquidity(&self, liquidity: U256) -> (U256, U256) {
-        funcs::calculate_remove_liquidity(self.get(), liquidity).unwrap_or_default()
+        let total_supply = self.lp_service().total_supply().unwrap_or(U256::zero());
+        self.with_state(|st| {
+            funcs::calculate_remove_liquidity(st, liquidity, total_supply).unwrap_or_default()
+        })
     }
 
     /// Calculates the expected output amount for a swap, given the input amount and
@@ -425,20 +374,27 @@ impl PairService {
     /// * `is_token0_to_token1` - Direction of swap (true: token0 to token1, false: token1 to token0)
     #[export]
     pub fn get_amount_out(&self, amount_in: U256, is_token0_to_token1: bool) -> U256 {
-        let state = self.get();
-        let (reserve_in, reserve_out) = if is_token0_to_token1 {
-            (state.reserve0, state.reserve1)
-        } else {
-            (state.reserve1, state.reserve0)
-        };
-        let treasury_fee_bps = if state.treasury_id.is_zero() {
-            0
-        } else {
-            amm_math::TREASURY_FEE_BPS
-        };
-        amm_math::get_amount_out_with_treasury(amount_in, reserve_in, reserve_out, treasury_fee_bps)
+        self.with_state(|st| {
+            let (reserve_in, reserve_out) = if is_token0_to_token1 {
+                (st.reserve0, st.reserve1)
+            } else {
+                (st.reserve1, st.reserve0)
+            };
+            let treasury_fee_bps = if st.treasury_id.is_zero() {
+                0
+            } else {
+                amm_math::TREASURY_FEE_BPS
+            };
+
+            amm_math::get_amount_out_with_treasury(
+                amount_in,
+                reserve_in,
+                reserve_out,
+                treasury_fee_bps,
+            )
             .map(|(_, amount_out, _)| amount_out)
             .unwrap_or_default()
+        })
     }
 
     /// Calculates the required input amount for a desired output, given current reserves,
@@ -459,99 +415,116 @@ impl PairService {
     /// * `is_token0_to_token1` - Direction of swap (true: token0 to token1, false: token1 to token0)
     #[export]
     pub fn get_amount_in(&self, amount_out: U256, is_token0_to_token1: bool) -> U256 {
-        let state = self.get();
-        let (reserve_in, reserve_out) = if is_token0_to_token1 {
-            (state.reserve0, state.reserve1)
-        } else {
-            (state.reserve1, state.reserve0)
-        };
-        let treasury_fee_bps = if state.treasury_id.is_zero() {
-            0
-        } else {
-            amm_math::TREASURY_FEE_BPS
-        };
+        self.with_state(|st| {
+            let (reserve_in, reserve_out) = if is_token0_to_token1 {
+                (st.reserve0, st.reserve1)
+            } else {
+                (st.reserve1, st.reserve0)
+            };
+            let treasury_fee_bps = if st.treasury_id.is_zero() {
+                0
+            } else {
+                amm_math::TREASURY_FEE_BPS
+            };
 
-        amm_math::get_amount_in_with_treasury(amount_out, reserve_in, reserve_out, treasury_fee_bps)
+            amm_math::get_amount_in_with_treasury(
+                amount_out,
+                reserve_in,
+                reserve_out,
+                treasury_fee_bps,
+            )
             .map(|(_, amount_in_total, _)| amount_in_total)
             .unwrap_or_default()
+        })
     }
 
     #[export]
     pub fn change_fee_to(&mut self, new_fee_to: ActorId) {
-        let state = self.get_mut();
-        if msg::source() == state.factory_id {
-            state.fee_to = new_fee_to;
-        } else {
-            panic!("Not factory")
-        }
+        let caller = msg::source();
+        self.with_state_mut(|st| {
+            if caller != st.factory_id {
+                panic!("Not factory");
+            }
+            st.fee_to = new_fee_to;
+        });
     }
 
     #[export]
     pub fn change_treasury_id(&mut self, new_treasury_id: ActorId) {
-        let state = self.get_mut();
-        if msg::source() == state.admin_id {
-            state.treasury_id = new_treasury_id;
-        } else {
-            panic!("Not admin")
-        }
+        let caller = msg::source();
+        self.with_state_mut(|st| {
+            if caller != st.admin_id {
+                panic!("Not admin");
+            }
+            st.treasury_id = new_treasury_id;
+        });
     }
 
     #[export]
     pub fn update_config(&mut self, config: Config) {
-        let state = self.get_mut();
-        if msg::source() != state.admin_id {
-            panic!("Not admin")
-        }
-        state.config = config;
+        let caller = msg::source();
+        self.with_state_mut(|st| {
+            if caller != st.admin_id {
+                panic!("Not admin");
+            }
+            st.config = config;
+        });
     }
 
     #[export]
     pub fn treasury_id(&self) -> ActorId {
-        self.get().treasury_id
+        self.with_state(|st| st.treasury_id)
     }
 
     #[export]
     pub fn get_reserves(&self) -> (U256, U256) {
-        (self.get().reserve0, self.get().reserve1)
+        self.with_state(|st| (st.reserve0, st.reserve1))
     }
 
     #[export]
     pub fn remove_msg_status(&mut self, msg_id: MessageId) {
-        let state = self.get_mut();
-        if msg::source() != state.admin_id {
-            panic!("Not admin")
-        }
-        msg_tracker_mut().remove_msg_status(&msg_id);
+        let caller = msg::source();
+        self.with_state(|st| {
+            if caller != st.admin_id {
+                panic!("Not admin");
+            }
+        });
+
+        self.with_tracker_mut(|tr| {
+            tr.remove_msg_status(&msg_id);
+        });
     }
 
     #[export]
     pub fn clear_msg_tracker(&mut self) {
-        let state = self.get_mut();
-        if msg::source() != state.admin_id {
-            panic!("Not admin")
-        }
-        msg_tracker_mut().clear_all();
+        let caller = msg::source();
+        self.with_state(|st| {
+            if caller != st.admin_id {
+                panic!("Not admin");
+            }
+        });
+
+        self.with_tracker_mut(|tr| tr.clear_all());
     }
 
     #[export]
     pub fn msgs_in_msg_tracker(&self) -> Vec<(MessageId, MessageStatus)> {
-        msg_tracker_ref().message_info.clone().into_iter().collect()
+        self.with_tracker(|tr| tr.message_info.clone().into_iter().collect())
     }
 
     #[export]
     pub fn lock(&self) -> LockState {
-        self.get().lock.clone()
+        self.with_state(|st| st.lock.clone())
     }
 
     #[export]
     pub fn migrated(&self) -> bool {
-        self.get().migrated
+        self.with_state(|st| st.migrated)
     }
 
     #[export]
     pub fn get_tokens(&self) -> (ActorId, ActorId) {
-        let state = self.get();
-        (state.token0, state.token1)
+        self.with_state(|st| (st.token0, st.token1))
     }
 
     /// Returns basic treasury info:
@@ -560,11 +533,12 @@ impl PairService {
     /// - accrued fee in token1.
     #[export]
     pub fn get_treasury_info(&self) -> (ActorId, U256, U256) {
-        let state = self.get();
-        (
-            state.treasury_id,
-            state.accrued_treasury_fee0,
-            state.accrued_treasury_fee1,
-        )
+        self.with_state(|st| {
+            (
+                st.treasury_id,
+                st.accrued_treasury_fee0,
+                st.accrued_treasury_fee1,
+            )
+        })
     }
 }

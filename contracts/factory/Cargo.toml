@@ -16,6 +16,7 @@ factory = { path = ".", features = ["wasm-binary"] }
 factory-client = { path = "client" }
 sails-rs = { workspace = true, features = ["gtest"] }
 tokio = { workspace = true, features = ["rt", "macros"] }
+pair = { path = "../pair" }
 
 [features]
 wasm-binary = []

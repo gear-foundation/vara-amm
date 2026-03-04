@@ -21,6 +21,12 @@ gtest = "=1.10.0"
 sails-rs = "=0.10.2"
 sails-client-gen = "=0.10.2"
 sails-idl-gen = "=0.10.2"
+awesome-sails-utils = { git = "https://github.com/gear-tech/awesome-sails", version = "0.2.0" }
+awesome-sails-vft = { git = "https://github.com/gear-tech/awesome-sails", version = "0.2.0" }
+awesome-sails-vft-utils = { git = "https://github.com/gear-tech/awesome-sails", version = "0.2.0" }
+awesome-sails-vft-metadata = { git = "https://github.com/gear-tech/awesome-sails", version = "0.2.0" }
+awesome-sails-storage = { git = "https://github.com/gear-tech/awesome-sails", version = "0.2.0" }
+
 log = "*"
 env_logger = "*"
 tokio = { version = "1.41", features = ["rt", "macros"] }
