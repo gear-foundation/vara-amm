@@ -117,16 +117,13 @@ impl<'a> PairService<'a> {
         // mint MINIMUM_LIQUIDITY once (to dead address), then mint user liquidity
         {
             if total_supply.is_zero() {
-                sails_rs::gstd::debug!("HERE1");
                 mint_liquidity(
                     &mut lp,
                     LP_DEAD.into(),
                     U256::from(amm_math::MINIMUM_LIQUIDITY),
                 )?
             }
-            sails_rs::gstd::debug!("HERE {:?}", liquidity);
             mint_liquidity(&mut lp, sender, liquidity)?;
-            sails_rs::gstd::debug!("HER2");
         }
 
         // update reserves + k_last + unlock
@@ -194,7 +191,6 @@ impl<'a> PairService<'a> {
         })?;
 
         let sender = msg::source();
-
         // Verify user has sufficient LP tokens
         let user_balance = self.lp_service().balance_of(sender).unwrap_or(U256::zero());
         if user_balance < liquidity {
@@ -255,10 +251,10 @@ impl<'a> PairService<'a> {
 
         self.with_state_mut(|st| -> Result<(), PairError> {
             let mut lp = self.lp_service();
+
             mint_fee_lp(st, &mut lp)?;
 
             burn_liquidity(&mut lp, sender, liquidity)?;
-
             st.reserve0 = st
                 .reserve0
                 .checked_sub(amount_a)
@@ -276,7 +272,6 @@ impl<'a> PairService<'a> {
             } else if !st.k_last.is_zero() {
                 st.k_last = U256::zero();
             }
-
             // unlock + cleanup
             st.lock.set_free();
             Ok(())
@@ -299,7 +294,7 @@ impl<'a> PairService<'a> {
                 return Err(PairError::PoolMigrated);
             }
 
-            if msg::source() != st.admin_id {
+            if !self.is_admin(&msg::source()) {
                 return Err(PairError::Unauthorized);
             }
 
@@ -315,11 +310,23 @@ impl<'a> PairService<'a> {
 
         let program_id = exec::program_id();
 
+        self.with_state_mut(|st| {
+            st.lock = LockState::Busy(LockCtx::MigrateAllLiquidity {
+                target,
+                amount0: U256::zero(),
+                amount1: U256::zero(),
+                stage: SendTokenStage::SendToken0,
+            });
+        });
+
         let balance0 = token_operations::balance_of(token0, program_id, &config).await?;
         let balance1 = token_operations::balance_of(token1, program_id, &config).await?;
 
         if balance0.is_zero() && balance1.is_zero() {
-            return Err(PairError::NoLiquidityToMigrate);
+            self.with_state_mut(|st| {
+                st.lock.set_free();
+            });
+            return Ok(PairEvent::NoLiquidityToMigrate);
         }
 
         self.with_state_mut(|st| {
@@ -392,8 +399,8 @@ impl<'a> PairService<'a> {
         deadline: u64,
     ) -> Result<PairEvent, PairError> {
         // ---------- PREPARE: читаем state копиями и валидируем ----------
-        let (token_in, token_out, reserve_in, reserve_out, treasury_fee_bps) = self
-            .with_state_mut(|st| {
+        let (token_in, token_out, reserve_in, reserve_out, treasury_fee_bps) =
+            self.with_state(|st| {
                 if st.migrated {
                     return Err(PairError::PoolMigrated);
                 }
@@ -700,13 +707,15 @@ impl<'a> PairService<'a> {
     pub async fn recover_paused_core(&self) -> Result<Option<PairEvent>, PairError> {
         let caller = msg::source();
 
-        // 1) забираем ctx (clone) без удержания borrow
-        let (ctx, admin_id, token1, config) = self.with_state(|st| {
+        if !self.is_admin(&caller) {
+            return Err(PairError::Unauthorized);
+        }
+        let (ctx, token1, config) = self.with_state(|st| {
             let ctx = match st.lock.clone() {
                 LockState::Paused(ctx) => ctx,
                 _ => return Err(PairError::NotPaused),
             };
-            Ok((ctx, st.admin_id, st.token1, st.config.clone()))
+            Ok((ctx, st.token1, st.config.clone()))
         })?;
 
         let clear_tracker = || {
@@ -722,10 +731,6 @@ impl<'a> PairService<'a> {
                 token,
                 amount,
             } => {
-                if caller != user && caller != admin_id {
-                    return Err(PairError::Unauthorized);
-                }
-
                 let msg_id = msg::id();
                 self.with_tracker_mut(|tr| {
                     tr.insert_msg_status(msg_id, MessageStatus::SendingMessageToReturnTokensA);
@@ -747,10 +752,6 @@ impl<'a> PairService<'a> {
                 token,
                 amount,
             } => {
-                if caller != user && caller != admin_id {
-                    return Err(PairError::Unauthorized);
-                }
-
                 let msg_id = msg::id();
                 self.with_tracker_mut(|tr| {
                     tr.insert_msg_status(msg_id, MessageStatus::SendingMessageToReturnTokenIn);
@@ -777,9 +778,6 @@ impl<'a> PairService<'a> {
                 if stage != SendTokenStage::SendToken1 {
                     return Err(PairError::InvalidRecoveryState);
                 }
-                if caller != user && caller != admin_id {
-                    return Err(PairError::Unauthorized);
-                }
 
                 // finish missing payout (token1)
                 let msg_id = msg::id();
@@ -790,6 +788,7 @@ impl<'a> PairService<'a> {
                 self.transfer(token1, user, amount_b, &config, msg_id)
                     .await?;
 
+                let _ = self.lp.pause.resume();
                 // finalize exactly-once: mint_fee -> burn -> reserves -> k_last
                 let event = self.with_state_mut(|st| -> Result<PairEvent, PairError> {
                     let mut lp = self.lp_service();
@@ -817,7 +816,6 @@ impl<'a> PairService<'a> {
                         liquidity,
                     })
                 })?;
-                let _ = self.lp.pause.resume();
                 clear_tracker();
                 return Ok(Some(event));
             }
@@ -832,9 +830,6 @@ impl<'a> PairService<'a> {
             } => {
                 if stage != SendTokenStage::SendToken1 {
                     return Err(PairError::InvalidRecoveryState);
-                }
-                if caller != admin_id {
-                    return Err(PairError::Unauthorized);
                 }
 
                 let msg_id = msg::id();
@@ -876,9 +871,6 @@ impl<'a> PairService<'a> {
             } => {
                 if stage != SendTokenStage::SendToken1 {
                     return Err(PairError::InvalidRecoveryState);
-                }
-                if caller != admin_id {
-                    return Err(PairError::Unauthorized);
                 }
 
                 let msg_id = msg::id();
@@ -973,6 +965,7 @@ impl<'a> PairService<'a> {
         self.with_tracker_mut(|tr| {
             tr.insert_msg_status(msg_id, MessageStatus::SendingMsgToUnlockTokenA);
         });
+        let _ = self.lp.pause.pause();
 
         self.transfer(token0, sender, amount_a, config, msg_id)
             .await?;
@@ -984,6 +977,7 @@ impl<'a> PairService<'a> {
         self.transfer(token1, sender, amount_b, config, msg_id)
             .await?;
 
+        let _ = self.lp.pause.resume();
         self.with_tracker_mut(|tr| tr.clear_all());
         Ok(())
     }

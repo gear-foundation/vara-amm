@@ -14,3 +14,6 @@ parity-scale-codec.workspace = true
 scale-info.workspace = true
 gstd.workspace = true
 extended-vft-client = { git = "https://github.com/gear-foundation/standards/", rev = "ac8dfdc41ba557669d98651267ab5cf53b46c0ee"}
+
+[dev-dependencies]
+proptest = "1"

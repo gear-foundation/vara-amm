@@ -1,6 +1,6 @@
 use crate::*;
+use pair_client::vft::Vft;
 use pair_client::LockState;
-
 pub fn calculate_price_token0_in_token1(
     reserve0: U256,
     reserve1: U256,
@@ -486,7 +486,7 @@ async fn test_exact_input_swap_exceeds_slippage_tolerance() {
 }
 
 #[tokio::test]
-async fn test_exact_input_swap_not_enoght_funds() {
+async fn test_exact_input_swap_not_enough_funds() {
     let treasury_id = ActorId::zero();
     let mut env = TestEnv::new(treasury_id).await;
     let lp_user = ACTOR_ID.into();
@@ -528,10 +528,10 @@ async fn test_exact_input_swap_not_enoght_funds() {
 
     assert!(result.is_err(), "Should fail due to insufficient balance");
 
-    // check msg tracker is empty
     let msgs_in_msg_tracker = env.pair.msgs_in_msg_tracker().await.unwrap();
     assert_eq!(msgs_in_msg_tracker.len(), 1);
 
     let lock = env.pair.lock().await.unwrap();
     assert_eq!(lock, LockState::Free);
+    assert!(!env.lp_vft.is_paused().await.unwrap());
 }

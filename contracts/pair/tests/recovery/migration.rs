@@ -1,6 +1,6 @@
-use pair_client::SendTokenStage;
-
 use crate::recovery::*;
+use pair_client::vft::Vft;
+use pair_client::SendTokenStage;
 
 #[tokio::test]
 async fn migrate_all_liquidity_recovery_send_token1() {
@@ -33,7 +33,12 @@ async fn migrate_all_liquidity_recovery_send_token1() {
         vft_ok_t(), // recovery: send token1 succeeds
     ];
 
-    let Deployed { env, mut pair, .. } = deploy_pair_with_mocks(system, token_a, token_b).await;
+    let Deployed {
+        env,
+        mut pair,
+        lp_vft,
+        ..
+    } = deploy_pair_with_mocks(system, token_a, token_b).await;
 
     // create some non-zero reserves (not strictly required, but makes the test meaningful)
     let deadline = env.system().block_timestamp() + 10_000;
@@ -63,6 +68,8 @@ async fn migrate_all_liquidity_recovery_send_token1() {
     )
     .await;
 
+    assert!(lp_vft.is_paused().await.unwrap());
+
     // recovery (admin only)
     pair.recover_paused().await.unwrap();
 
@@ -80,4 +87,5 @@ async fn migrate_all_liquidity_recovery_send_token1() {
         migrated,
         "pool must be marked as migrated after successful recovery"
     );
+    assert!(!lp_vft.is_paused().await.unwrap());
 }

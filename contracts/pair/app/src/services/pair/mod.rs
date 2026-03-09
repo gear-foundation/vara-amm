@@ -19,6 +19,7 @@ pub struct PairService<'a> {
     state: &'a RefCell<State>,
     tracker: &'a RefCell<MessageTracker>,
     lp: &'a LpTokenState,
+    admins: &'a RefCell<Vec<ActorId>>,
 }
 
 #[derive(Debug, Default)]
@@ -33,7 +34,6 @@ pub struct State {
     pub config: Config,
     pub lock: LockState,
     pub treasury_id: ActorId,
-    pub admin_id: ActorId,
     pub migrated: bool,
     pub accrued_treasury_fee0: U256,
     pub accrued_treasury_fee1: U256,
@@ -70,6 +70,7 @@ pub enum PairEvent {
         amount0: U256,
         amount1: U256,
     },
+    NoLiquidityToMigrate,
 }
 
 #[derive(Debug)]
@@ -97,11 +98,11 @@ pub enum PairError {
     Unauthorized,
     NoTreasuryFees,
     NotTreasuryId,
-    NoLiquidityToMigrate,
     PoolMigrated,
     UnableToDecode,
     NotPaused,
     InvalidRecoveryState,
+    EventError,
 }
 
 /// Config that will be used to send messages to the other programs.
@@ -125,8 +126,14 @@ impl<'a> PairService<'a> {
         state: &'a RefCell<State>,
         tracker: &'a RefCell<MessageTracker>,
         lp: &'a LpTokenState,
+        admins: &'a RefCell<Vec<ActorId>>,
     ) -> Self {
-        Self { state, tracker, lp }
+        Self {
+            state,
+            tracker,
+            lp,
+            admins,
+        }
     }
     #[inline]
     pub fn with_state<R>(&self, f: impl FnOnce(&State) -> R) -> R {
@@ -157,8 +164,34 @@ impl<'a> PairService<'a> {
             &self.lp.allowances,
             &self.lp.balances,
             &self.lp.metadata,
+            self.admins,
         )
         .expose(b"Vft")
+    }
+
+    pub fn is_admin(&self, account: &ActorId) -> bool {
+        let admins = self.admins.borrow();
+        admins.contains(account)
+    }
+
+    fn ensure_admin(&self) -> Result<(), PairError> {
+        let caller = msg::source();
+        if self.is_admin(&caller) {
+            Ok(())
+        } else {
+            Err(PairError::Unauthorized)
+        }
+    }
+
+    fn ensure_factory_or_admin(&self) -> Result<(), PairError> {
+        let caller = msg::source();
+
+        let is_factory = self.with_state(|st| caller == st.factory_id);
+        if is_factory || self.is_admin(&caller) {
+            Ok(())
+        } else {
+            Err(PairError::Unauthorized)
+        }
     }
 }
 
@@ -182,7 +215,7 @@ impl<'a> PairService<'a> {
                 deadline,
             )
             .await?;
-        self.emit_event(event).expect("Event emission error");
+        self.emit_pair_event(event)?;
         Ok(())
     }
 
@@ -256,7 +289,7 @@ impl<'a> PairService<'a> {
                 deadline,
             )
             .await?;
-        self.emit_event(event).expect("Event emission error");
+        self.emit_pair_event(event)?;
         Ok(())
     }
 
@@ -284,7 +317,7 @@ impl<'a> PairService<'a> {
                 deadline,
             )
             .await?;
-        self.emit_event(event).expect("Event emission error");
+        self.emit_pair_event(event)?;
         Ok(())
     }
 
@@ -292,7 +325,7 @@ impl<'a> PairService<'a> {
     pub async fn recover_paused(&mut self) -> Result<(), PairError> {
         let res = self.recover_paused_core().await?;
         if let Some(event) = res {
-            self.emit_event(event).expect("Event emission error");
+            self.emit_pair_event(event)?;
         }
         Ok(())
     }
@@ -300,19 +333,17 @@ impl<'a> PairService<'a> {
     #[export(unwrap_result)]
     pub async fn send_treasury_fees(&mut self) -> Result<(), PairError> {
         let event = self.send_treasury_fees_from_pool().await?;
-        self.emit_event(event).expect("Event emission error");
+        self.emit_pair_event(event)?;
         Ok(())
     }
 
-    #[export]
-    pub async fn set_lock(&mut self, lock: LockState) {
-        let caller = msg::source();
+    #[export(unwrap_result)]
+    pub fn set_lock(&mut self, lock: LockState) -> Result<(), PairError> {
+        self.ensure_admin()?;
         self.with_state_mut(|st| {
-            if caller != st.admin_id {
-                panic!("Not admin");
-            }
             st.lock = lock;
         });
+        Ok(())
     }
     /// Calculates protocol fees for the liquidity pool, similar to Uniswap V2, without minting.
     ///
@@ -438,37 +469,32 @@ impl<'a> PairService<'a> {
         })
     }
 
-    #[export]
-    pub fn change_fee_to(&mut self, new_fee_to: ActorId) {
-        let caller = msg::source();
+    #[export(unwrap_result)]
+    pub fn change_fee_to(&mut self, new_fee_to: ActorId) -> Result<(), PairError> {
+        self.ensure_factory_or_admin()?;
+
         self.with_state_mut(|st| {
-            if caller != st.factory_id {
-                panic!("Not factory");
-            }
             st.fee_to = new_fee_to;
         });
-    }
 
-    #[export]
-    pub fn change_treasury_id(&mut self, new_treasury_id: ActorId) {
-        let caller = msg::source();
+        Ok(())
+    }
+    #[export(unwrap_result)]
+    pub fn change_treasury_id(&mut self, new_treasury_id: ActorId) -> Result<(), PairError> {
+        self.ensure_admin()?;
         self.with_state_mut(|st| {
-            if caller != st.admin_id {
-                panic!("Not admin");
-            }
             st.treasury_id = new_treasury_id;
         });
+        Ok(())
     }
 
-    #[export]
-    pub fn update_config(&mut self, config: Config) {
-        let caller = msg::source();
+    #[export(unwrap_result)]
+    pub fn update_config(&mut self, config: Config) -> Result<(), PairError> {
+        self.ensure_admin()?;
         self.with_state_mut(|st| {
-            if caller != st.admin_id {
-                panic!("Not admin");
-            }
             st.config = config;
         });
+        Ok(())
     }
 
     #[export]
@@ -481,30 +507,20 @@ impl<'a> PairService<'a> {
         self.with_state(|st| (st.reserve0, st.reserve1))
     }
 
-    #[export]
-    pub fn remove_msg_status(&mut self, msg_id: MessageId) {
-        let caller = msg::source();
-        self.with_state(|st| {
-            if caller != st.admin_id {
-                panic!("Not admin");
-            }
-        });
-
+    #[export(unwrap_result)]
+    pub fn remove_msg_status(&mut self, msg_id: MessageId) -> Result<(), PairError> {
+        self.ensure_admin()?;
         self.with_tracker_mut(|tr| {
             tr.remove_msg_status(&msg_id);
         });
+        Ok(())
     }
 
-    #[export]
-    pub fn clear_msg_tracker(&mut self) {
-        let caller = msg::source();
-        self.with_state(|st| {
-            if caller != st.admin_id {
-                panic!("Not admin");
-            }
-        });
-
+    #[export(unwrap_result)]
+    pub fn clear_msg_tracker(&mut self) -> Result<(), PairError> {
+        self.ensure_admin()?;
         self.with_tracker_mut(|tr| tr.clear_all());
+        Ok(())
     }
 
     #[export]
@@ -540,5 +556,40 @@ impl<'a> PairService<'a> {
                 st.accrued_treasury_fee1,
             )
         })
+    }
+
+    #[export(unwrap_result)]
+    pub fn set_admin(&mut self, account: ActorId) -> Result<(), PairError> {
+        self.ensure_admin()?;
+
+        let mut admins = self.admins.borrow_mut();
+
+        if admins.contains(&account) {
+            return Ok(());
+        }
+
+        admins.push(account);
+        Ok(())
+    }
+
+    #[export(unwrap_result)]
+    pub fn remove_admin(&mut self, account: ActorId) -> Result<(), PairError> {
+        self.ensure_admin()?;
+
+        let mut admins = self.admins.borrow_mut();
+
+        // Cant delete last admin
+        if admins.len() == 1 && admins[0] == account {
+            return Err(PairError::Unauthorized);
+        }
+        if let Some(pos) = admins.iter().position(|a| *a == account) {
+            admins.swap_remove(pos);
+        }
+
+        Ok(())
+    }
+
+    fn emit_pair_event(&self, event: PairEvent) -> Result<(), PairError> {
+        self.emit_event(event).map_err(|_| PairError::EventError)
     }
 }

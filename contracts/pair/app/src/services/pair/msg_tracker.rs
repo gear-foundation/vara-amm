@@ -1,3 +1,4 @@
+use crate::services::lp_token::state::LpTokenState;
 use crate::services::pair::token_operations;
 use crate::services::pair::{PairService, State};
 use sails_rs::{collections::HashMap, gstd::msg, prelude::*};
@@ -82,6 +83,7 @@ impl MessageTracker {
     /// Clear all tracked messages
     pub fn clear_all(&mut self) {
         self.message_info.clear();
+        self.reply_to_root.clear();
     }
 }
 
@@ -118,6 +120,7 @@ impl MessageStatus {
         &self,
         ok: bool,
         state: &mut State,
+        lp: &LpTokenState,
         tr: &mut MessageTracker,
         msg_id: MessageId,
     ) {
@@ -128,6 +131,7 @@ impl MessageStatus {
                 tr.update_msg_status(msg_id, TokenALocked(ok));
                 if !ok {
                     state.lock.set_free();
+                    let _ = lp.pause.resume();
                 }
             }
             SendingMsgToLockTokenB => {
@@ -137,6 +141,7 @@ impl MessageStatus {
                 tr.update_msg_status(msg_id, TokensAReturnComplete(ok));
                 if ok {
                     state.lock.set_free();
+                    let _ = lp.pause.resume();
                 } else {
                     state.lock.pause_keep_ctx();
                 }
@@ -146,6 +151,7 @@ impl MessageStatus {
                 tr.update_msg_status(msg_id, TokenInTransfered(ok));
                 if !ok {
                     state.lock.set_free();
+                    let _ = lp.pause.resume();
                 }
             }
             SendingMsgToTransferTokenOut => {
@@ -155,6 +161,7 @@ impl MessageStatus {
                 tr.update_msg_status(msg_id, TokenInReturnComplete(ok));
                 if ok {
                     state.lock.set_free();
+                    let _ = lp.pause.resume();
                 } else {
                     state.lock.pause_keep_ctx();
                 }
@@ -211,17 +218,15 @@ impl<'a> PairService<'a> {
                 .clone()
         });
 
-        // 4) decode по ReplyCodec
         let ok = match status.reply_codec() {
             ReplyCodec::TransferFrom => token_operations::decode_transfer_from_reply(&bytes),
             ReplyCodec::Transfer => token_operations::decode_transfer_reply(&bytes),
             ReplyCodec::None => return,
         };
 
-        // 5) применяем reply: нужен и state, и tracker
         self.with_tracker_mut(|tr| {
             self.with_state_mut(|st| {
-                status.apply_reply(ok, st, tr, root_msg_id);
+                status.apply_reply(ok, st, self.lp, tr, root_msg_id);
             })
         });
     }
