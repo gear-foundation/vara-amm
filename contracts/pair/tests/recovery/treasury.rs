@@ -1,6 +1,6 @@
-use pair_client::SendTokenStage;
-
 use crate::recovery::*;
+use pair_client::vft::Vft;
+use pair_client::SendTokenStage;
 
 #[tokio::test]
 async fn treasury_payout_recovery_send_token1() {
@@ -32,7 +32,12 @@ async fn treasury_payout_recovery_send_token1() {
         vft_ok_t(),  // recovery: send tokenB fee succeeds
     ];
 
-    let Deployed { env, mut pair, .. } = deploy_pair_with_mocks(system, token_a, token_b).await;
+    let Deployed {
+        env,
+        mut pair,
+        lp_vft,
+        ..
+    } = deploy_pair_with_mocks(system, token_a, token_b).await;
 
     // add liquidity
     let deadline = env.system().block_timestamp() + 10_000;
@@ -92,6 +97,8 @@ async fn treasury_payout_recovery_send_token1() {
     )
     .await;
 
+    assert!(lp_vft.is_paused().await.unwrap());
+
     // recovery (your recover_paused requires admin)
     pair.recover_paused()
         .with_params(|p| p.with_actor_id(admin))
@@ -106,4 +113,5 @@ async fn treasury_payout_recovery_send_token1() {
         fee0_after.is_zero() && fee1_after.is_zero(),
         "treasury fees must be cleared after recovery"
     );
+    assert!(!lp_vft.is_paused().await.unwrap());
 }

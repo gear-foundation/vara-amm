@@ -360,3 +360,453 @@ pub fn get_amount_in(
 
     Ok(amount_in)
 }
+
+#[cfg(test)]
+mod prop_tests {
+    use crate::pair::amm_math::{
+        FEE_DENOM_BPS, calculate_liquidity, calculate_optimal_amounts, get_amount_in,
+        get_amount_in_with_treasury, get_amount_out, get_amount_out_with_treasury, quote,
+    };
+    use proptest::prelude::*;
+    use sails_rs::U256;
+
+    fn u256_small() -> impl Strategy<Value = U256> {
+        (1u64..=u64::MAX / 2).prop_map(U256::from)
+    }
+
+    // quote
+
+    proptest! {
+        /// quote(0, _, _) must always return 0.
+        #[test]
+        fn prop_quote_zero_amount_returns_zero(
+            reserve_a in u256_small(),
+            reserve_b in u256_small(),
+        ) {
+            let result = quote(U256::zero(), reserve_a, reserve_b).unwrap();
+            prop_assert_eq!(result, U256::zero());
+        }
+
+        /// quote must error when either reserve is zero.
+        #[test]
+        fn prop_quote_zero_reserves_returns_error(amount_a in u256_small()) {
+            prop_assert!(quote(amount_a, U256::zero(), U256::from(1u64)).is_err());
+            prop_assert!(quote(amount_a, U256::from(1u64), U256::zero()).is_err());
+        }
+
+        /// Proportionality: doubling amount_a exactly doubles the result
+        /// (within floor-division rounding: result ∈ {2q, 2q+1}).
+        #[test]
+        fn prop_quote_linear_in_amount(
+            amount_a in (1u64..=u32::MAX as u64).prop_map(U256::from),
+            reserve_a in (1u64..=u32::MAX as u64).prop_map(U256::from),
+            reserve_b in (1u64..=u32::MAX as u64).prop_map(U256::from),
+        ) {
+            let q1 = quote(amount_a, reserve_a, reserve_b).unwrap();
+            let q2 = quote(amount_a * U256::from(2u64), reserve_a, reserve_b).unwrap();
+            // Due to floor division: 2*q1 <= q2 <= 2*q1 + 1
+            prop_assert!(q2 >= q1 * U256::from(2u64));
+            prop_assert!(q2 <= q1 * U256::from(2u64) + U256::from(1u64));
+        }
+
+        /// quote is monotonically non-decreasing in amount_a.
+        #[test]
+        fn prop_quote_monotone_in_amount(
+            amount_a in (1u64..=u32::MAX as u64).prop_map(U256::from),
+            delta in (0u64..=1000u64).prop_map(U256::from),
+            reserve_a in (1u64..=u32::MAX as u64).prop_map(U256::from),
+            reserve_b in (1u64..=u32::MAX as u64).prop_map(U256::from),
+        ) {
+            let q1 = quote(amount_a, reserve_a, reserve_b).unwrap();
+            let q2 = quote(amount_a + delta, reserve_a, reserve_b).unwrap();
+            prop_assert!(q2 >= q1);
+        }
+    }
+
+    // get_amount_out
+    proptest! {
+        /// Output is always strictly less than reserve_out (pool can't be drained).
+        #[test]
+        fn prop_get_amount_out_less_than_reserve(
+            amount_in in u256_small(),
+            reserve_in in u256_small(),
+            reserve_out in u256_small(),
+        ) {
+            if let Ok(out) = get_amount_out(amount_in, reserve_in, reserve_out) {
+                prop_assert!(out < reserve_out);
+            }
+        }
+
+        /// Output is strictly positive for positive inputs and reserves.
+        #[test]
+        fn prop_get_amount_out_positive(
+            amount_in in u256_small(),
+            reserve_in in u256_small(),
+            reserve_out in u256_small(),
+        ) {
+            if let Ok(out) = get_amount_out(amount_in, reserve_in, reserve_out) {
+                prop_assert!(out > U256::zero());
+            }
+        }
+        /// Monotone: larger input → at least as large output.
+        #[test]
+        fn prop_get_amount_out_monotone(
+            amount_in in (1u64..=u32::MAX as u64).prop_map(U256::from),
+            delta in (1u64..=1000u64).prop_map(U256::from),
+            reserve_in in (1u64..=u32::MAX as u64).prop_map(U256::from),
+            reserve_out in (1u64..=u32::MAX as u64).prop_map(U256::from),
+        ) {
+            if let (Ok(out1), Ok(out2)) = (
+                get_amount_out(amount_in, reserve_in, reserve_out),
+                get_amount_out(amount_in + delta, reserve_in, reserve_out),
+            ) {
+                prop_assert!(out2 >= out1);
+            }
+        }
+
+        /// Zero input must return an error.
+        #[test]
+        fn prop_get_amount_out_zero_input_is_err(
+            reserve_in in u256_small(),
+            reserve_out in u256_small(),
+        ) {
+            prop_assert!(get_amount_out(U256::zero(), reserve_in, reserve_out).is_err());
+        }
+    }
+
+    // get_amount_in
+    proptest! {
+        /// Required input is always > 0 for valid parameters.
+        #[test]
+        fn prop_get_amount_in_positive(
+            amount_out in (1u64..=u32::MAX as u64).prop_map(U256::from),
+            reserve_in in (1u64..=u32::MAX as u64).prop_map(U256::from),
+            reserve_out in (1u64..=u32::MAX as u64).prop_map(U256::from),
+        ) {
+            // Only test where amount_out < reserve_out
+            let amount_out = if amount_out >= reserve_out {
+                reserve_out / U256::from(2u64)
+            } else {
+                amount_out
+            };
+            if amount_out.is_zero() { return Ok(()); }
+
+            if let Ok(r_in) = get_amount_in(amount_out, reserve_in, reserve_out) {
+                prop_assert!(r_in > U256::zero());
+            }
+        }
+
+        /// amount_out >= reserve_out must always fail (pool invariant).
+        #[test]
+        fn prop_get_amount_in_output_exceeds_reserve_is_err(
+            reserve_out in u256_small(),
+            excess in (0u64..=100u64).prop_map(U256::from),
+            reserve_in in u256_small(),
+        ) {
+            let bad_out = reserve_out + excess;
+            prop_assert!(get_amount_in(bad_out, reserve_in, reserve_out).is_err());
+        }
+
+        /// Round-trip: get_amount_in then get_amount_out must yield ≥ amount_out.
+        ///
+        /// i.e., if you pay `amount_in = get_amount_in(desired_out, ...)`,
+        /// then `get_amount_out(amount_in, ...)` >= desired_out.
+        #[test]
+        fn prop_amount_in_out_roundtrip(
+            amount_out in (1u64..=1_000_000u64).prop_map(U256::from),
+            reserve_in in (1_000_000u64..=u32::MAX as u64).prop_map(U256::from),
+            reserve_out in (1_000_000u64..=u32::MAX as u64).prop_map(U256::from),
+        ) {
+            let amount_out = if amount_out >= reserve_out {
+                return Ok(());
+            } else {
+                amount_out
+            };
+
+            if let Ok(amount_in) = get_amount_in(amount_out, reserve_in, reserve_out)
+                && let Ok(out_check) = get_amount_out(amount_in, reserve_in, reserve_out) {
+                    // Due to ceiling in get_amount_in, out_check must be >= amount_out
+                    prop_assert!(out_check >= amount_out,
+                        "round-trip failed: desired={}, got={}", amount_out, out_check);
+                }
+
+        }
+    }
+
+    // get_amount_out_with_treasury
+
+    proptest! {
+        /// treasury_fee + amount_in_for_pool == amount_in_total.
+        #[test]
+        fn prop_treasury_out_fee_plus_pool_eq_total(
+            amount_in in u256_small(),
+            reserve_in in u256_small(),
+            reserve_out in u256_small(),
+            treasury_bps in 0u64..=FEE_DENOM_BPS,
+        ) {
+            if let Ok((amount_in_for_pool, _amount_out, treasury_fee)) =
+                get_amount_out_with_treasury(amount_in, reserve_in, reserve_out, treasury_bps)
+            {
+                let reconstructed = amount_in_for_pool
+                    .checked_add(treasury_fee)
+                    .unwrap();
+                prop_assert_eq!(reconstructed, amount_in,
+                    "pool + treasury != total_in");
+            }
+        }
+
+        /// With zero treasury bps, treasury_fee must be zero.
+        #[test]
+        fn prop_treasury_out_zero_bps_no_fee(
+            amount_in in u256_small(),
+            reserve_in in u256_small(),
+            reserve_out in u256_small(),
+        ) {
+            if let Ok((_pool, _out, fee)) =
+                get_amount_out_with_treasury(amount_in, reserve_in, reserve_out, 0)
+            {
+                prop_assert_eq!(fee, U256::zero());
+            }
+        }
+
+        /// Output must be < reserve_out.
+        #[test]
+        fn prop_treasury_out_less_than_reserve(
+            amount_in in u256_small(),
+            reserve_in in u256_small(),
+            reserve_out in u256_small(),
+            treasury_bps in 0u64..FEE_DENOM_BPS,
+        ) {
+            if let Ok((_pool, out, _fee)) =
+                get_amount_out_with_treasury(amount_in, reserve_in, reserve_out, treasury_bps)
+            {
+                prop_assert!(out < reserve_out);
+            }
+        }
+
+        /// Higher treasury bps → less or equal output (more of the input is diverted).
+        #[test]
+        fn prop_treasury_out_higher_bps_less_output(
+            amount_in in (1_000u64..=u32::MAX as u64).prop_map(U256::from),
+            reserve_in in (1_000u64..=u32::MAX as u64).prop_map(U256::from),
+            reserve_out in (1_000u64..=u32::MAX as u64).prop_map(U256::from),
+            bps_low in 0u64..=50u64,
+            bps_high in 51u64..=500u64,
+        ) {
+            if let (Ok((_, out_low, _)), Ok((_, out_high, _))) = (
+                get_amount_out_with_treasury(amount_in, reserve_in, reserve_out, bps_low),
+                get_amount_out_with_treasury(amount_in, reserve_in, reserve_out, bps_high),
+            ) {
+                prop_assert!(out_low >= out_high,
+                    "higher bps should yield <= output: low_bps={bps_low} out={out_low}, high_bps={bps_high} out={out_high}");
+            }
+        }
+    }
+
+    // get_amount_in_with_treasury
+
+    proptest! {
+        /// amount_in_total - amount_in_for_pool == treasury_fee.
+        #[test]
+        fn prop_treasury_in_total_minus_pool_eq_fee(
+            amount_out in (1u64..=1_000_000u64).prop_map(U256::from),
+            reserve_in in (1_000_000u64..=u32::MAX as u64).prop_map(U256::from),
+            reserve_out in (1_000_000u64..=u32::MAX as u64).prop_map(U256::from),
+            treasury_bps in 0u64..=500u64,
+        ) {
+            let amount_out = if amount_out >= reserve_out { return Ok(()); } else { amount_out };
+
+            if let Ok((pool, total, fee)) =
+                get_amount_in_with_treasury(amount_out, reserve_in, reserve_out, treasury_bps)
+            {
+                let expected_fee = total.checked_sub(pool).unwrap();
+                prop_assert_eq!(fee, expected_fee);
+            }
+        }
+
+        /// amount_in_total >= amount_in_for_pool (treasury never makes total cheaper).
+        #[test]
+        fn prop_treasury_in_total_gte_pool(
+            amount_out in (1u64..=1_000_000u64).prop_map(U256::from),
+            reserve_in in (1_000_000u64..=u32::MAX as u64).prop_map(U256::from),
+            reserve_out in (1_000_000u64..=u32::MAX as u64).prop_map(U256::from),
+            treasury_bps in 0u64..=500u64,
+        ) {
+            let amount_out = if amount_out >= reserve_out { return Ok(()); } else { amount_out };
+
+            if let Ok((pool, total, _fee)) =
+                get_amount_in_with_treasury(amount_out, reserve_in, reserve_out, treasury_bps)
+            {
+                prop_assert!(total >= pool);
+            }
+        }
+
+        /// With zero treasury, total == pool and fee == 0.
+        #[test]
+        fn prop_treasury_in_zero_bps_no_fee(
+            amount_out in (1u64..=1_000_000u64).prop_map(U256::from),
+            reserve_in in (1_000_000u64..=u32::MAX as u64).prop_map(U256::from),
+            reserve_out in (1_000_000u64..=u32::MAX as u64).prop_map(U256::from),
+        ) {
+            let amount_out = if amount_out >= reserve_out { return Ok(()); } else { amount_out };
+
+            if let Ok((pool, total, fee)) =
+                get_amount_in_with_treasury(amount_out, reserve_in, reserve_out, 0)
+            {
+                prop_assert_eq!(fee, U256::zero());
+                prop_assert_eq!(pool, total);
+            }
+        }
+
+        /// Round-trip: if user pays amount_in_total, the pool part gets them >= amount_out.
+        #[test]
+        fn prop_treasury_in_roundtrip(
+            amount_out in (1u64..=100_000u64).prop_map(U256::from),
+            reserve_in in (10_000_000u64..=u32::MAX as u64).prop_map(U256::from),
+            reserve_out in (10_000_000u64..=u32::MAX as u64).prop_map(U256::from),
+            treasury_bps in 0u64..=500u64,
+        ) {
+            let amount_out = if amount_out >= reserve_out { return Ok(()); } else { amount_out };
+
+            if let Ok((pool_in, _total, _fee)) =
+                get_amount_in_with_treasury(amount_out, reserve_in, reserve_out, treasury_bps)
+                && let Ok(actual_out) = get_amount_out(pool_in, reserve_in, reserve_out) {
+                    prop_assert!(actual_out >= amount_out,
+                        "round-trip: desired={amount_out}, got={actual_out}");
+                }
+
+        }
+    }
+
+    // calculate_liquidity
+
+    proptest! {
+        /// First mint: liquidity > 0 only when sqrt(a*b) > MINIMUM_LIQUIDITY.
+        #[test]
+        fn prop_first_mint_positive_liquidity(
+            amount_a in (1_000_000u64..=u32::MAX as u64).prop_map(U256::from),
+            amount_b in (1_000_000u64..=u32::MAX as u64).prop_map(U256::from),
+        ) {
+            let result = calculate_liquidity(
+                U256::zero(), U256::zero(),
+                amount_a, amount_b,
+                U256::zero(),
+            );
+            if let Ok(liq) = result { prop_assert!(liq > U256::zero()) }
+        }
+
+        /// First mint returns error when product is too small (sqrt < 1000).
+        #[test]
+        fn prop_first_mint_too_small_returns_err(
+            // Both amounts = 1 → sqrt(1) = 1 < 1000
+            amount_a in (1u64..=30u64).prop_map(U256::from),
+            amount_b in (1u64..=30u64).prop_map(U256::from),
+        ) {
+            // sqrt(30*30) = 30 < 1000, so all combos here should err
+            let result = calculate_liquidity(
+                U256::zero(), U256::zero(),
+                amount_a, amount_b,
+                U256::zero(),
+            );
+            prop_assert!(result.is_err());
+        }
+
+        /// Subsequent mint: liquidity is proportional (min of liq_a, liq_b).
+        /// With balanced amounts, result must be > 0.
+        #[test]
+        fn prop_subsequent_mint_positive(
+            reserve in (1_000_000u64..=u32::MAX as u64).prop_map(U256::from),
+            add_a in (1_000u64..=100_000u64).prop_map(U256::from),
+            add_b in (1_000u64..=100_000u64).prop_map(U256::from),
+            total_supply in (1_000_000u64..=u32::MAX as u64).prop_map(U256::from),
+        ) {
+            if let Ok(liq) = calculate_liquidity(reserve, reserve, add_a, add_b, total_supply) {
+                prop_assert!(liq > U256::zero());
+            }
+        }
+
+        /// Subsequent mint: adding more tokens yields at least as much liquidity.
+        #[test]
+        fn prop_subsequent_mint_monotone(
+            reserve in (1_000_000u64..=u32::MAX as u64).prop_map(U256::from),
+            add_a in (1_000u64..=50_000u64).prop_map(U256::from),
+            extra in (0u64..=1_000u64).prop_map(U256::from),
+            add_b in (1_000u64..=50_000u64).prop_map(U256::from),
+            total_supply in (1_000_000u64..=u32::MAX as u64).prop_map(U256::from),
+        ) {
+            let liq1 = calculate_liquidity(reserve, reserve, add_a, add_b, total_supply);
+            let liq2 = calculate_liquidity(reserve, reserve, add_a + extra, add_b + extra, total_supply);
+
+            if let (Ok(l1), Ok(l2)) = (liq1, liq2) {
+                prop_assert!(l2 >= l1);
+            }
+        }
+    }
+
+    // calculate_optimal_amounts
+    proptest! {
+        /// For first liquidity addition (both reserves 0), output equals input.
+        #[test]
+        fn prop_optimal_first_add_passthrough(
+            amount_a in u256_small(),
+            amount_b in u256_small(),
+        ) {
+            let (a, b) = calculate_optimal_amounts(
+                U256::zero(), U256::zero(),
+                amount_a, amount_b,
+                U256::zero(), U256::zero(),
+            ).unwrap();
+            prop_assert_eq!(a, amount_a);
+            prop_assert_eq!(b, amount_b);
+        }
+
+        /// Result must satisfy: a <= amount_a_desired AND b <= amount_b_desired.
+        #[test]
+        fn prop_optimal_amounts_within_desired(
+            reserve in (1_000_000u64..=u32::MAX as u64).prop_map(U256::from),
+            desired_a in (1_000u64..=1_000_000u64).prop_map(U256::from),
+            desired_b in (1_000u64..=1_000_000u64).prop_map(U256::from),
+        ) {
+            let (a, b) = match calculate_optimal_amounts(
+                reserve, reserve,
+                desired_a, desired_b,
+                U256::zero(), U256::zero(),
+            ) {
+                Ok(v) => v,
+                Err(_) => return Ok(()),
+            };
+
+            prop_assert!(a <= desired_a, "a={a} > desired_a={desired_a}");
+            prop_assert!(b <= desired_b, "b={b} > desired_b={desired_b}");
+        }
+
+        /// Pool price invariant: a/b must equal reserve_a/reserve_b (within 1 unit rounding).
+        ///
+        /// Concretely: a * reserve_b == b * reserve_a  (or differ by at most reserve_b)
+        #[test]
+        fn prop_optimal_amounts_maintain_price_ratio(
+            reserve_a in (1_000_000u64..=u32::MAX as u64).prop_map(U256::from),
+            reserve_b in (1_000_000u64..=u32::MAX as u64).prop_map(U256::from),
+            desired_a in (1_000u64..=1_000_000u64).prop_map(U256::from),
+            desired_b in (1_000u64..=1_000_000u64).prop_map(U256::from),
+        ) {
+            let (a, b) = match calculate_optimal_amounts(
+                reserve_a, reserve_b,
+                desired_a, desired_b,
+                U256::zero(), U256::zero(),
+            ) {
+                Ok(v) => v,
+                Err(_) => return Ok(()),
+            };
+
+            // a / b ≈ reserve_a / reserve_b
+            // a * reserve_b ≈ b * reserve_a  (within 1 ULP of floor division)
+            let lhs = a.checked_mul(reserve_b).unwrap_or(U256::MAX);
+            let rhs = b.checked_mul(reserve_a).unwrap_or(U256::MAX);
+            let diff = if lhs >= rhs { lhs - rhs } else { rhs - lhs };
+
+            prop_assert!(diff <= reserve_b.max(reserve_a),
+                "price ratio violated: a={a}, b={b}, ra={reserve_a}, rb={reserve_b}, diff={diff}");
+        }
+    }
+}

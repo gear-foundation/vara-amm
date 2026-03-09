@@ -6,6 +6,7 @@ use services::lp_token::{LpService, state::LpTokenState};
 use services::pair::{self, Config, PairService, msg_tracker::MessageTracker};
 
 pub struct PairProgram {
+    admins: RefCell<Vec<ActorId>>,
     pair_state: RefCell<pair::State>,
     tracker: RefCell<MessageTracker>,
     lp: LpTokenState,
@@ -31,20 +32,21 @@ impl PairProgram {
             fee_to,
             factory_id,
             treasury_id,
-            admin_id,
             config,
             ..Default::default()
         };
+        let admins = vec![admin_id];
         sails_rs::gstd::msg::reply_bytes(b"", 0).expect("Error during msg reply");
         Self {
             pair_state: RefCell::new(pair_state),
             tracker: RefCell::new(MessageTracker::default()),
             lp,
+            admins: RefCell::new(admins),
         }
     }
 
     pub fn pair(&self) -> PairService<'_> {
-        PairService::new(&self.pair_state, &self.tracker, &self.lp)
+        PairService::new(&self.pair_state, &self.tracker, &self.lp, &self.admins)
     }
 
     pub fn vft(&self) -> LpService<'_> {
@@ -53,6 +55,7 @@ impl PairProgram {
             &self.lp.allowances,
             &self.lp.balances,
             &self.lp.metadata,
+            &self.admins,
         )
     }
 

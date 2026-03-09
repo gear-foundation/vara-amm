@@ -4,7 +4,7 @@ use crate::recovery::*;
 
 #[tokio::test]
 async fn add_liquidity_recovery() {
-    let system = System::new();
+    let system: System = System::new();
     system.init_logger();
     system.mint_to(ACTOR_ID, 1_000_000_000_000_000);
 
@@ -22,6 +22,7 @@ async fn add_liquidity_recovery() {
         env,
         mut pair,
         token_a_id,
+        lp_vft,
         ..
     } = deploy_pair_with_mocks(system, token_a, token_b).await;
 
@@ -46,11 +47,14 @@ async fn add_liquidity_recovery() {
     )
     .await;
 
+    assert!(lp_vft.is_paused().await.unwrap());
+
     pair.recover_paused()
         .with_params(|p| p.with_actor_id(user))
         .await
         .unwrap();
     assert_free(&pair).await;
+    assert!(!lp_vft.is_paused().await.unwrap());
 }
 
 #[tokio::test]
@@ -107,6 +111,8 @@ async fn remove_liquidity_recovery_unlock_b() {
     )
     .await;
 
+    assert!(lp_vft.is_paused().await.unwrap());
+
     pair.recover_paused()
         .with_params(|p| p.with_actor_id(user))
         .await
@@ -119,4 +125,5 @@ async fn remove_liquidity_recovery_unlock_b() {
     let lp_after = lp_vft.balance_of(user).await.unwrap();
     assert!(lp_after.is_zero());
     assert_free(&pair).await;
+    assert!(!lp_vft.is_paused().await.unwrap());
 }

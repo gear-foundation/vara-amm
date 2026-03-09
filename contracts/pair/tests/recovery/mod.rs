@@ -1,7 +1,6 @@
 use crate::*;
 use gtest::{Program, WasmProgram};
 use pair_client::{vft::VftImpl, LockCtx, LockState, Pair as PairClient, PairCtors};
-
 mod liquidity;
 mod migration;
 mod swap;
@@ -52,31 +51,31 @@ async fn assert_free(pair: &Service<PairImpl, GtestEnv>) {
     assert_eq!(lock, LockState::Free);
 }
 
-struct Deployed {
-    env: GtestEnv,
-    pair: Service<PairImpl, GtestEnv>,
-    lp_vft: Service<VftImpl, GtestEnv>,
-    token_a_id: u64,
-    token_b_id: u64,
+pub struct Deployed {
+    pub env: GtestEnv,
+    pub pair: Service<PairImpl, GtestEnv>,
+    pub lp_vft: Service<VftImpl, GtestEnv>,
+    pub token_a_id: u64,
+    pub token_b_id: u64,
 }
 
-fn vft_ok_tf() -> Vec<u8> {
+pub fn vft_ok_tf() -> Vec<u8> {
     ("Vft", "TransferFrom", true).encode()
 }
-fn vft_no_tf() -> Vec<u8> {
+pub fn vft_no_tf() -> Vec<u8> {
     ("Vft", "TransferFrom", false).encode()
 }
-fn vft_ok_t() -> Vec<u8> {
+pub fn vft_ok_t() -> Vec<u8> {
     ("Vft", "Transfer", true).encode()
 }
-fn vft_no_t() -> Vec<u8> {
+pub fn vft_no_t() -> Vec<u8> {
     ("Vft", "Transfer", false).encode()
 }
 
-fn vft_balance(value: U256) -> Vec<u8> {
+pub fn vft_balance(value: U256) -> Vec<u8> {
     ("Vft", "BalanceOf", value).encode()
 }
-async fn deploy_pair_with_mocks(
+pub async fn deploy_pair_with_mocks(
     system: System,
     token_a_replies: Vec<Vec<u8>>,
     token_b_replies: Vec<Vec<u8>>,

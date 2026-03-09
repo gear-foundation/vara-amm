@@ -6,6 +6,7 @@ use rand::prelude::*;
 pub mod liquidity;
 pub mod swaps;
 
+pub mod pause;
 pub mod recovery;
 
 mod utils;

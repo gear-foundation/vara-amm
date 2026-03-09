@@ -7,6 +7,7 @@ use awesome_sails_utils::{
     pause::{Pausable, PausableRef, Pause},
 };
 use awesome_sails_vft_metadata::{Metadata, VftMetadata, VftMetadataExposure};
+use gstd::msg;
 use sails_rs::{cell::RefCell, gstd::services::Service, prelude::*};
 
 use crate::services::lp_token::state::{LpAllowances, LpBalance, LpBalances};
@@ -18,6 +19,7 @@ pub struct LpService<'a> {
     allowances: &'a RefCell<LpAllowances>,
     balances: &'a RefCell<LpBalances>,
     metadata: &'a RefCell<Metadata>,
+    admins: &'a RefCell<Vec<ActorId>>,
 }
 
 impl<'a> LpService<'a> {
@@ -26,12 +28,14 @@ impl<'a> LpService<'a> {
         allowances: &'a RefCell<LpAllowances>,
         balances: &'a RefCell<LpBalances>,
         metadata: &'a RefCell<Metadata>,
+        admins: &'a RefCell<Vec<ActorId>>,
     ) -> Self {
         Self {
             pause,
             allowances,
             balances,
             metadata,
+            admins,
         }
     }
 
@@ -41,6 +45,18 @@ impl<'a> LpService<'a> {
 
     fn balances_ref(&self) -> PausableRef<'_, LpBalances> {
         Pausable::new(self.pause, StorageRefCell::new(self.balances))
+    }
+
+    pub fn is_admin(&self, account: &ActorId) -> bool {
+        let admins = self.admins.borrow();
+        admins.contains(account)
+    }
+
+    fn ensure_admin(&self) {
+        let caller = msg::source();
+        if !self.is_admin(&caller) {
+            panic!("Not admin")
+        }
     }
 }
 
@@ -69,6 +85,8 @@ pub enum Event {
         from: ActorId,
         value: U256,
     },
+    Paused,
+    Resumed,
 }
 
 #[service(events = Event)]
@@ -223,5 +241,61 @@ impl LpService<'_> {
     pub fn total_supply(&self) -> Result<U256, Error> {
         let b = self.balances_ref();
         Ok(b.get()?.total_supply())
+    }
+
+    #[export]
+    pub fn pause(&mut self) {
+        self.ensure_admin();
+
+        if self.pause.pause() {
+            self.emit_event(Event::Paused)
+                .expect("Error during event emission")
+        }
+    }
+
+    #[export]
+    pub fn resume(&mut self) {
+        self.ensure_admin();
+
+        if self.pause.resume() {
+            self.emit_event(Event::Resumed)
+                .expect("Error during event emission")
+        }
+    }
+
+    #[export]
+    pub fn is_paused(&self) -> bool {
+        self.pause.is_paused()
+    }
+
+    #[export(unwrap_result)]
+    pub fn append_balances_shard(&mut self, capacity: u32) -> Result<(), Error> {
+        self.ensure_admin();
+        self.balances
+            .borrow_mut()
+            .try_append_shard(capacity as usize)?;
+        Ok(())
+    }
+
+    #[export(unwrap_result)]
+    pub fn append_allowances_shard(&mut self, capacity: u32) -> Result<(), Error> {
+        self.ensure_admin();
+        self.allowances
+            .borrow_mut()
+            .try_append_shard(capacity as usize)?;
+
+        Ok(())
+    }
+
+    #[export]
+    pub fn alloc_next_balances_shard(&mut self) -> bool {
+        self.ensure_admin();
+        self.balances.borrow_mut().allocate_next_shard()
+    }
+
+    #[export]
+    pub fn alloc_next_allowances_shard(&mut self) -> bool {
+        self.ensure_admin();
+        self.allowances.borrow_mut().allocate_next_shard()
     }
 }

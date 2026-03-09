@@ -1,5 +1,5 @@
 use crate::recovery::*;
-
+use pair_client::vft::Vft;
 #[tokio::test]
 async fn swap_recovery_exact_input_a_to_b() {
     let system = System::new();
@@ -20,6 +20,7 @@ async fn swap_recovery_exact_input_a_to_b() {
         env,
         mut pair,
         token_a_id,
+        lp_vft,
         ..
     } = deploy_pair_with_mocks(system, token_a, token_b).await;
 
@@ -52,11 +53,14 @@ async fn swap_recovery_exact_input_a_to_b() {
     )
     .await;
 
+    assert!(lp_vft.is_paused().await.unwrap());
+
     pair.recover_paused()
         .with_params(|p| p.with_actor_id(user))
         .await
         .unwrap();
     assert_free(&pair).await;
+    assert!(!lp_vft.is_paused().await.unwrap());
 }
 
 #[tokio::test]
@@ -76,6 +80,7 @@ async fn swap_recovery_exact_input_b_to_a() {
     let Deployed {
         env,
         mut pair,
+        lp_vft,
         token_b_id,
         ..
     } = deploy_pair_with_mocks(system, token_a, token_b).await;
@@ -109,11 +114,14 @@ async fn swap_recovery_exact_input_b_to_a() {
     )
     .await;
 
+    assert!(lp_vft.is_paused().await.unwrap());
+
     pair.recover_paused()
         .with_params(|p| p.with_actor_id(user))
         .await
         .unwrap();
     assert_free(&pair).await;
+    assert!(!lp_vft.is_paused().await.unwrap());
 }
 
 #[tokio::test]
@@ -131,6 +139,7 @@ async fn swap_recovery_exact_output_a_to_b() {
     let Deployed {
         env,
         mut pair,
+        lp_vft,
         token_a_id,
         ..
     } = deploy_pair_with_mocks(system, token_a, token_b).await;
@@ -165,11 +174,14 @@ async fn swap_recovery_exact_output_a_to_b() {
     )
     .await;
 
+    assert!(lp_vft.is_paused().await.unwrap());
+
     pair.recover_paused()
         .with_params(|p| p.with_actor_id(user))
         .await
         .unwrap();
     assert_free(&pair).await;
+    assert!(!lp_vft.is_paused().await.unwrap());
 }
 
 #[tokio::test]
@@ -187,6 +199,7 @@ async fn swap_recovery_exact_output_b_to_a() {
     let Deployed {
         env,
         mut pair,
+        lp_vft,
         token_b_id,
         ..
     } = deploy_pair_with_mocks(system, token_a, token_b).await;
@@ -221,9 +234,12 @@ async fn swap_recovery_exact_output_b_to_a() {
     )
     .await;
 
+    assert!(lp_vft.is_paused().await.unwrap());
+
     pair.recover_paused()
         .with_params(|p| p.with_actor_id(user))
         .await
         .unwrap();
     assert_free(&pair).await;
+    assert!(!lp_vft.is_paused().await.unwrap());
 }
