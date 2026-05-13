@@ -37,7 +37,7 @@ async fn test_failed_swap_does_not_change_treasury() {
 
     let (reserve_a, _) = env.get_reserves().await;
     // Swap more tokens then user has
-    let amount_in = calculate_swap_amount_from_percent(reserve_a, 50); // 50% пула
+    let amount_in = calculate_swap_amount_from_percent(reserve_a, 50); // 50% of the pool
 
     let min_amount_out = U256::zero();
 

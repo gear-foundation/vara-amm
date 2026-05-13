@@ -1,6 +1,6 @@
 use crate::*;
 
-/// Setup initial liquidity for any test (ОБЩАЯ функция)
+/// Shared helper to set up initial liquidity for any test.
 pub async fn setup_initial_liquidity(
     env: &mut TestEnv,
     user: ActorId,
