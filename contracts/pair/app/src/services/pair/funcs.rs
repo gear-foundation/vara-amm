@@ -204,7 +204,7 @@ impl<'a> PairService<'a> {
 
         let (token0, token1, config, amount_a, amount_b) = self.with_state_mut(
             |st| -> Result<(ActorId, ActorId, Config, U256, U256), PairError> {
-                // protocol fee (view) — не меняем state
+                // Protocol fee is a read-only calculation; state is not changed.
                 let lp_protocol_fee = calculate_protocol_fee(st, total_supply)?;
 
                 // Calculate proportional amounts of underlying tokens to return
@@ -398,7 +398,7 @@ impl<'a> PairService<'a> {
         is_token0_to_token1: bool,
         deadline: u64,
     ) -> Result<PairEvent, PairError> {
-        // ---------- PREPARE: читаем state копиями и валидируем ----------
+        // ---------- PREPARE: copy state and validate ----------
         let (token_in, token_out, reserve_in, reserve_out, treasury_fee_bps) =
             self.with_state(|st| {
                 if st.migrated {
@@ -584,7 +584,7 @@ impl<'a> PairService<'a> {
             },
         )?;
 
-        // ---------- IO (await) — без borrow state ----------
+        // ---------- IO (await): no state borrow ----------
         self.execute_swap_transfers(
             sender,
             token_in,
@@ -595,7 +595,7 @@ impl<'a> PairService<'a> {
         )
         .await?;
 
-        // ---------- FINALIZE (короткий borrow) ----------
+        // ---------- FINALIZE: short borrow ----------
         self.with_state_mut(|st| {
             st.reserve0 = finalize.new_reserve0;
             st.reserve1 = finalize.new_reserve1;
