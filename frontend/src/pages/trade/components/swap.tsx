@@ -8,7 +8,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 
 import { TokenIcon, TokenSelector, Button, Input, Card, CardContent, CardHeader, Wallet } from '@/components';
-import { INPUT_PERCENTAGES, SECONDS_IN_MINUTE, SLIPPAGE, VERIFIED_TOKENS } from '@/consts';
+import { ENV, INPUT_PERCENTAGES, SECONDS_IN_MINUTE, SLIPPAGE, VERIFIED_TOKENS } from '@/consts';
 import { usePairsBalances, usePairsReserves } from '@/features/pair';
 import { useVaraTokenAddress } from '@/features/pair/hooks';
 import { createSwapValidationSchema, SwapFormData } from '@/features/pair/schema';
@@ -22,6 +22,7 @@ import {
   parseUnits,
 } from '@/features/pair/utils';
 import { useSignAndSend } from '@/hooks/use-sign-and-send';
+import { ensureGasVoucher } from '@/lib/gas-voucher';
 import {
   useApproveMessage,
   useSwapExactTokensForTokensMessage,
@@ -31,6 +32,7 @@ import {
   useGetReservesQuery,
 } from '@/lib/sails';
 import { getErrorMessage } from '@/lib/utils';
+import { wrapGearSendMessageWithVoucher } from '@/lib/voucher-tx';
 
 type TradePageProps = {
   pairsTokens: PairsTokens;
@@ -237,7 +239,25 @@ export function Swap({ pairsTokens, refetchBalances }: TradePageProps) {
         if (burnTx) transactions.push(burnTx.extrinsic);
       }
 
-      const extrinsic = api.tx.utility.batchAll(transactions);
+      const maxNativeVaraBalanceForVoucher = parseUnits(ENV.MAX_NATIVE_VARA_BALANCE_FOR_VOUCHER, 12);
+      const shouldUseVoucher =
+        !!ENV.VOUCHER_API_URL &&
+        !!ENV.VUSDT_TOKEN_PROGRAM_ID &&
+        fromTokenAddress.toLowerCase() === ENV.VUSDT_TOKEN_PROGRAM_ID.toLowerCase() &&
+        !!toToken.isVaraNative &&
+        (toToken.balance ?? 0n) <= maxNativeVaraBalanceForVoucher;
+
+      if (shouldUseVoucher && !varaTokenAddress) {
+        throw new Error('VARA token program is not available for sponsored swap.');
+      }
+
+      const voucherId = shouldUseVoucher
+        ? await ensureGasVoucher(account.address, [fromTokenAddress, pairAddress, varaTokenAddress!])
+        : null;
+
+      const extrinsic = api.tx.utility.batchAll(
+        voucherId ? transactions.map((tx) => wrapGearSendMessageWithVoucher(api, tx, voucherId)) : transactions,
+      );
       await signAndSend.mutateAsync({ extrinsic });
 
       alert.success('Swap successful');
