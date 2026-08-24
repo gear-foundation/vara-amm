@@ -81,24 +81,6 @@ const Buy = () => {
             <div className="text-xs text-gray-400 group-hover:text-[#00FF85]">→</div>
           </a>
 
-          {/* MEXC */}
-          <a
-            href="https://www.mexc.com/price/VARA"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-between p-4 rounded-lg border border-gray-500/20 hover:border-[#00FF85]/50 hover:bg-gray-500/5 transition-all group cursor-pointer">
-            <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">M</span>
-              </div>
-              <div className="text-left">
-                <div className="font-medium theme-text">MEXC</div>
-                <div className="text-xs text-gray-400">Low fees</div>
-              </div>
-            </div>
-            <div className="text-xs text-gray-400 group-hover:text-[#00FF85]">→</div>
-          </a>
-
           {/* BitMart */}
           <a
             href="https://www.bitmart.com/trade/?type=spot&symbol=VARA_USDT"
