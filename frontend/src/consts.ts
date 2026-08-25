@@ -4,6 +4,13 @@ export const ENV = {
   NODE_ADDRESS: import.meta.env.VITE_NODE_ADDRESS as string,
   EXPLORER_URL: import.meta.env.VITE_EXPLORER_URL as string,
   FACTORY_PROGRAM_ID: import.meta.env.VITE_FACTORY_PROGRAM_ID as HexString,
+  VOUCHER_API_URL: import.meta.env.VITE_VOUCHER_API_URL as string | undefined,
+  VUSDT_TOKEN_PROGRAM_ID: import.meta.env.VITE_VUSDT_TOKEN_PROGRAM_ID as HexString | undefined,
+  VARA_TOKEN_PROGRAM_ID: import.meta.env.VITE_VARA_TOKEN_PROGRAM_ID as HexString | undefined,
+  MAX_NATIVE_VARA_BALANCE_FOR_VOUCHER:
+    (import.meta.env.VITE_MAX_NATIVE_VARA_BALANCE_FOR_VOUCHER as string | undefined) ||
+    (import.meta.env.VITE_MIN_NATIVE_VARA_BALANCE as string | undefined) ||
+    '1',
 };
 
 export const ROUTES = {
@@ -30,12 +37,14 @@ export const LOGO_URI_BY_SYMBOL: Record<string, string> = {
 };
 
 export const VERIFIED_TOKENS: HexString[] = [
+  ENV.VARA_TOKEN_PROGRAM_ID,
+  ENV.VUSDT_TOKEN_PROGRAM_ID,
   '0xd0f89cfd994c92bb743a5a69049609b796e2026e05318f7eef621a5e31df3d4b', // WTVARA
   '0xba764e2836b28806be10fe6f674d89d1e0c86898d25728f776588f03bddc6f58', // WETH
   '0x9f332e61589e0850dce6d8e6070ea5618de33d9f134a4a35d6d1164dc9002f48', // WUSDC
   '0x464511231a1afe9108a689ed3dbbb047ca308d6f5dfb86453e4df5612a2d668a', // WUSDT
   '0xc1ec06d99efcffd863f9c2ad2bc76f656aff861acf06f438046c64e5b41e3fd9', // WBTC
-];
+].filter(Boolean) as HexString[];
 
 export const PRIORITY_TOKEN_SYMBOLS = ['VARA', 'WBTC', 'WETH', 'WUSDT', 'WUSDC'];
 
