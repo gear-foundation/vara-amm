@@ -9,6 +9,7 @@ const routes = [
   { path: ROUTES.TRADE, Page: lazy(() => import('./trade')) },
   { path: ROUTES.EXPLORE, Page: lazy(() => import('./explore')) },
   { path: ROUTES.POOL, Page: lazy(() => import('./pool')) },
+  { path: ROUTES.FUTURES, Page: lazy(() => import('./futures')) },
 ];
 
 export function Routing() {

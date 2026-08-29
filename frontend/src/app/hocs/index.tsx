@@ -9,6 +9,7 @@ import { BrowserRouter } from 'react-router-dom';
 
 import { ThemeProvider } from '@/components/theme-provider';
 import { Alert, alertStyles } from '@/components/ui/alert';
+import { SimWsProvider } from '@/features/sim';
 
 import { ENV } from '../../consts';
 
@@ -33,7 +34,15 @@ function AlertProvider({ children }: ProviderProps) {
   );
 }
 
-const providers = [BrowserRouter, ApiProvider, QueryProvider, AccountProvider, ThemeProvider, AlertProvider];
+const providers = [
+  BrowserRouter,
+  ApiProvider,
+  QueryProvider,
+  AccountProvider,
+  ThemeProvider,
+  AlertProvider,
+  SimWsProvider,
+];
 
 function withProviders(Component: ComponentType) {
   return () => providers.reduceRight((children, Provider) => <Provider>{children}</Provider>, <Component />);

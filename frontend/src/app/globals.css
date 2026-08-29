@@ -261,7 +261,7 @@
 
   .nav-bg {
     backdrop-filter: blur(12px);
-    @apply sticky top-0 z-10;
+    @apply sticky top-0 z-50;
   }
 
   .dark .nav-bg {
@@ -288,5 +288,84 @@
 
   .theme-text:hover {
     color: #00ff85 !important;
+  }
+
+  /* Futures specific styles */
+  .futures-slider {
+    @apply appearance-none bg-transparent cursor-pointer;
+  }
+
+  .futures-slider::-webkit-slider-track {
+    @apply h-1 rounded-full;
+    background: linear-gradient(to right, #00ff85 0%, rgba(255, 255, 255, 0.1) 0%);
+  }
+
+  .futures-slider::-webkit-slider-thumb {
+    @apply appearance-none w-4 h-4 rounded-full bg-[#00ff85] cursor-pointer;
+    margin-top: -6px;
+  }
+
+  .futures-slider::-moz-range-track {
+    @apply h-1 rounded-full bg-gray-500/20;
+  }
+
+  .futures-slider::-moz-range-thumb {
+    @apply w-4 h-4 rounded-full bg-[#00ff85] border-none cursor-pointer;
+  }
+
+  .long-btn {
+    @apply bg-green-500 hover:bg-green-600 text-white;
+  }
+
+  .short-btn {
+    @apply bg-red-500 hover:bg-red-600 text-white;
+  }
+
+  /* Custom scrollbar for tables */
+  .custom-scrollbar::-webkit-scrollbar {
+    @apply w-2 h-2;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply rounded-full;
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
+
+  /* TradingView chart styles */
+  .tradingview-chart-container {
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background-color: #131722;
+    position: relative;
+  }
+
+  /* Скрываем внутренний бордер iframe через position */
+  .tradingview-chart-container > div {
+    border: none !important;
+    outline: none !important;
+    position: relative !important;
+    top: -2px !important;
+    left: -2px !important;
+    width: calc(100% + 4px) !important;
+    height: calc(100% + 4px) !important;
+  }
+
+  .tradingview-chart-container iframe {
+    border: none !important;
+    outline: none !important;
+    position: relative !important;
+    top: -2px !important;
+    left: -2px !important;
+    width: calc(100% + 4px) !important;
+    height: calc(100% + 4px) !important;
   }
 }
